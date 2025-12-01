@@ -30,14 +30,14 @@ A DIP is a design document providing information to the Datacore community about
 ## DIP Workflow
 
 ```
-1. Fork datacore repo
-2. Copy dips/DIP-0000-template.md to dips/DIP-XXXX-title.md
+1. Fork datacore-dips repo
+2. Copy DIP-0000-template.md to DIP-XXXX-title.md
 3. Fill in the template
 4. Submit PR with status: Draft
 5. Community discussion on PR
 6. Maintainers move to Review
 7. Accept/Reject decision
-8. Implementation PR(s)
+8. Implementation PR(s) to relevant repos
 9. Status updated to Implemented
 ```
 
@@ -75,6 +75,7 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 | [0000](DIP-0000-template.md) | DIP Template | Process | Implemented |
 | [0001](DIP-0001-contribution-model.md) | Contribution Model | Process | Implemented |
 | [0002](DIP-0002-layered-context-pattern.md) | Layered Context Pattern | Core | Implemented |
+| [0003](DIP-0003-scaffolding-pattern.md) | Scaffolding Pattern | Core | Draft |
 
 ## Contributing
 
