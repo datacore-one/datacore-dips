@@ -277,6 +277,123 @@ New agents:
 2. Add missing project docs as stubs
 3. Document contribution workflow
 
+## Conventions
+
+### Naming Conventions
+
+| Document Type | Convention | Examples |
+|--------------|------------|----------|
+| **Scaffolding documents** | Title Case | `Mission.md`, `Values.md`, `Brand-Guidelines.md` |
+| **Regular notes** | lowercase | `meeting-notes.md`, `competitor-analysis.md` |
+| **Index files** | `_index.md` | `zettel/_index.md`, `pages/_core/_index.md` |
+
+Scaffolding documents are foundational - the only content files using Title Case naming.
+
+### Frontmatter Standard
+
+All scaffolding documents require this frontmatter:
+
+```yaml
+---
+scaffolding: required|recommended
+category: identity|strategy|brand|sensing|memory|reasoning|action|learning|coordination|metrics
+status: draft|review|active
+created: YYYY-MM-DD
+reviewer: null
+reviewed_date: null
+---
+```
+
+**Field Definitions:**
+
+| Field | Values | Purpose |
+|-------|--------|---------|
+| `scaffolding` | `required`, `recommended` | Importance level |
+| `category` | One of 10 categories | Document classification |
+| `status` | `draft`, `review`, `active` | Lifecycle stage |
+| `created` | `YYYY-MM-DD` | Creation date |
+| `reviewer` | Name or `null` | Who reviewed |
+| `reviewed_date` | `YYYY-MM-DD` or `null` | When reviewed |
+
+### Status Lifecycle
+
+```
+┌─────────┐     ┌─────────┐     ┌─────────┐
+│  draft  │ ──► │ review  │ ──► │ active  │
+└─────────┘     └─────────┘     └─────────┘
+     ▲               │               │
+     │               │               │
+     └───────────────┴───────────────┘
+           (revision needed)
+```
+
+**Status Definitions:**
+
+| Status | Meaning | Who Can Change |
+|--------|---------|----------------|
+| `draft` | AI-generated or work in progress | AI agents |
+| `review` | Ready for human review | Human (marks ready) |
+| `active` | Approved and in use | Human only |
+
+**Key Rule**: Only humans can change status to `active`. AI agents can create drafts but cannot approve documents.
+
+### Source Attribution
+
+Every AI-generated document includes attribution at the bottom:
+
+```markdown
+---
+
+*Source: Consolidated from [Source 1], [Source 2], and [N] zettels*
+```
+
+This enables:
+- Traceability to original content
+- Review of synthesis quality
+- Identification of gaps in source material
+
+### Multi-Source Synthesis
+
+AI agents must synthesize from multiple sources (minimum 2) when generating scaffolding documents:
+
+```
+Source 1 (zettel) + Source 2 (personal notes) + Source 3 (research)
+= Synthesized scaffolding document with attribution
+```
+
+Single-source generation results in thin documents and should be avoided.
+
+### Index-First Approach
+
+Before deep content scans, ensure `_index.md` files exist in key folders:
+
+| Folder | Index Purpose |
+|--------|---------------|
+| `3-knowledge/zettel/` | Zettel navigation |
+| `3-knowledge/pages/_core/` | Core docs overview |
+| `3-knowledge/literature/` | Literature structure |
+| `3-knowledge/reference/` | Reference hub |
+| `1-tracks/ops/metrics/` | Metrics dashboard |
+
+Indexes enable link-following topic discovery, which is more powerful than keyword-only search.
+
+### Link-Following Discovery
+
+Rather than keyword-only search, agents should:
+
+1. Identify seed documents for each category
+2. Follow wiki-links to connected concepts
+3. Build topic clusters from link traversal
+4. Capture related insights found along the way
+
+**Example:**
+```
+Start: [[Datafund-Core-Purpose]]
+  → Follow: [[Fair-Data-Society-In-Datafund]]
+    → Follow: [[Data-Ownership-and-Control]]
+      → Discover: Values and principles content
+```
+
 ## Open Questions
 
 1. Should scaffolding coverage be a space health metric?
