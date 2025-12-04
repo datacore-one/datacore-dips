@@ -76,6 +76,9 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 | [0001](DIP-0001-contribution-model.md) | Contribution Model | Process | Implemented |
 | [0002](DIP-0002-layered-context-pattern.md) | Layered Context Pattern | Core | Implemented |
 | [0003](DIP-0003-scaffolding-pattern.md) | Scaffolding Pattern | Core | Draft |
+| [0004](DIP-0004-knowledge-database.md) | Knowledge Database | Core | Draft |
+| [0008](DIP-0008-task-sync-architecture.md) | Task Sync Architecture | Core | Draft |
+| [0009](DIP-0009-gtd-specification.md) | GTD System Specification | Core | Draft |
 
 ## Contributing
 
