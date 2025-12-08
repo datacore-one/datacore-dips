@@ -1,8 +1,8 @@
-# DIP-0008: Task Sync Architecture
+# DIP-0010: Task Sync Architecture
 
 | Field | Value |
 |-------|-------|
-| **DIP** | 0008 |
+| **DIP** | 0010 |
 | **Title** | Task Sync Architecture |
 | **Status** | Draft - NEEDS REVIEW |
 | **Created** | 2025-12-04 |
@@ -534,6 +534,77 @@ sync:
 - **Email sync**: Tasks from email (via n8n)
 - **Calendar sync**: Deadlines ↔ calendar events
 - **Mobile app**: Task capture → sync to org-mode
+
+### 11. Tag Governance
+
+To ensure consistent tag usage and prevent tag proliferation/variants, maintain a **canonical tag reference list**.
+
+#### 11.1 Tag Registry
+
+Location: `.datacore/config/tags.yaml`
+
+```yaml
+# Canonical org-mode tags with descriptions and mappings
+tags:
+  # AI delegation tags
+  AI:
+    description: "General AI-delegatable task"
+    external_label: "ai-task"
+    variants_to_avoid: ["ai", "AI-task", "automation"]
+
+  "AI:content":
+    description: "Content generation (blog, email, docs)"
+    external_label: "ai-content"
+    agent: gtd-content-writer
+
+  "AI:research":
+    description: "Research and analysis tasks"
+    external_label: "ai-research"
+    agent: gtd-research-processor
+
+  "AI:data":
+    description: "Data processing and reporting"
+    external_label: "ai-data"
+    agent: gtd-data-analyzer
+
+  "AI:pm":
+    description: "Project management tasks"
+    external_label: "ai-pm"
+    agent: gtd-project-manager
+
+  # Context tags
+  "@gregor":
+    description: "Assigned to Gregor"
+    external_label: "assignee:gregor"
+
+  "@crt":
+    description: "Assigned to Črt"
+    external_label: "assignee:crtahlin"
+
+  # Category tags
+  # ... (extend as needed)
+```
+
+#### 11.2 Tag Validation
+
+Agents and sync engine should:
+
+1. **Warn on unknown tags** - Flag tags not in registry
+2. **Suggest corrections** - "Did you mean `:AI:content:` instead of `:ai-content:`?"
+3. **Auto-normalize** - Convert known variants to canonical form
+4. **Report tag drift** - Weekly report of new/unlisted tags
+
+#### 11.3 Tag Mapping
+
+When syncing between org-mode and external tools:
+
+| Org-mode Tag | GitHub Label | Asana Tag |
+|--------------|--------------|-----------|
+| `:AI:` | `ai-task` | `AI Task` |
+| `:AI:research:` | `ai-research` | `AI Research` |
+| `[#A]` | `priority-high` | `High Priority` |
+| `[#B]` | `priority-medium` | `Medium Priority` |
+| `[#C]` | `priority-low` | `Low Priority` |
 
 ## Open Questions
 

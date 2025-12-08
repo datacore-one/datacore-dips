@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0004 |
 | **Title** | Knowledge Database |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2025-12-02 |
 | **Author** | Claude (AI-assisted) |
 | **Affects** | All agents, /today, /wrap-up, /tomorrow, /diagnostic |

@@ -6,7 +6,7 @@
 | **Title** | Scaffolding Pattern |
 | **Author** | Gregor |
 | **Type** | Standard |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2025-12-01 |
 | **Updated** | 2025-12-01 |
 | **Tags** | `scaffolding`, `knowledge`, `projects`, `modules` |

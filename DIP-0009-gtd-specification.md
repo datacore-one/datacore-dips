@@ -296,7 +296,7 @@ Related: [[Wiki Link 1]], [[Wiki Link 2]]
               ▲            ▲            ▲
               └────────────┴────────────┘
                     Bidirectional sync
-                    (via DIP-0008)
+                    (via DIP-0010)
 ```
 
 ### Core Execution Engine
@@ -433,7 +433,7 @@ Related: [[Wiki Link 1]], [[Wiki Link 2]]
 
 | Module | Purpose | DIP |
 |--------|---------|-----|
-| `task-sync` | GitHub, Asana, Calendar sync | DIP-0008 |
+| `task-sync` | GitHub, Asana, Calendar sync | DIP-0010 |
 | `trading` | Trading-specific workflows | - |
 | `meetings` | Meeting lifecycle, questions | DIP-0006 |
 
@@ -450,7 +450,7 @@ Registration via `module-registrar` agent.
 
 ## Part 7: External Integration
 
-### Sync Architecture (DIP-0008)
+### Sync Architecture (DIP-0010)
 
 Org-mode is the source of truth. External tools sync bidirectionally.
 
@@ -500,7 +500,7 @@ org-mode ←→ Sync Engine ←→ Adapter ←→ External Tool
 - Extract optional components to modules
 - Document module creation guide
 
-### Phase 4: External Sync (DIP-0008)
+### Phase 4: External Sync (DIP-0010)
 - Implement GitHub adapter
 - Add Calendar read support
 - Build sync engine
@@ -520,5 +520,5 @@ org-mode ←→ Sync Engine ←→ Adapter ←→ External Tool
 - [GTD Methodology](https://gettingthingsdone.com/) - David Allen's original work
 - [Org-mode Manual](https://orgmode.org/manual/) - Org-mode documentation
 - DIP-0006: Meetings Module (planned)
-- DIP-0008: Task Sync Architecture (draft)
+- DIP-0010: Task Sync Architecture (draft)
 - `.datacore/gtd-spec.md` - Previous operational specification (to be archived)
