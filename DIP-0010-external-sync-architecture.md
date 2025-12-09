@@ -629,7 +629,7 @@ sync:
 
 #### Phase 3: Calendar Adapter
 
-**Priority:** Next (after GitHub adapter stable)
+**Status:** ✅ Complete (2025-12-09)
 
 ##### calendar.org File
 
@@ -681,17 +681,21 @@ Calendar entries are org-mode entries with timestamps:
 
 ##### Deliverables
 
-- [ ] Create `0-personal/org/calendar.org` template
-- [ ] `OrgCalendarEntry` dataclass in `base.py`
-- [ ] Google Calendar adapter (`calendar.py`)
-- [ ] Integration with `/today` (show today's events)
-- [ ] Configuration in `settings.yaml`
-- [ ] Auth setup documentation (gcalcli)
-- [ ] Tests (`test_calendar_adapter.py`)
+- [x] Create `0-personal/org/calendar.org` with synced events
+- [x] `OrgCalendarEntry` dataclass in `base.py`
+- [x] Google Calendar adapter (`calendar.py`) using Google Calendar API
+- [x] Integration with `/today` (calendar section with Python code example)
+- [x] Configuration in `settings.yaml` and `settings.local.yaml`
+- [x] OAuth setup via `gcal_auth.py` helper script
+- [x] Tests (`test_calendar_adapter.py`) - 11 tests passing
 
 **Files created:**
-- `.datacore/lib/sync/adapters/calendar.py`
-- `0-personal/org/calendar.org` (template)
+- `.datacore/lib/sync/adapters/calendar.py` - Full adapter with pull/push methods
+- `.datacore/lib/sync/adapters/gcal_auth.py` - OAuth authentication helper
+- `.datacore/lib/sync/tests/test_calendar_adapter.py` - Unit and integration tests
+- `0-personal/org/calendar.org` - Synced calendar entries
+- Updated `settings.yaml` with calendar adapter configuration
+- Updated `/today` command with calendar integration
 
 #### Phase 4: Additional Adapters (Future)
 
@@ -893,6 +897,7 @@ The following questions were resolved during review:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2025-12-09 | 1.5 | **Phase 3 Complete**: Google Calendar adapter implemented with full OAuth flow, pull/push methods, OrgCalendarEntry dataclass, settings configuration, /today integration, and 11 passing tests. |
 | 2025-12-09 | 1.4 | **Renamed to External Sync Architecture**: Broadened scope beyond tasks to include calendar entries and future content types. Added abstract payload architecture (OrgEntry base class), calendar.org file documentation, module → adapter relationship pattern. |
 | 2025-12-09 | 1.3 | Implementation: Phase 2 (Conflict Resolution) complete - conflict.py, ConflictDetector, ConflictResolver, ConflictQueue, CLI |
 | 2025-12-09 | 1.2 | Implementation: Section 11 (Tag Governance) complete - tag registry, tag validator script, diagnostic integration |
