@@ -4,19 +4,17 @@
 |-------|-------|
 | **DIP** | 0010 |
 | **Title** | Task Sync Architecture |
-| **Status** | Draft - NEEDS REVIEW |
+| **Status** | Accepted |
 | **Created** | 2025-12-04 |
 | **Author** | Gregor |
 | **Affects** | All GTD agents, /today, /wrap-up, next_actions.org, GitHub Issues |
-| **Related DIPs** | DIP-0004 (Knowledge Database), DIP-0005 (Onboarding) |
-
-> **NOTE**: This is a draft requiring review before implementation. See task in `2-datacore/org/next_actions.org`.
+| **Related DIPs** | DIP-0004 (Knowledge Database), DIP-0005 (Onboarding), DIP-0009 (GTD Specification) |
 
 ## Abstract
 
 This DIP defines how org-mode coordinates with external task management systems (GitHub Issues, Asana, Linear, etc.). Org-mode serves as the **internal coordination layer** for AI agents, while users interact with their preferred task tools. Bidirectional sync ensures changes flow both directions automatically.
 
-**Core Principle**: Users never need to touch org-mode directly. They use GitHub/Asana/etc. Agents use org-mode. Sync keeps them aligned.
+**Core Principle**: Users choose their preferred interface (org-mode, GitHub, Asana, etc.). Datacore agents use org-mode. External agents use GitHub. Sync keeps them aligned.
 
 ## Motivation
 
@@ -38,16 +36,19 @@ This DIP defines how org-mode coordinates with external task management systems 
 | Git-versioned | Yes | No | No |
 | Works offline | Yes | No | No |
 | AI-readable | Excellent | Good | Good |
+| Privacy (data stays local) | Yes | No | No |
+| No vendor lock-in | Yes | No | No |
 
-Org-mode is the **best format for AI agents** to read and manipulate tasks. External tools are the **best format for humans**.
+Org-mode is the **best format for AI agents** to read and manipulate tasks. External tools provide **familiar UIs for humans and external collaboration**.
 
 ### Design Goals
 
-1. **Users choose their tool** - GitHub, Asana, Linear, Notion, etc.
-2. **Agents use org-mode** - Structured, local, fast, git-versioned
-3. **Bidirectional sync** - Changes flow both ways automatically
-4. **Single source of truth** - Org-mode is authoritative, external tools are mirrors
-5. **Graceful degradation** - System works if external tool is unavailable
+1. **Users choose their tool** - Org-mode directly, GitHub, Asana, Linear, Notion, etc.
+2. **Datacore agents use org-mode** - Structured, local, fast, git-versioned
+3. **External agents use GitHub** - Standard interface for automation and integrations
+4. **Bidirectional sync** - Changes flow both ways automatically
+5. **Single source of truth** - Org-mode is authoritative, external tools are mirrors
+6. **Graceful degradation** - System works if external tool is unavailable
 
 ## Specification
 
@@ -89,6 +90,30 @@ Org-mode is the **best format for AI agents** to read and manipulate tasks. Exte
 │                          AGENT LAYER                                         │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
+
+#### 1.1 Module Structure
+
+The sync engine is part of Datacore core, providing reusable infrastructure for task sync, calendar sync, and future integrations.
+
+```
+.datacore/lib/sync/
+├── engine.py          # Base sync engine, orchestration
+├── adapters/
+│   ├── __init__.py
+│   ├── base.py        # Adapter interface (TaskSyncAdapter)
+│   ├── github.py      # GitHub Issues adapter
+│   └── calendar.py    # Google Calendar adapter (future)
+├── conflict.py        # Conflict detection and resolution
+├── router.py          # Task routing rules
+└── history.py         # Sync history logging
+```
+
+**Design principle:** The sync engine provides generic sync patterns (pull, push, conflict resolution, routing). Domain-specific logic (task semantics, calendar events) lives in the adapters and calling modules.
+
+**Planned adapters:**
+1. **GitHub Issues** (Phase 1) - Current priority
+2. **Google Calendar** (Phase 3) - Future
+3. **Asana, Linear** (Phase 4) - Optional
 
 ### 2. Sync Adapters
 
@@ -172,12 +197,14 @@ Tasks are linked via properties in org-mode and metadata in external tools.
 :PROPERTIES:
 :CREATED: [2025-12-04 Wed]
 :EXTERNAL_ID: github:datacore-one/datafund-space#42
-:EXTERNAL_URL: https://github.com/datacore-one/datafund-space/issues/42
+:EXTERNAL_URL: [[https://github.com/datacore-one/datafund-space/issues/42][datafund-space#42]]
 :SYNC_STATUS: synced
 :SYNC_UPDATED: [2025-12-04 Wed 14:30]
 :END:
 DEADLINE: <2025-12-04 Wed>
 ```
+
+Note: `:EXTERNAL_URL:` uses org-mode link format `[[url][description]]` so it's clickable for users who access org-mode directly.
 
 #### 3.2 GitHub Issue with Org Link
 
@@ -205,8 +232,10 @@ DEADLINE: <2025-12-04 Wed>
 | `/today` | Pull | Morning briefing |
 | `/wrap-up` | Push | Session end |
 | Webhook | Pull | External change (real-time) |
-| Manual | Both | User runs `/sync-tasks` |
-| Scheduled | Both | Cron job (every 5 min) |
+| `/sync` | Both | User runs manual sync (repos + tasks + calendars) |
+| Scheduled | Both | Cron job (every 10 min) |
+
+Note: The `/sync` command replaces the legacy `./sync` shell script and planned `/sync-tasks` command. It provides unified synchronization for repositories, tasks, and calendars (future).
 
 #### 4.2 Sync Flow: External → Org-mode
 
@@ -243,8 +272,12 @@ ORG-MODE CHANGE DETECTED
 
 1. IDENTIFY
    ├── Check if task has :EXTERNAL_ID:
-   ├── If no external ID: Create in external tool
-   └── If has external ID: Update external task
+   ├── If has external ID: Update external task
+   ├── If no external ID:
+   │   ├── Search external tool for matching task (by title, deadline, description hash)
+   │   ├── If match found: Link existing task, set :EXTERNAL_ID:
+   │   └── If no match: Create new task in external tool
+   └── This prevents duplicate creation when :EXTERNAL_ID: was lost or never set
 
 2. TRANSLATE
    ├── Map org state → external state
@@ -403,53 +436,101 @@ They just see a responsive GitHub project.
 
 ### 7. Implementation Roadmap
 
-> **TODO**: Review and refine phases based on priority and resources.
+#### Phase 1: GitHub Adapter
 
-#### Phase 1: GitHub Adapter (Week 1-2)
+**Status:** ✅ Complete (2025-12-09)
 
 **Deliverables:**
-- [ ] GitHub sync adapter implementation
-- [ ] Pull: GitHub Issues → inbox.org
-- [ ] Push: org-mode state changes → GitHub
-- [ ] Webhook receiver for real-time sync
-- [ ] Task identity linking (:EXTERNAL_ID: property)
-- [ ] Integration with /today, /wrap-up
+- [x] Sync engine core (`engine.py`, `base.py`)
+- [x] GitHub sync adapter implementation (uses `gh` CLI)
+- [x] Pull: GitHub Issues → org-mode (via router)
+- [x] Push: org-mode state changes → GitHub
+- [ ] Webhook receiver for real-time sync (deferred - polling works)
+- [x] Task identity linking (`:EXTERNAL_ID:` property)
+- [x] Duplicate detection before creating external tasks
+- [ ] Integration with `/today`, `/wrap-up` (commands defined, wiring pending)
+- [x] `/sync` command (unified sync for repos + tasks)
+- [x] Task routing rules (`router.py`)
+- [x] Sync history logging (`history.py` - moved from Phase 2)
 
 **Files created:**
-- `.datacore/lib/sync_engine.py`
-- `.datacore/lib/adapters/github_adapter.py`
-- `.datacore/lib/task_router.py`
+```
+.datacore/lib/sync/
+├── __init__.py           # Module exports
+├── engine.py             # SyncEngine orchestration
+├── router.py             # Task routing rules
+├── history.py            # SQLite sync history
+├── adapters/
+│   ├── __init__.py       # Adapter registry
+│   ├── base.py           # TaskSyncAdapter interface
+│   └── github.py         # GitHub adapter (gh CLI)
+└── tests/
+    ├── __init__.py
+    ├── test_engine.py
+    ├── test_github_adapter.py
+    ├── test_router.py
+    └── test_history.py
+```
 
 **Commands updated:**
-- `/today` - Pull external changes before briefing
-- `/wrap-up` - Push org changes before session end
+- `.datacore/commands/sync.md` - New unified `/sync` command
+- `.datacore/commands/diagnostic.md` - Added Section 11: External Sync Health
 
-#### Phase 2: Conflict Resolution (Week 2-3)
+**Configuration:**
+- `.datacore/settings.yaml` - Added `sync.tasks` and `sync.adapters` config
+
+**To enable:** Create `.datacore/settings.local.yaml`:
+```yaml
+sync:
+  tasks:
+    enabled: true
+  adapters:
+    github:
+      enabled: true
+      repos:
+        - owner: datacore-one
+          repo: datacore
+```
+
+#### Phase 2: Conflict Resolution
+
+**Status:** Partially complete
 
 **Deliverables:**
 - [ ] Conflict detection logic
-- [ ] Resolution strategies implementation
-- [ ] Conflict queue in /today briefing
-- [ ] Sync history logging
-- [ ] Manual conflict resolution command
+- [ ] Resolution strategies implementation (org_wins, external_wins, merge, ask)
+- [ ] Conflict queue in `/today` briefing
+- [x] Sync history logging (completed in Phase 1)
+- [ ] Manual conflict resolution UI
 
-**Commands created:**
-- `/sync-tasks` - Manual bidirectional sync
-- `/resolve-conflict` - Handle sync conflicts
+**Files to create:**
+- `.datacore/lib/sync/conflict.py`
 
-#### Phase 3: Additional Adapters (Week 3-4)
+#### Phase 3: Calendar Adapter
+
+**Priority:** After GitHub adapter is stable
 
 **Deliverables:**
-- [ ] Adapter plugin architecture
-- [ ] Asana adapter (reference implementation)
-- [ ] Linear adapter (optional)
+- [ ] Google Calendar adapter
+- [ ] Deadline ↔ calendar event sync
+- [ ] Calendar module using sync engine patterns
+
+**Files created:**
+- `.datacore/lib/sync/adapters/calendar.py`
+- `.datacore/modules/calendar/` (calendar-specific logic)
+
+#### Phase 4: Additional Adapters (Future)
+
+**Deliverables:**
+- [ ] Asana adapter
+- [ ] Linear adapter
 - [ ] Configuration UI for adapter setup
 
 **Files created:**
-- `.datacore/lib/adapters/asana_adapter.py`
-- `.datacore/lib/adapters/linear_adapter.py`
+- `.datacore/lib/sync/adapters/asana.py`
+- `.datacore/lib/sync/adapters/linear.py`
 
-#### Phase 4: Agent Integration (Week 4-5)
+#### Phase 5: Agent Integration
 
 **Deliverables:**
 - [ ] AI task executor reads/writes via sync engine
@@ -537,89 +618,100 @@ sync:
 
 ### 11. Tag Governance
 
-To ensure consistent tag usage and prevent tag proliferation/variants, maintain a **canonical tag reference list**.
+To ensure consistent tag usage and prevent tag proliferation/variants, maintain a **canonical tag registry**.
+
+> **Cross-reference:** Tag governance is also required for GTD workflows (DIP-0009). The tag registry serves both sync mapping (this DIP) and GTD agent routing (DIP-0009).
 
 #### 11.1 Tag Registry
 
-Location: `.datacore/config/tags.yaml`
+**Location:** `.datacore/config/tags.yaml`
 
-```yaml
-# Canonical org-mode tags with descriptions and mappings
-tags:
-  # AI delegation tags
-  AI:
-    description: "General AI-delegatable task"
-    external_label: "ai-task"
-    variants_to_avoid: ["ai", "AI-task", "automation"]
+The tag registry is the single source of truth for all tags across the system:
+- AI delegation tags (`:AI:*:`)
+- Priority tags (`[#A/B/C]`)
+- Context tags (`@person`, `@place`)
+- Domain tags (datafund, verity, etc.)
+- Content type tags (article, zettel, etc.)
+- Action tags (read-later, watchlist, etc.)
 
-  "AI:content":
-    description: "Content generation (blog, email, docs)"
-    external_label: "ai-content"
-    agent: gtd-content-writer
+**Each tag definition includes:**
+- `description` - Human-readable purpose
+- `org` - Org-mode format (`:tag:`)
+- `hashtag` - Notes format (`#Tag`)
+- `yaml` - Frontmatter format
+- `github` - GitHub label mapping
+- `agent` - Which agent handles this tag (for AI tags)
+- `aliases` - Known variants to normalize
 
-  "AI:research":
-    description: "Research and analysis tasks"
-    external_label: "ai-research"
-    agent: gtd-research-processor
+**Referenced by:**
+- Sync engine (label mappings)
+- GTD agents (task routing)
+- Zettel processor (note classification)
+- Tag validator script
 
-  "AI:data":
-    description: "Data processing and reporting"
-    external_label: "ai-data"
-    agent: gtd-data-analyzer
-
-  "AI:pm":
-    description: "Project management tasks"
-    external_label: "ai-pm"
-    agent: gtd-project-manager
-
-  # Context tags
-  "@gregor":
-    description: "Assigned to Gregor"
-    external_label: "assignee:gregor"
-
-  "@crt":
-    description: "Assigned to Črt"
-    external_label: "assignee:crtahlin"
-
-  # Category tags
-  # ... (extend as needed)
-```
+See `.datacore/config/tags.yaml` for full registry.
 
 #### 11.2 Tag Validation
 
-Agents and sync engine should:
+**Script:** `.datacore/lib/tag_validator.py`
 
-1. **Warn on unknown tags** - Flag tags not in registry
-2. **Suggest corrections** - "Did you mean `:AI:content:` instead of `:ai-content:`?"
-3. **Auto-normalize** - Convert known variants to canonical form
-4. **Report tag drift** - Weekly report of new/unlisted tags
+```bash
+# Full validation report
+python tag_validator.py --report
 
-#### 11.3 Tag Mapping
+# Validate only org files
+python tag_validator.py --org
 
-When syncing between org-mode and external tools:
+# Validate only notes
+python tag_validator.py --notes
 
-| Org-mode Tag | GitHub Label | Asana Tag |
-|--------------|--------------|-----------|
-| `:AI:` | `ai-task` | `AI Task` |
-| `:AI:research:` | `ai-research` | `AI Research` |
-| `[#A]` | `priority-high` | `High Priority` |
-| `[#B]` | `priority-medium` | `Medium Priority` |
-| `[#C]` | `priority-low` | `Low Priority` |
+# Auto-fix normalizable variants
+python tag_validator.py --fix
 
-## Open Questions
+# Show tag usage statistics
+python tag_validator.py --stats
+```
 
-> **TODO**: Address these during review.
+**Validation checks:**
+1. **Unknown tags** - Flags tags not in registry
+2. **Variant warnings** - Suggests canonical form for known variants
+3. **Auto-normalize** - Converts known variants to canonical form (with `--fix`)
+4. **New tag tracking** - Reports new tags for registry consideration
 
-1. How to handle task hierarchies? GitHub Issues are flat, org-mode is hierarchical.
-2. Should comments sync bidirectionally or just external → org?
-3. What's the right polling interval vs webhook priority?
-4. How to handle bulk operations (close 50 issues at once)?
-5. Should we support multiple external tools per task?
+#### 11.3 Sync Label Mapping
+
+The `sync_label_mapping` section in `tags.yaml` provides the org ↔ GitHub mapping:
+
+| Org-mode | GitHub Label | Notes Format |
+|----------|--------------|--------------|
+| `:AI:` | `ai-task` | `#AI` |
+| `:AI:content:` | `ai-content` | - |
+| `:AI:research:` | `ai-research` | - |
+| `:AI:data:` | `ai-data` | - |
+| `:AI:pm:` | `ai-pm` | - |
+| `[#A]` | `priority-high` | - |
+| `[#B]` | `priority-medium` | - |
+| `[#C]` | `priority-low` | - |
+
+Settings reference: `settings.yaml` → `tags.registry` points to the registry file.
+
+## Design Decisions
+
+The following questions were resolved during review:
+
+| Question | Decision | Rationale |
+|----------|----------|-----------|
+| Task hierarchies | Flatten in GitHub; org-mode handles sequencing/prioritization | GitHub Issues are flat by design. Org-mode's hierarchical structure is the coordination layer for ordering and grouping. |
+| Comments sync | Out of scope for Phase 1. Notify in `/today` if open comments exist. | Comments require nuanced handling (auto-reply vs human review). Start simple, iterate later. |
+| Polling interval | 10 minutes | Balance between responsiveness and API rate limits. Webhooks provide real-time for critical events. |
+| Bulk operations | User-initiated only | Safety first. Bulk close/update should require explicit user action. Can automate later with safeguards. |
+| Multiple external tools | Supported in architecture, only GitHub implemented now | Design for flexibility, implement what's needed. `:EXTERNAL_ID:` format (`github:owner/repo#42`) supports multiple tools. |
 
 ## References
 
-- DIP-0004: Knowledge Database (provides sync infrastructure)
+- DIP-0004: Knowledge Database (provides write-back infrastructure)
 - DIP-0005: GitHub-Based Onboarding (first use case)
+- DIP-0009: GTD Specification (uses tag registry from this DIP)
 - `.datacore/specs/datacore-specification.md` - Task Management section
 - `.datacore/datacore-docs/org-mode-conventions.md`
 
@@ -627,4 +719,7 @@ When syncing between org-mode and external tools:
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2025-12-04 | 0.1 | Initial draft - needs review |
+| 2025-12-09 | 1.1 | Implementation: Phase 1 complete - sync engine, GitHub adapter, router, history, /sync command, tests |
+| 2025-12-09 | 1.0 | Accepted: Resolved open questions, added module structure, updated design goals, added duplicate detection, replaced /sync-tasks with /sync |
+| 2025-12-08 | 0.2 | Renamed from DIP-0008, added Tag Governance section |
+| 2025-12-04 | 0.1 | Initial draft |

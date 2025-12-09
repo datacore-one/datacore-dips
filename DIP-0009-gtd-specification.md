@@ -326,6 +326,21 @@ Related: [[Wiki Link 1]], [[Wiki Link 2]]
 | `gtd-inbox-processor` | Single entry processing |
 | `gtd-inbox-coordinator` | Batch orchestration (spawns processors) |
 
+### Session Wrap-Up (Coordinator Pattern)
+
+| Agent | Role |
+|-------|------|
+| `journal-entry-writer` | Per-space journal writer (spawned by coordinator) |
+| `journal-coordinator` | Discovers spaces, spawns journal-entry-writer per space |
+| `session-learning` | Per-space learning extraction |
+| `session-learning-coordinator` | Discovers spaces, spawns session-learning per space |
+
+**Pattern:** Commands like `/wrap-up` spawn coordinators that:
+1. Discover spaces dynamically via `[0-9]-*/` pattern
+2. Spawn subagents in parallel (one per space)
+3. Each subagent writes to space-specific files
+4. Coordinator aggregates results
+
 **Processing flow:**
 1. Read inbox entry
 2. Classify (ACTION, PROJECT, REFERENCE, etc.)
