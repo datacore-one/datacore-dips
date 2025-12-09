@@ -1,20 +1,28 @@
-# DIP-0010: Task Sync Architecture
+# DIP-0010: External Sync Architecture
 
 | Field | Value |
 |-------|-------|
 | **DIP** | 0010 |
-| **Title** | Task Sync Architecture |
+| **Title** | External Sync Architecture |
 | **Status** | Accepted |
 | **Created** | 2025-12-04 |
 | **Author** | Gregor |
-| **Affects** | All GTD agents, /today, /wrap-up, next_actions.org, GitHub Issues |
+| **Affects** | All GTD agents, /today, /wrap-up, org files, GitHub Issues, Google Calendar |
 | **Related DIPs** | DIP-0004 (Knowledge Database), DIP-0005 (Onboarding), DIP-0009 (GTD Specification) |
 
 ## Abstract
 
-This DIP defines how org-mode coordinates with external task management systems (GitHub Issues, Asana, Linear, etc.). Org-mode serves as the **internal coordination layer** for AI agents, while users interact with their preferred task tools. Bidirectional sync ensures changes flow both directions automatically.
+This DIP defines how org-mode coordinates with external services (GitHub Issues, Google Calendar, Asana, Linear, etc.). Org-mode serves as the **internal coordination layer** and **source of truth** for all content. Bidirectional sync ensures changes flow both directions automatically.
 
-**Core Principle**: Users choose their preferred interface (org-mode, GitHub, Asana, etc.). Datacore agents use org-mode. External agents use GitHub. Sync keeps them aligned.
+The sync infrastructure is **payload-agnostic**. Different adapters sync different content types:
+
+| Adapter | Org File | Content Type | External Service |
+|---------|----------|--------------|------------------|
+| GitHub | `next_actions.org` | Tasks | GitHub Issues |
+| Calendar | `calendar.org` | Calendar entries | Google Calendar |
+| Asana | `next_actions.org` | Tasks | Asana Tasks |
+
+**Core Principle**: All content lives in org-mode. Adapters handle bidirectional sync with external services. Modules provide domain workflows that write to org files.
 
 ## Motivation
 
@@ -93,55 +101,149 @@ Org-mode is the **best format for AI agents** to read and manipulate tasks. Exte
 
 #### 1.1 Module Structure
 
-The sync engine is part of Datacore core, providing reusable infrastructure for task sync, calendar sync, and future integrations.
+The sync engine is part of Datacore core, providing reusable infrastructure for external service sync.
 
 ```
 .datacore/lib/sync/
 ├── engine.py          # Base sync engine, orchestration
 ├── adapters/
 │   ├── __init__.py
-│   ├── base.py        # Adapter interface (TaskSyncAdapter)
-│   ├── github.py      # GitHub Issues adapter
-│   └── calendar.py    # Google Calendar adapter (future)
+│   ├── base.py        # Abstract SyncAdapter interface (payload-agnostic)
+│   ├── github.py      # GitHub Issues adapter (tasks)
+│   └── calendar.py    # Google Calendar adapter (calendar entries)
 ├── conflict.py        # Conflict detection and resolution
-├── router.py          # Task routing rules
+├── router.py          # Entry routing rules
 └── history.py         # Sync history logging
 ```
 
-**Design principle:** The sync engine provides generic sync patterns (pull, push, conflict resolution, routing). Domain-specific logic (task semantics, calendar events) lives in the adapters and calling modules.
+**Design principle:** The sync engine provides generic sync patterns (pull, push, conflict resolution, routing). Each adapter handles a specific external service and content type. Domain workflows (modules) write to org files; adapters sync those files.
+
+#### 1.2 Abstract Payload Architecture
+
+The sync infrastructure is **payload-agnostic**. The base data model supports different content types:
+
+```python
+# Base class for all org entries
+class OrgEntry:
+    """Abstract base for any org-mode entry."""
+    id: str
+    title: str
+    body: str
+    external_id: Optional[str]
+    sync_status: str
+    sync_updated: datetime
+
+# Task-specific (next_actions.org)
+class OrgTask(OrgEntry):
+    state: TaskState  # TODO, NEXT, DONE, etc.
+    priority: Priority
+    deadline: Optional[datetime]
+    scheduled: Optional[datetime]
+    tags: List[str]
+
+# Calendar-specific (calendar.org)
+class OrgCalendarEntry(OrgEntry):
+    timestamp: datetime  # <2025-12-10 Tue 10:00-11:00>
+    end_time: Optional[datetime]
+    repeater: Optional[str]  # +1w, +1m, etc.
+    location: Optional[str]
+    attendees: List[str]
+```
+
+#### 1.3 Module → Adapter Relationship
+
+Modules provide domain workflows. Adapters provide sync infrastructure.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    MODULE LAYER (Domain Logic)               │
+│  ┌─────────────────┐     ┌─────────────────┐                │
+│  │ Meetings Module │     │ GTD Agents      │                │
+│  │ - Create meeting│     │ - Process inbox │                │
+│  │ - Generate agenda│    │ - Route tasks   │                │
+│  └────────┬────────┘     └────────┬────────┘                │
+│           │ writes to             │ writes to               │
+│           ▼                       ▼                          │
+│     calendar.org            next_actions.org                │
+└───────────┼───────────────────────┼──────────────────────────┘
+            │                       │
+     ┌──────▼──────┐         ┌──────▼──────┐
+     │  Calendar   │         │   GitHub    │
+     │  Adapter    │         │   Adapter   │
+     │  (sync)     │         │   (sync)    │
+     └─────────────┘         └─────────────┘
+```
+
+**Example: Meetings module using calendar adapter**
+```python
+class MeetingsModule:
+    def schedule_meeting(self, title, time, attendees):
+        # Module writes to calendar.org
+        entry = OrgCalendarEntry(
+            title=title,
+            timestamp=time,
+            attendees=attendees
+        )
+        append_to_calendar_org(entry)
+        # Calendar adapter syncs to Google Calendar automatically
+```
 
 **Planned adapters:**
-1. **GitHub Issues** (Phase 1) - Current priority
-2. **Google Calendar** (Phase 3) - Future
+1. **GitHub Issues** (Phase 1) - ✅ Complete
+2. **Google Calendar** (Phase 3) - Next
 3. **Asana, Linear** (Phase 4) - Optional
 
 ### 2. Sync Adapters
 
-Each external tool has an adapter that translates between org-mode and the tool's format.
+Each external service has an adapter that translates between org-mode and the service's format.
 
 #### 2.1 Adapter Interface
 
 ```python
-class TaskSyncAdapter:
-    """Base interface for task sync adapters."""
+class SyncAdapter(ABC):
+    """Abstract base interface for all sync adapters."""
 
-    def pull_changes(self, since: datetime) -> List[TaskChange]:
-        """Fetch changes from external tool since timestamp."""
+    @property
+    @abstractmethod
+    def adapter_type(self) -> str:
+        """Unique identifier (e.g., 'github', 'calendar')."""
 
-    def push_changes(self, changes: List[TaskChange]) -> SyncResult:
-        """Push org-mode changes to external tool."""
+    @property
+    @abstractmethod
+    def org_file(self) -> str:
+        """Which org file this adapter syncs (e.g., 'next_actions.org', 'calendar.org')."""
 
-    def create_task(self, task: OrgTask) -> ExternalTaskRef:
-        """Create new task in external tool, return reference."""
+    @abstractmethod
+    def pull_changes(self, since: datetime) -> List[Change]:
+        """Fetch changes from external service since timestamp."""
 
-    def update_task(self, ref: ExternalTaskRef, changes: dict) -> bool:
-        """Update existing task in external tool."""
+    @abstractmethod
+    def push_changes(self, changes: List[Change]) -> SyncResult:
+        """Push org-mode changes to external service."""
 
-    def delete_task(self, ref: ExternalTaskRef) -> bool:
-        """Delete/close task in external tool."""
+    @abstractmethod
+    def create_entry(self, entry: OrgEntry) -> ExternalRef:
+        """Create new entry in external service, return reference."""
 
-    def resolve_conflict(self, org_task: OrgTask, external_task: ExternalTask) -> Resolution:
-        """Handle conflict when both sides changed."""
+    @abstractmethod
+    def update_entry(self, ref: ExternalRef, changes: dict) -> bool:
+        """Update existing entry in external service."""
+
+    @abstractmethod
+    def delete_entry(self, ref: ExternalRef) -> bool:
+        """Delete/archive entry in external service."""
+
+
+class TaskSyncAdapter(SyncAdapter):
+    """Adapter for task-based services (GitHub, Asana, Linear)."""
+    org_file = "next_actions.org"
+    # Task-specific methods...
+
+
+class CalendarSyncAdapter(SyncAdapter):
+    """Adapter for calendar services (Google Calendar)."""
+    org_file = "calendar.org"
+    # Calendar-specific methods...
 ```
 
 #### 2.2 GitHub Issues Adapter
@@ -527,16 +629,69 @@ sync:
 
 #### Phase 3: Calendar Adapter
 
-**Priority:** After GitHub adapter is stable
+**Priority:** Next (after GitHub adapter stable)
 
-**Deliverables:**
-- [ ] Google Calendar adapter
-- [ ] Deadline ↔ calendar event sync
-- [ ] Calendar module using sync engine patterns
+##### calendar.org File
+
+New file: `0-personal/org/calendar.org`
+
+Calendar entries are org-mode entries with timestamps:
+
+```org
+#+TITLE: Calendar
+#+FILETAGS: :calendar:
+
+* Meeting with investors
+  :PROPERTIES:
+  :EXTERNAL_ID: calendar:primary/abc123
+  :SYNC_STATUS: synced
+  :SYNC_UPDATED: [2025-12-09 Mon 10:00]
+  :END:
+  <2025-12-10 Tue 10:00-11:00>
+  Discuss Series A terms
+  - Attendees: John, Sarah
+  - Location: Zoom
+
+* Weekly standup :recurring:
+  :PROPERTIES:
+  :EXTERNAL_ID: calendar:primary/def456
+  :END:
+  <2025-12-09 Mon 09:00-09:30 +1w>
+
+* Doctor appointment
+  <2025-12-12 Thu 14:00>
+```
+
+**Key differences from tasks:**
+- Uses timestamps `<...>` not DEADLINE/SCHEDULED
+- May or may not have TODO state
+- Shows in org-agenda calendar view
+- Supports time ranges `10:00-11:00`
+- Supports repeaters `+1w`, `+1m`
+
+##### Sync Mapping
+
+| calendar.org | Google Calendar |
+|--------------|-----------------|
+| Heading title | Event title |
+| `<timestamp>` | Event start/end time |
+| Body text | Event description |
+| `:recurring:` tag | Recurring event |
+| `:EXTERNAL_ID:` | Event ID link |
+
+##### Deliverables
+
+- [ ] Create `0-personal/org/calendar.org` template
+- [ ] `OrgCalendarEntry` dataclass in `base.py`
+- [ ] Google Calendar adapter (`calendar.py`)
+- [ ] Integration with `/today` (show today's events)
+- [ ] Configuration in `settings.yaml`
+- [ ] Auth setup documentation (gcalcli)
+- [ ] Tests (`test_calendar_adapter.py`)
 
 **Files created:**
 - `.datacore/lib/sync/adapters/calendar.py`
-- `.datacore/modules/calendar/` (calendar-specific logic)
+- `0-personal/org/calendar.org` (template)
 
 #### Phase 4: Additional Adapters (Future)
 
@@ -738,6 +893,7 @@ The following questions were resolved during review:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2025-12-09 | 1.4 | **Renamed to External Sync Architecture**: Broadened scope beyond tasks to include calendar entries and future content types. Added abstract payload architecture (OrgEntry base class), calendar.org file documentation, module → adapter relationship pattern. |
 | 2025-12-09 | 1.3 | Implementation: Phase 2 (Conflict Resolution) complete - conflict.py, ConflictDetector, ConflictResolver, ConflictQueue, CLI |
 | 2025-12-09 | 1.2 | Implementation: Section 11 (Tag Governance) complete - tag registry, tag validator script, diagnostic integration |
 | 2025-12-09 | 1.1 | Implementation: Phase 1 complete - sync engine, GitHub adapter, router, history, /sync command, tests |

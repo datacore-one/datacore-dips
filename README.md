@@ -78,7 +78,7 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 | [0003](DIP-0003-scaffolding-pattern.md) | Scaffolding Pattern | Core | Implemented |
 | [0004](DIP-0004-knowledge-database.md) | Knowledge Database | Core | Implemented |
 | [0009](DIP-0009-gtd-specification.md) | GTD System Specification | Core | Draft |
-| [0010](DIP-0010-task-sync-architecture.md) | Task Sync Architecture | Core | Draft |
+| [0010](DIP-0010-external-sync-architecture.md) | External Sync Architecture | Core | Accepted |
 
 ## Contributing
 

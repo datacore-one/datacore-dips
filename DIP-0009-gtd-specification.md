@@ -535,5 +535,5 @@ org-mode ←→ Sync Engine ←→ Adapter ←→ External Tool
 - [GTD Methodology](https://gettingthingsdone.com/) - David Allen's original work
 - [Org-mode Manual](https://orgmode.org/manual/) - Org-mode documentation
 - DIP-0006: Meetings Module (planned)
-- DIP-0010: Task Sync Architecture (draft)
+- DIP-0010: External Sync Architecture (accepted)
 - `.datacore/gtd-spec.md` - Previous operational specification (to be archived)
