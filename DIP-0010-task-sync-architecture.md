@@ -494,17 +494,36 @@ sync:
 
 #### Phase 2: Conflict Resolution
 
-**Status:** Partially complete
+**Status:** ✅ Complete (2025-12-09)
 
 **Deliverables:**
-- [ ] Conflict detection logic
-- [ ] Resolution strategies implementation (org_wins, external_wins, merge, ask)
-- [ ] Conflict queue in `/today` briefing
+- [x] Conflict detection logic (`ConflictDetector`)
+- [x] Resolution strategies implementation (org_wins, external_wins, merge, ask)
+- [x] Conflict queue in `/today` briefing
 - [x] Sync history logging (completed in Phase 1)
-- [ ] Manual conflict resolution UI
+- [x] CLI for conflict management (`--unresolved`, `--stats`, `--resolve`)
 
-**Files to create:**
-- `.datacore/lib/sync/conflict.py`
+**Files created:**
+- `.datacore/lib/sync/conflict.py` - Full conflict resolution module:
+  - `ConflictType` enum (state, title, description, priority, deadline, labels, comments)
+  - `ConflictStrategy` enum (org_wins, external_wins, merge, ask)
+  - `ConflictDetector` - Detects conflicts between org and external tasks
+  - `ConflictResolver` - Resolves conflicts using configured strategies
+  - `ConflictQueue` - SQLite-backed queue for unresolved conflicts
+  - CLI interface for conflict management
+
+**Configuration added to settings.yaml:**
+```yaml
+sync:
+  conflict_resolution:
+    state: org_wins
+    title: org_wins
+    description: merge
+    priority: org_wins
+    deadline: org_wins
+    labels: merge
+    comments: external_wins
+```
 
 #### Phase 3: Calendar Adapter
 
@@ -719,6 +738,7 @@ The following questions were resolved during review:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2025-12-09 | 1.3 | Implementation: Phase 2 (Conflict Resolution) complete - conflict.py, ConflictDetector, ConflictResolver, ConflictQueue, CLI |
 | 2025-12-09 | 1.2 | Implementation: Section 11 (Tag Governance) complete - tag registry, tag validator script, diagnostic integration |
 | 2025-12-09 | 1.1 | Implementation: Phase 1 complete - sync engine, GitHub adapter, router, history, /sync command, tests |
 | 2025-12-09 | 1.0 | Accepted: Resolved open questions, added module structure, updated design goals, added duplicate detection, replaced /sync-tasks with /sync |
