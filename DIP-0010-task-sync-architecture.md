@@ -719,6 +719,7 @@ The following questions were resolved during review:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2025-12-09 | 1.2 | Implementation: Section 11 (Tag Governance) complete - tag registry, tag validator script, diagnostic integration |
 | 2025-12-09 | 1.1 | Implementation: Phase 1 complete - sync engine, GitHub adapter, router, history, /sync command, tests |
 | 2025-12-09 | 1.0 | Accepted: Resolved open questions, added module structure, updated design goals, added duplicate detection, replaced /sync-tasks with /sync |
 | 2025-12-08 | 0.2 | Renamed from DIP-0008, added Tag Governance section |
