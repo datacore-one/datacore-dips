@@ -94,6 +94,7 @@ Merge utility: `.datacore/lib/context_merge.py`
 | Module context | `modules/[name]/CLAUDE.base.md` | Trading rules |
 | Agent definition | `agents/[name].base.md` | Agent prompt |
 | Command definition | `commands/[name].base.md` | Command prompt |
+| Mail rules | `modules/mail/rules.base.yaml` | Email classification |
 
 ### gitignore Pattern
 
@@ -150,6 +151,39 @@ When `.base.md` changes:
 │   ├── position-manager.local.md   # My thresholds (PRIVATE)
 │   └── position-manager.md         # Composed
 ```
+
+### Example: Mail Module Classification Rules
+
+The pattern extends to non-markdown configuration files:
+
+```
+.datacore/modules/mail/
+├── rules.base.yaml             # Generic patterns (PUBLIC)
+│   └── Newsletter senders, spam patterns, research sources
+├── rules.local.yaml            # Personal overrides (PRIVATE, gitignored)
+│   └── Personal contacts, custom ignore patterns
+
+1-datafund/
+├── mail-rules.yaml             # Space-specific rules (SPACE)
+│   └── Business contacts, partner patterns, project threads
+
+0-personal/
+├── mail-rules.yaml             # Personal space rules (SPACE)
+│   └── Family contacts, personal subscriptions
+```
+
+**Merge order**: `rules.base.yaml` → `{space}/mail-rules.yaml` → `rules.local.yaml`
+
+**Key patterns**:
+- Sender classification (actionable, research, newsletter, ignore)
+- Subject rules (finance, calendar triggers)
+- Thread rules (ongoing conversations)
+- Cross-module actions (route invoices to accounting module)
+
+This enables:
+1. Generic newsletter detection (base) + space-specific business contacts (space)
+2. Research extraction for AVC/HBR (base) + personal research sources (local)
+3. Financial email routing (base) → accounting module integration
 
 ### Merge Utility
 
@@ -270,5 +304,16 @@ Migration script provided in implementation.
 ## References
 
 - [DIP-0001: Contribution Model](./DIP-0001-contribution-model.md)
+- [DIP-0010: External Sync Architecture](./DIP-0010-external-sync-architecture.md)
 - [Privacy Policy](../.datacore/specs/privacy-policy.md)
 - [Ethereum EIP Process](https://eips.ethereum.org/EIPS/eip-1)
+
+## Applications
+
+This pattern is used by:
+
+| Module/Component | Layer Files | Purpose |
+|------------------|-------------|---------|
+| Mail Module | `rules.base.yaml`, `{space}/mail-rules.yaml`, `rules.local.yaml` | Email classification rules |
+| Trading Module | `CLAUDE.*.md`, `agents/*.md` | Trading methodology and agents |
+| All Agents | `*.base.md`, `*.space.md`, `*.local.md` | Agent behavior customization |
