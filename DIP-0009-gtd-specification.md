@@ -133,6 +133,8 @@ Regular reviews ensure system integrity.
 
 ### State Definitions
 
+**Standard GTD States** (next_actions.org, research_learning.org):
+
 | State | Meaning | Terminal | Required Properties |
 |-------|---------|----------|---------------------|
 | `TODO` | Standard next action | No | - |
@@ -141,6 +143,15 @@ Regular reviews ensure system integrity.
 | `DONE` | Completed successfully | Yes | `CLOSED:` timestamp |
 | `DEFERRED` | Someday/maybe | No | `:DEFERRED_REASON:` (optional) |
 | `CANCELED` | Will not do | Yes | `:CANCEL_REASON:` |
+
+**Nightshift States** (nightshift.org only):
+
+| State | Meaning | Terminal | Required Properties |
+|-------|---------|----------|---------------------|
+| `QUEUED` | Waiting in AI queue | No | - |
+| `EXECUTING` | Currently being processed by AI | No | `:NIGHTSHIFT_EXECUTOR:`, `:NIGHTSHIFT_STARTED:` |
+| `DONE` | Completed successfully with quality gates | Yes | `CLOSED:` timestamp, `:NIGHTSHIFT_SCORE:` |
+| `FAILED` | Needs human review (evaluation failed) | No | `:NIGHTSHIFT_REASON:` |
 
 ### State Transitions
 
@@ -197,9 +208,35 @@ Terminal states (`DONE`, `CANCELED`) trigger archival:
 |------|------|---------|
 | Inbox | `org/inbox.org` | Single capture point |
 | Next Actions | `org/next_actions.org` | Active tasks by focus area |
+| Nightshift | `org/nightshift.org` | AI task queue (`:AI:` tagged tasks moved here) |
+| Research | `org/research_learning.org` | Research and learning pipeline |
 | Someday | `org/someday.org` | Future possibilities |
 | Habits | `org/habits.org` | Recurring behaviors |
 | Archive | `org/archive.org` | Completed/canceled tasks |
+
+### nightshift.org Structure
+
+The nightshift queue file mirrors the structure of next_actions.org to preserve project context:
+
+```org
+#+TITLE: Nightshift Queue
+#+TODO: QUEUED EXECUTING | DONE FAILED
+
+* TIER 1: STRATEGIC FOUNDATION
+** /Verity
+** /Datafund
+...
+* RESEARCH & LEARNING
+** Verity
+...
+```
+
+**Task Flow:**
+1. User adds `:AI:` tag to task in next_actions.org or research_learning.org
+2. `/tomorrow` command moves tagged tasks to nightshift.org with QUEUED state
+3. Nightshift module processes QUEUED tasks overnight
+4. Completed tasks marked DONE or FAILED
+5. DONE tasks archived to next_actions.org_archive under matching heading
 
 ### next_actions.org Structure
 

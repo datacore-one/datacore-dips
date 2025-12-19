@@ -42,7 +42,8 @@ Nightshift is an autonomous task execution module that processes `:AI:` tagged t
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     /tomorrow (evening)                         │
-│  - Validate :AI: tasks                                          │
+│  - Scan for :AI: tasks in next_actions.org, research_learning  │
+│  - Move :AI: tasks to nightshift.org with QUEUED state          │
 │  - Show execution preview                                       │
 │  - Commit/push to make available to server                      │
 │  - Trigger server (optional)                                    │
@@ -56,7 +57,7 @@ Nightshift is an autonomous task execution module that processes `:AI:` tagged t
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │ 1. QUEUE OPTIMIZER                                       │   │
-│  │    - Parse :AI: tasks from next_actions.org              │   │
+│  │    - Parse QUEUED tasks from nightshift.org              │   │
 │  │    - Analyze dependencies                                │   │
 │  │    - Score by impact/effort/urgency                      │   │
 │  │    - Build execution plan                                │   │
@@ -117,9 +118,11 @@ Nightshift is an autonomous task execution module that processes `:AI:` tagged t
 **Purpose**: Analyze pending tasks and create optimal execution plan.
 
 **Inputs**:
-- `:AI:` tagged tasks from `next_actions.org`
+- QUEUED tasks from `nightshift.org` (primary source)
 - Task metadata (priority, tags, dependencies)
 - Historical execution data
+
+**Note**: Tasks are moved from `next_actions.org` and `research_learning.org` to `nightshift.org` by the `/tomorrow` command before queue optimization runs.
 
 **Logic**:
 ```
