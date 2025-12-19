@@ -8,16 +8,24 @@
 | **Type** | Module |
 | **Status** | Draft |
 | **Created** | 2025-12-18 |
-| **Updated** | 2025-12-18 |
-| **Tags** | `crm`, `contacts`, `relationships`, `adapters` |
-| **Affects** | `/today`, `/gtd-weekly-review`, knowledge base, modules |
+| **Updated** | 2025-12-19 |
+| **Tags** | `crm`, `contacts`, `relationships`, `adapters`, `network-intelligence` |
+| **Affects** | `/today`, `/gtd-weekly-review`, knowledge base, modules, research |
 | **Specs** | - |
-| **Agents** | `crm-interaction-extractor`, `crm-relationship-scorer` |
+| **Agents** | `crm-interaction-extractor`, `crm-relationship-scorer`, `crm-entity-extractor`, `crm-contact-maintainer` |
 | **Related DIPs** | DIP-0002, DIP-0009, DIP-0010 |
 
 ## Summary
 
-The CRM module provides relationship management for Datacore, serving as a central hub that aggregates contact interactions from multiple channels (journal, calendar, meeting notes, email, telegram, linkedin). It maintains contact notes with interaction history, surfaces relationship insights in daily/weekly workflows, and supports privacy staging between personal and team spaces.
+The CRM module provides **Network Intelligence** for Datacore - a comprehensive system for tracking entities (people, companies, projects, events), their relationships, and industry landscape. It serves as a central hub that:
+
+1. **Captures entities** from research, journals, calendar, and external channels
+2. **Tracks relationship evolution** from discovery → lead → active → partner
+3. **Aggregates interactions** from multiple sources via adapter interface
+4. **Maintains contact notes** with structured metadata and interaction history
+5. **Provides industry landscape** visualization and strategic insights
+6. **Surfaces relationship insights** in `/today` and `/gtd-weekly-review`
+7. **Supports privacy staging** between personal and team spaces
 
 ## Motivation
 
@@ -49,7 +57,118 @@ A CRM module that:
 
 ## Specification
 
-### 1. Architecture Overview
+### 1. Entity & Relationship Taxonomy
+
+#### Entity Types
+
+The CRM tracks four entity types:
+
+```yaml
+entity_types:
+  person:     # Individual contact
+  company:    # Organization
+  project:    # Product, initiative, protocol
+  event:      # Conference, meetup, workshop
+```
+
+#### Relationship Status (Lifecycle)
+
+Tracks where entities are in the relationship lifecycle:
+
+```yaml
+relationship_status:
+  # Discovery phase
+  discovered:     # Found in research, no contact yet
+  lead:           # Identified as relevant, potential outreach
+
+  # Engagement phase
+  contacted:      # Initial outreach made
+  in_discussion:  # Active conversation
+  negotiating:    # Deal/partnership in progress
+
+  # Established phase
+  active:         # Ongoing relationship
+  partner:        # Formal partnership
+  customer:       # Paying customer
+  investor:       # Has invested
+
+  # Inactive phase
+  dormant:        # No recent interaction
+  churned:        # Former customer/partner
+  archived:       # Closed, no longer relevant
+```
+
+#### Relationship Types
+
+Describes the nature of the relationship:
+
+```yaml
+relationship_types:
+  # Collaborative
+  partner:              # Strategic/integration partner
+  investor:             # Financial backer
+  customer:             # Paying user
+  vendor:               # Service/product provider
+  advisor:              # Provides guidance
+  collaborator:         # Project collaboration
+
+  # Neutral
+  peer:                 # Industry peer, neutral
+  acquaintance:         # Know but no formal relationship
+  press:                # Media contact
+
+  # Competitive
+  competitor:           # Direct competitor
+  indirect_competitor:  # Adjacent market
+
+  # Potential
+  target_customer:      # Potential customer
+  target_partner:       # Potential partner
+  target_investor:      # Potential investor
+```
+
+#### Relevance Score
+
+Strategic importance (1-5):
+
+```yaml
+relevance:
+  5: critical   # Must-have relationship
+  4: high       # Important for strategy
+  3: medium     # Useful connection
+  2: low        # Nice to have
+  1: minimal    # Peripheral
+```
+
+#### Industry Tags (Dynamic Registry)
+
+Industries are **discovered, not prescribed**. No hardcoded list - industries are registered when first used and become canonical for consistency.
+
+**Registry location:** `.datacore/state/crm/industries.yaml`
+
+```yaml
+# Auto-generated registry
+industries:
+  rwa:
+    label: "RWA"
+    aliases: [real_world_assets]
+    count: 12
+    first_seen: 2025-12-18
+
+  gold_trade_data:
+    label: "Gold Trade Data"
+    aliases: []
+    count: 3
+    first_seen: 2025-12-19
+```
+
+**Registry principles:**
+1. First use creates canonical entry
+2. New tags checked against existing (Levenshtein similarity)
+3. Aliases map variations to canonical key
+4. Normalization: `lowercase_underscores`
+
+### 2. Architecture Overview
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -202,8 +321,16 @@ provides:
 ├── _index.md              # Contacts index for this space
 ├── people/
 │   └── [Person Name].md
-└── companies/
-    └── [Company Name].md
+├── companies/
+│   └── [Company Name].md
+├── projects/
+│   └── [Project Name].md
+├── events/
+│   └── [Event Name].md
+└── landscape/
+    ├── _overview.md       # Industry landscape summary
+    ├── competitors.md     # Competitive analysis
+    └── ecosystem.md       # Partner/vendor ecosystem
 ```
 
 ### 6. Contact Note Schema
@@ -213,22 +340,27 @@ provides:
 ```yaml
 ---
 type: contact
-contact_type: person
+entity_type: person
 name: "John Smith"
-status: active              # draft | active | dormant | archived
-privacy: team               # personal | team
+status: active                    # draft | active | dormant | archived
+relationship_status: active       # discovered | lead | contacted | in_discussion | active | partner | dormant | archived
+relationship_type: partner        # partner | investor | customer | vendor | advisor | peer | competitor | target_*
+relevance: 4                      # 1-5 (minimal to critical)
+privacy: team                     # personal | team
 space: 1-datafund
 organization: "[[Acme Corp]]"
 role: "VP of Partnerships"
+industries: [defi, data_infrastructure]
 channels:
   email: john@acme.com
   telegram: "@jsmith"
   linkedin: "/in/johnsmith"
   phone: "+1-555-0123"
 location: "New York, USA"
-tags: [investor, partner, crypto]
+tags: [crypto, web3]
 introduced_by: "[[Jane Doe]]"
 met_at: "ETH Denver 2024"
+discovered_in: ""                 # Source: "[[Literature Note]]" | "research" | "journal"
 created: 2024-03-15
 updated: 2025-12-18
 last_interaction: 2025-12-10
@@ -290,17 +422,21 @@ VP of Partnerships at [[Acme Corp]]. Met at ETH Denver 2024, introduced by [[Jan
 ```yaml
 ---
 type: contact
-contact_type: company
+entity_type: company
 name: "Acme Corp"
-status: active
-category: partner           # partner | investor | customer | vendor | competitor
-industry: "DeFi Infrastructure"
-stage: "Series B"
+status: active                    # draft | active | dormant | archived
+relationship_status: active       # discovered | lead | contacted | in_discussion | active | partner | dormant | archived
+relationship_type: partner        # partner | investor | customer | vendor | competitor | target_*
+relevance: 4                      # 1-5 (minimal to critical)
+industries: [defi, data_infrastructure]
+market_position: competitor       # competitor | leader | emerging | adjacent
+stage: "Series B"                 # seed | series_a | series_b | growth | enterprise
 space: 1-datafund
 website: "https://acme.com"
 linkedin: "/company/acmecorp"
 location: "San Francisco, USA"
-tags: [defi, infrastructure, partner]
+tags: [web3, infrastructure]
+discovered_in: ""                 # Source: "[[Literature Note]]" | "research" | "journal"
 created: 2024-03-15
 updated: 2025-12-18
 last_interaction: 2025-12-10
@@ -343,6 +479,141 @@ DeFi infrastructure company, Series B stage. Potential strategic partner.
 
 - [[DeFi Partnerships]]
 - [[Competitor Analysis]]
+```
+
+#### Project Contact
+
+For tracking protocols, products, platforms, and initiatives.
+
+```yaml
+---
+type: contact
+entity_type: project
+name: "Filecoin"
+status: active                    # draft | active | dormant | archived
+relationship_status: discovered   # discovered | lead | active | partner | competitor
+relationship_type: peer           # partner | competitor | target_partner | peer
+relevance: 3                      # 1-5 (minimal to critical)
+industries: [storage, web3, data_infrastructure]
+project_type: protocol            # protocol | platform | product | initiative
+stage: mainnet                    # concept | development | testnet | mainnet | mature
+parent_company: "[[Protocol Labs]]"
+website: "https://filecoin.io"
+github: "https://github.com/filecoin-project"
+docs: "https://docs.filecoin.io"
+tags: [decentralized_storage, ipfs]
+discovered_in: "[[Research - Storage Protocols]]"
+created: 2025-12-19
+updated: 2025-12-19
+---
+
+# Filecoin
+
+## Overview
+
+Decentralized storage network built on IPFS. Major player in Web3 storage infrastructure.
+
+**Relevance:** Potential integration partner or competitor in storage space.
+
+## Technical Summary
+
+<!-- Key technical details, architecture, capabilities -->
+
+## Competitive Position
+
+**Market position:** Leader in decentralized storage
+**Strengths:**
+- Large network, proven at scale
+- Strong ecosystem
+
+**Weaknesses:**
+- Complex onboarding
+- Storage costs
+
+## Key People
+
+| Name | Role | Our Status |
+|------|------|------------|
+| [[Juan Benet]] | Founder | Dormant |
+
+## Related Projects
+
+- [[IPFS]]
+- [[Arweave]] (competitor)
+
+## Notes
+
+<!-- Strategic observations, integration possibilities -->
+
+## Related
+
+- [[Protocol Labs]]
+- [[Storage Landscape]]
+```
+
+#### Event Contact
+
+For tracking conferences, meetups, workshops, and industry events.
+
+```yaml
+---
+type: contact
+entity_type: event
+name: "ETH Denver 2025"
+status: active                    # draft | active | completed | archived
+event_type: conference            # conference | meetup | workshop | hackathon | summit
+industries: [web3, defi, ethereum]
+relevance: 4                      # 1-5 (minimal to critical)
+date_start: 2025-02-23
+date_end: 2025-03-02
+location: "Denver, Colorado, USA"
+website: "https://ethdenver.com"
+tags: [ethereum, crypto, networking]
+discovered_in: ""
+created: 2025-12-19
+updated: 2025-12-19
+---
+
+# ETH Denver 2025
+
+## Overview
+
+Major Ethereum conference and hackathon. Key networking opportunity for Web3 projects.
+
+**Relevance:** Priority event for partnership development and industry visibility.
+
+## Our Goals
+
+- [ ] Secure speaking slot
+- [ ] Schedule meetings with target partners
+- [ ] Host side event
+
+## Key Contacts Attending
+
+| Contact | Company | Meeting Status |
+|---------|---------|----------------|
+| [[John Smith]] | [[Acme Corp]] | Scheduled |
+| [[Jane Doe]] | [[Protocol Labs]] | Requested |
+
+## Target Introductions
+
+People/companies we want to meet at this event:
+
+- [[Target Company A]] - Potential partner
+- [[Target Person B]] - Investor connection
+
+## Schedule
+
+<!-- Planned meetings, talks, side events -->
+
+## Notes
+
+<!-- Pre-event prep, post-event debrief -->
+
+## Related
+
+- [[Conference Calendar]]
+- [[ETH Denver 2024]] (previous year)
 ```
 
 ### 7. Cross-Space Index (DIP-0002)
@@ -574,6 +845,256 @@ Score thresholds:
 - `0.4 - 0.7` Warming/Cooling
 - `< 0.4` Dormant
 
+### 13. Contact Creation Interface
+
+Standardized interface for other agents (e.g., research processor) to create contacts.
+
+```yaml
+# Contact creation interface for other agents
+contact_creation:
+  required_fields:
+    name: string                    # Entity name
+    entity_type: person | company | project | event
+    source: string                  # "[[Literature Note]]" | "research" | "journal"
+    source_context: string          # Brief context where discovered
+
+  optional_fields:
+    relationship_status: discovered # Default for new entities
+    relationship_type: string
+    industries: []                  # Will register new industries
+    tags: []
+    organization: "[[Company]]"     # For persons
+    relevance: 1-5                  # Default: 2
+    location: string
+
+  output:
+    path: "[space]/contacts/[entity_type_plural]/[Name].md"
+    status: draft                   # Requires human review
+```
+
+**Usage by research processor:**
+```python
+# After processing article about Filecoin
+crm.create_contact({
+    'name': 'Filecoin',
+    'entity_type': 'project',
+    'source': '[[Storage Protocols Research]]',
+    'source_context': 'Decentralized storage network, competitor analysis',
+    'industries': ['storage', 'web3'],
+    'relationship_status': 'discovered',
+    'relevance': 3
+})
+```
+
+### 14. Entity Extractor Agent
+
+**Agent:** `crm-entity-extractor`
+
+Extracts entities (people, companies, projects, events) from research outputs and literature notes.
+
+```yaml
+trigger:
+  - After gtd-research-processor creates literature note
+  - After research-link-processor creates report
+  - Manual: /crm extract [file]
+
+input:
+  file_path: string     # Literature note or research report
+  auto_create: boolean  # Create draft contacts automatically (default: false)
+
+process:
+  1. Scan for person patterns:
+     - Capitalized names followed by role/title context
+     - Pattern: "[Name], [Role] at [Company]"
+     - Pattern: "[Name] ([Title])"
+
+  2. Scan for company patterns:
+     - Names with Inc, Corp, Ltd, GmbH, Labs, Protocol
+     - Capitalized names with company context (founded, raised, announced)
+     - Domain names in URLs
+
+  3. Scan for project patterns:
+     - Protocol/platform/product + capitalized name
+     - Names with "network", "protocol", "chain", "token"
+     - GitHub organization names
+
+  4. Scan for event patterns:
+     - Conference/summit/meetup + name + date
+     - Location + date patterns
+
+  5. For each entity:
+     - Extract surrounding context (1-2 sentences)
+     - Assign confidence score (0-1)
+     - Check for duplicates against existing contacts
+     - Suggest industries from context
+
+output:
+  entities:
+    - name: "Protocol Labs"
+      type: company
+      confidence: 0.95
+      context: "Protocol Labs, founded by Juan Benet, created IPFS and Filecoin"
+      suggested_industries: [storage, web3]
+      existing_match: null  # or path to existing contact
+
+    - name: "Juan Benet"
+      type: person
+      confidence: 0.85
+      context: "Juan Benet, founder of Protocol Labs"
+      suggested_organization: "[[Protocol Labs]]"
+      existing_match: "1-datafund/contacts/people/Juan Benet.md"
+
+  summary:
+    total_extracted: 15
+    high_confidence: 8    # > 0.8
+    existing_matches: 3
+    new_entities: 12
+    created_drafts: 0     # If auto_create enabled
+```
+
+**Boundaries:**
+- **CAN:** Read research files, create draft contacts, update industry registry
+- **CANNOT:** Modify existing contacts, delete entities
+- **MUST:** Flag all entities for human review, include confidence scores
+
+### 15. Contact Maintainer Agent
+
+**Agent:** `crm-contact-maintainer`
+
+Maintains contact database quality: deduplication, merging, validation, industry registry.
+
+```yaml
+trigger:
+  - Weekly via nightshift
+  - Manual: /crm maintenance
+
+input:
+  scope: all | [space-name]
+  actions: [dedupe, validate, merge, registry]
+
+process:
+  1. Duplicate detection:
+     - Fuzzy name matching (Levenshtein distance < 3)
+     - Same organization + similar role
+     - Same email/linkedin across contacts
+     - Flag for review, don't auto-merge
+
+  2. Merge candidates:
+     - Identify pairs with high similarity
+     - Calculate field precedence (newer wins, non-empty wins)
+     - Generate merge preview
+
+  3. Validation:
+     - Check wiki-links resolve to existing pages
+     - Verify required fields present
+     - Flag incomplete/stale contacts
+
+  4. Industry registry maintenance:
+     - Scan all contacts for industry tags
+     - Normalize similar tags
+     - Update counts in registry
+     - Flag potential merges (Levenshtein similarity)
+
+output:
+  duplicates:
+    - pair: ["John Smith", "Jon Smith"]
+      similarity: 0.92
+      same_org: true
+      recommendation: merge
+      preview:
+        keep: "John Smith"
+        merge_fields: [channels.phone]
+
+  validation:
+    broken_links: 3
+    incomplete: 5
+    stale: 12  # No interaction > 180 days
+
+  industry_registry:
+    new_industries: 2
+    potential_merges:
+      - ["rwa", "real_world_assets"]
+      - ["ai", "ai_ml"]
+    updated_counts: true
+
+  actions_taken:
+    - "Updated industry registry with 2 new entries"
+    - "Flagged 3 duplicate pairs for review"
+```
+
+**Boundaries:**
+- **CAN:** Read all contacts, update industry registry, create merge previews
+- **CANNOT:** Auto-merge without user approval, delete contacts
+- **MUST:** Always require human confirmation for merges, preserve history
+
+### 16. Industry Landscape
+
+Strategic view of market positioning and network intelligence.
+
+#### Structure
+
+```
+[space]/contacts/landscape/
+├── _overview.md       # Industry landscape summary
+├── competitors.md     # Competitive analysis matrix
+└── ecosystem.md       # Partner/vendor ecosystem
+```
+
+#### Overview Template
+
+```markdown
+# Industry Landscape
+
+*Auto-generated: {{DATE}}*
+
+## Industries
+
+| Industry | Contacts | Companies | Projects |
+|----------|----------|-----------|----------|
+| data_infrastructure | 23 | 8 | 5 |
+| rwa | 12 | 4 | 3 |
+| defi | 45 | 15 | 12 |
+
+## Relationship Distribution
+
+| Status | Count |
+|--------|-------|
+| Active partners | 8 |
+| Customers | 3 |
+| Competitors | 12 |
+| Targets | 25 |
+
+## Network Graph
+
+<!-- Render with datacortex visualization -->
+```
+
+#### Supported Queries
+
+The landscape enables strategic queries:
+
+- "Who are our competitors in [industry]?"
+- "Who should we connect with at [event]?"
+- "What's our position vs [competitor]?"
+- "Who introduced us to [company]?"
+- "What companies in [industry] are we not tracking?"
+
+#### Landscape Compiler
+
+```python
+def compile_landscape(spaces: List[str]) -> LandscapeData:
+    """Aggregate contacts into landscape view."""
+    contacts = load_all_contacts(spaces)
+
+    return {
+        'industries': aggregate_by_industry(contacts),
+        'relationships': aggregate_by_relationship(contacts),
+        'competitors': filter_competitors(contacts),
+        'ecosystem': build_network_graph(contacts),
+        'coverage_gaps': identify_gaps(contacts, industry_targets)
+    }
+```
+
 ## Rationale
 
 ### Why Hybrid Folder Structure?
@@ -613,36 +1134,70 @@ Score thresholds:
 
 ## Implementation
 
-### Phase 1: Core Structure
-- [ ] Create module scaffold
-- [ ] Implement contact note templates
-- [ ] Create `contacts/` folder structure
+### Phase 1: Core Structure (Complete)
+- [x] Create module scaffold
+- [x] Implement contact note templates (person, company)
+- [x] Create `contacts/` folder structure
 
-### Phase 2: Built-in Adapters
-- [ ] Implement journal adapter
-- [ ] Implement calendar adapter
-- [ ] Create interaction extraction logic
+### Phase 2: Built-in Adapters (Complete)
+- [x] Implement journal adapter
+- [x] Implement calendar adapter
+- [x] Create interaction extraction logic
 
-### Phase 3: Commands & Integration
-- [ ] Implement `/crm` command
-- [ ] Add CRM section to `/today`
-- [ ] Add CRM section to `/gtd-weekly-review`
+### Phase 3: Commands & Integration (Complete)
+- [x] Implement `/crm` command
+- [x] Add CRM section to `/today`
+- [x] Add CRM section to `/gtd-weekly-review`
 
-### Phase 4: Cross-Space Index
-- [ ] Implement index compiler
-- [ ] Implement relationship scorer
-- [ ] Create privacy staging workflow
+### Phase 4: Cross-Space Index (Complete)
+- [x] Implement index compiler
+- [x] Implement relationship scorer
+- [x] Create privacy staging workflow
 
-### Phase 5: External Adapters
+### Phase 5: Extended Entity Types
+- [ ] Create project contact template
+- [ ] Create event contact template
+- [ ] Update person/company templates with new taxonomy
+- [ ] Add projects/ and events/ to folder structure
+
+### Phase 6: Entity Extractor Agent
+- [ ] Create agent specification
+- [ ] Implement entity extraction patterns
+- [ ] Add research processor hook
+- [ ] Test with literature notes
+
+### Phase 7: Contact Maintainer Agent
+- [ ] Create agent specification
+- [ ] Implement duplicate detection (Levenshtein)
+- [ ] Implement merge workflow
+- [ ] Add nightshift hook for weekly maintenance
+
+### Phase 8: Industry Registry
+- [ ] Create industry registry schema
+- [ ] Implement registration/normalization
+- [ ] Add alias detection
+- [ ] Integrate with contact creation
+
+### Phase 9: Industry Landscape
+- [ ] Create landscape templates
+- [ ] Implement landscape compiler
+- [ ] Add strategic query support
+- [ ] Datacortex visualization integration (optional)
+
+### Phase 10: External Adapters
 - [ ] Document adapter interface for other modules
 - [ ] Coordinate with meeting-notes module
 - [ ] Coordinate with mail module
 
 ## Open Questions
 
-1. **Duplicate detection:** How to handle same person appearing in multiple spaces with different names?
-2. **Merge contacts:** Workflow for merging duplicate contacts?
+1. ~~**Duplicate detection:** How to handle same person appearing in multiple spaces with different names?~~
+   → Resolved: Contact maintainer agent with Levenshtein similarity detection
+2. ~~**Merge contacts:** Workflow for merging duplicate contacts?~~
+   → Resolved: Contact maintainer generates merge previews, requires human approval
 3. **Calendar attendee resolution:** How to map email addresses to contact names reliably?
+4. **Industry hierarchy:** Should industries support parent/child relationships (e.g., finance/rwa)?
+5. **Cross-space duplicates:** How to handle same entity in personal vs team space?
 
 ## References
 
