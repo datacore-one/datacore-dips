@@ -77,8 +77,15 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 | [0002](DIP-0002-layered-context-pattern.md) | Layered Context Pattern | Core | Implemented |
 | [0003](DIP-0003-scaffolding-pattern.md) | Scaffolding Pattern | Core | Implemented |
 | [0004](DIP-0004-knowledge-database.md) | Knowledge Database | Core | Implemented |
+| [0005](DIP-0005-github-onboarding.md) | GitHub-Based Onboarding | Process | Draft |
+| [0006](DIP-0006-open-questions-management.md) | Open Questions Management | Process | Superseded |
 | [0009](DIP-0009-gtd-specification.md) | GTD System Specification | Core | Draft |
 | [0010](DIP-0010-external-sync-architecture.md) | External Sync Architecture | Core | Accepted |
+| [0011](DIP-0011-nightshift-module.md) | Nightshift Module | Module | Draft |
+| [0012](DIP-0012-crm-module.md) | CRM Module | Module | Draft |
+| [0013](DIP-0013-meetings-module.md) | Meetings Module | Module | Draft |
+
+**Note:** DIP-0006 (Open Questions) is superseded by DIP-0013 (Meetings Module) which incorporates and expands on the concepts.
 
 ## Contributing
 
