@@ -16,7 +16,54 @@
 
 ## Summary
 
-This DIP introduces a machine-readable agent registry system that enables dynamic agent discovery, capability advertising, and knowledge source linking. The design is forward-compatible with [ERC-8004 Trustless Agents](https://eips.ethereum.org/EIPS/eip-8004) and [Google A2A Protocol](https://a2a-protocol.org/latest/specification/), enabling future scenarios where agents have wallets, charge for services, or operate across organizational boundaries.
+This DIP introduces a machine-readable agent registry system that enables dynamic agent discovery, capability advertising, knowledge source linking, performance tracking, and agent-to-agent coordination. The design is forward-compatible with [ERC-8004 Trustless Agents](https://eips.ethereum.org/EIPS/eip-8004), [Google A2A Protocol](https://a2a-protocol.org/latest/specification/), [Virtuals Agent Commerce Protocol](https://whitepaper.virtuals.io), and [Olas Protocol](https://olas.network/), enabling future scenarios where agents have wallets, charge for services, rate each other, and operate across organizational boundaries.
+
+## Agent Context
+
+This section helps agents understand when and how to apply this DIP.
+
+### When to Reference This DIP
+
+**Always reference when:**
+- Spawning or routing to another agent
+- Adding a new agent to the system
+- Querying agent capabilities or availability
+- Tracking agent performance or interactions
+- Installing modules that provide agents
+- Generating external-facing agent metadata (AgentCard, ERC-8004)
+
+**Key decisions this DIP informs:**
+- Agent discovery uses registry, NOT hardcoded routing
+- Agent context includes pre-fetched knowledge from `reads.required`
+- Agent interactions are logged for performance tracking
+- New agents must be registered before they can be routed to
+
+### Quick Reference for Agents
+
+| Question | Answer |
+|----------|--------|
+| How do I find an agent for a task? | Query `agents.yaml` by skill tags or use `datacortex agent find` |
+| What knowledge should I read? | Check `reads.required` and `reads.contextual` in registry |
+| Which DIPs apply to my task? | Check `references.dips` in your registry entry |
+| Can I spawn another agent? | Check `spawns` field - only listed agents can be spawned |
+| Where do I log my results? | Check `writes` paths and log to `execution_log` |
+| How is my performance tracked? | Via `performance` metrics in registry state |
+
+### Related Agents
+
+| Agent | Uses This DIP For |
+|-------|-------------------|
+| `ai-task-executor` | Routing tasks to agents via registry lookup |
+| `context-maintainer` | Syncing registry with module agents |
+| `session-learning` | Recording agent interactions and outcomes |
+| All agents | Reading their `reads.required` knowledge sources |
+
+### Integration Points
+
+- **[DIP-0009: GTD](./DIP-0009-gtd-specification.md)** - Task routing and :AI: tag processing
+- **[DIP-0014: Tags](./DIP-0014-tag-taxonomy.md)** - Tag-based agent triggers
+- **[DIP-0004: Knowledge Database](./DIP-0004-knowledge-database.md)** - Datacortex semantic queries
+- **[DIP-0011: Nightshift](./DIP-0011-nightshift-module.md)** - Server-side performance aggregation
 
 ## Motivation
 
@@ -364,7 +411,255 @@ Before executing your primary task:
 4. **Task-Specific**: {inferred_paths}
 ```
 
-### 6. Future: Agent Wallets & Monetization
+### 6. Performance Tracking
+
+Track agent execution locally and sync to nightshift server for aggregation.
+
+#### 6.1 Execution Log Format
+
+Create `.datacore/state/execution_log.yaml` (gitignored, synced to nightshift):
+
+```yaml
+# Execution Log - Local state, synced to nightshift
+version: "1.0.0"
+last_sync: "2025-12-21T10:30:00Z"
+
+executions:
+  - id: "exec-2025-12-21-001"
+    agent_id: "gtd-research-processor"
+    timestamp: "2025-12-21T10:15:32Z"
+    task_id: "next_actions:L227"
+
+    # Execution metrics
+    duration_ms: 45000
+    tokens_in: 12500
+    tokens_out: 3200
+
+    # Outcome
+    status: "success"  # success, partial, failed, timeout
+    outputs:
+      - path: "notes/2-knowledge/zettel/Data-Tokenization.md"
+        type: "zettel"
+      - path: "notes/2-knowledge/literature/RWA-Report-2024.md"
+        type: "literature-note"
+
+    # Quality signals (for reputation)
+    quality:
+      user_feedback: null  # pending, positive, negative, revised
+      automated_checks:
+        - check: "output_exists"
+          passed: true
+        - check: "links_valid"
+          passed: true
+
+    # Agent interactions
+    spawned_agents: []
+    called_by: "ai-task-executor"
+
+  - id: "exec-2025-12-21-002"
+    agent_id: "ai-task-executor"
+    timestamp: "2025-12-21T10:14:00Z"
+    task_id: "nightshift-batch-001"
+    duration_ms: 180000
+    status: "success"
+    spawned_agents:
+      - agent_id: "gtd-research-processor"
+        execution_id: "exec-2025-12-21-001"
+        status: "success"
+      - agent_id: "gtd-content-writer"
+        execution_id: "exec-2025-12-21-003"
+        status: "success"
+```
+
+#### 6.2 Aggregated Performance Metrics
+
+Add to registry as computed state (updated after each execution):
+
+```yaml
+# In agents.yaml, computed section
+agents:
+  gtd-research-processor:
+    # ... static fields ...
+
+    # === Performance (computed, not manually edited) ===
+    performance:
+      total_executions: 142
+      success_rate: 0.94
+      avg_duration_ms: 38500
+      last_execution: "2025-12-21T10:15:32Z"
+
+      # Per-skill breakdown
+      skill_metrics:
+        url-analysis:
+          executions: 89
+          success_rate: 0.96
+        zettel-creation:
+          executions: 53
+          success_rate: 0.91
+
+      # Reputation (Virtuals ACP inspired)
+      reputation:
+        score: 87  # 0-100, computed from feedback
+        feedback_count: 28
+        positive_rate: 0.89
+
+      # Version history (Olas inspired)
+      version_history:
+        - version: "1.0.0"
+          hash: "abc123"
+          deployed: "2025-11-15"
+          executions: 142
+        - version: "0.9.0"
+          hash: "def456"
+          deployed: "2025-10-01"
+          executions: 87
+          retired: "2025-11-15"
+```
+
+#### 6.3 Nightshift Sync
+
+Performance data syncs bidirectionally with nightshift server:
+
+```
+LOCAL                              NIGHTSHIFT SERVER
+─────────────────────────────────────────────────────
+execution_log.yaml  ──push──→     Aggregate metrics
+                                        ↓
+                               Compute cross-session stats
+                               Update reputation scores
+                                        ↓
+performance stats   ←──pull──     Return aggregated data
+```
+
+**Sync triggers:**
+- After each agent execution (append to local log)
+- On `/wrap-up` command (push to server)
+- On `/today` command (pull aggregated stats)
+- Nightshift batch completion (server-side aggregation)
+
+### 7. Agent-to-Agent Interactions
+
+Track how agents collaborate, spawn, and evaluate each other.
+
+#### 7.1 Interaction Registry
+
+```yaml
+# In agents.yaml
+agents:
+  ai-task-executor:
+    # ... other fields ...
+
+    # === Relationships ===
+    spawns:
+      - "gtd-research-processor"
+      - "gtd-content-writer"
+      - "gtd-data-analyzer"
+      - "gtd-project-manager"
+
+    can_be_called_by:
+      - "nightshift"  # Scheduled execution
+      - "user"        # Direct invocation
+
+    delegates_to: []  # Passes control entirely
+
+  gtd-research-processor:
+    spawns: []
+    can_be_called_by:
+      - "ai-task-executor"
+      - "user"
+    delegates_to: []
+```
+
+#### 7.2 Inter-Agent Evaluation (Virtuals ACP Pattern)
+
+Agents can provide feedback on other agents' outputs:
+
+```yaml
+# In execution_log.yaml
+evaluations:
+  - id: "eval-2025-12-21-001"
+    evaluator_agent: "ai-task-executor"
+    evaluated_agent: "gtd-research-processor"
+    execution_id: "exec-2025-12-21-001"
+    timestamp: "2025-12-21T10:20:00Z"
+
+    # Structured evaluation
+    scores:
+      task_completion: 95     # Did it complete the task?
+      output_quality: 88      # Quality of outputs
+      efficiency: 72          # Token/time efficiency
+
+    # Tags for categorization (ERC-8004 feedback tags)
+    tags: ["research", "zettel"]
+
+    # Optional notes
+    notes: "Created high-quality zettel but took longer than expected"
+```
+
+#### 7.3 Composition Model (Olas Pattern)
+
+Borrow from Olas: agents can be composed from reusable components.
+
+```yaml
+# Component registry (future extension)
+components:
+  web-fetcher:
+    type: "component"
+    description: "Fetches and parses web content"
+    version: "1.0.0"
+
+  markdown-writer:
+    type: "component"
+    description: "Generates structured markdown"
+    version: "1.0.0"
+
+agents:
+  gtd-research-processor:
+    type: "agent"
+    # Agent is composed of components
+    components:
+      - "web-fetcher"
+      - "markdown-writer"
+    # Components + agent prompt = full capability
+```
+
+### 8. Knowledge Location Matrix
+
+Standardize where agents read from and write to:
+
+```yaml
+# In agents.yaml, global section
+knowledge_locations:
+  personal:
+    inbox: "0-personal/org/inbox.org"
+    next_actions: "0-personal/org/next_actions.org"
+    journals: "0-personal/notes/journals/"
+    zettel: "0-personal/notes/2-knowledge/zettel/"
+    literature: "0-personal/notes/2-knowledge/literature/"
+    active_notes: "0-personal/notes/1-active/"
+
+  org:  # Template for org spaces
+    inbox: "{space}/org/inbox.org"
+    next_actions: "{space}/org/next_actions.org"
+    journals: "{space}/journal/"
+    zettel: "{space}/3-knowledge/zettel/"
+    literature: "{space}/3-knowledge/literature/"
+    tracks: "{space}/1-tracks/"
+    archive: "{space}/4-archive/"
+
+  routing:
+    # How to determine space
+    personal_indicators:
+      - "my notes"
+      - "personal"
+      - "draft"
+    org_indicators:
+      - "official"
+      - "company"
+      - "team"
+```
+
+### 9. Future: Agent Wallets & Monetization
 
 Reserved fields in the registry enable future scenarios:
 
@@ -378,7 +673,7 @@ erc8004:
     - crypto-economic  # Staked validation
     - tee-attestation  # TEE proofs
 
-  # Payment configuration
+  # Payment configuration (x402 protocol)
   payment:
     protocol: "x402"  # HTTP 402 Payment Required
     currency: "USDC"
@@ -390,6 +685,17 @@ erc8004:
     - chainId: "8453"  # Base
       identityRegistry: "0xABC..."
       agentId: 42
+
+# Virtuals ACP integration (future)
+virtuals:
+  agent_token: null  # ERC-20 token address
+  commerce_enabled: false
+
+# Olas integration (future)
+olas:
+  service_id: null  # NFT ID in Olas registry
+  component_hashes: []  # Version history via hash appending
+  staking_enabled: false
 ```
 
 ## Rationale
@@ -443,55 +749,122 @@ erc8004:
 2. Update `ai-task-executor` to read registry for routing
 3. Add `references` field and auto-inject DIPs/specs
 4. Add CLI: `datacortex agent list`, `datacortex agent find`
+5. Add `knowledge_locations` matrix for consistent paths
 
 ### Phase 2: Knowledge Pre-Fetch (v1.1)
 
 1. Implement `reads.contextual` query execution
 2. Add datacortex integration for semantic pre-fetch
 3. Validate `writes` paths exist before agent execution
+4. Add Agent Context section pattern to all agent prompts
 
-### Phase 3: Module Integration (v1.2)
+### Phase 3: Performance Tracking (v1.2)
+
+1. Create `.datacore/state/execution_log.yaml` structure
+2. Implement execution logging after each agent run
+3. Add automated quality checks (output_exists, links_valid)
+4. Compute aggregated `performance` metrics in registry
+
+### Phase 4: Module Integration (v1.3)
 
 1. Add install hook for module agent registration
 2. Implement `module_agents` section handling
 3. Update `context-maintainer` to sync module agents
+4. Add `spawns` and `can_be_called_by` relationship tracking
 
-### Phase 4: External Compatibility (v2.0)
+### Phase 5: Nightshift Sync (v1.4)
 
-1. Add AgentCard generation endpoint
+1. Implement execution_log push to nightshift server
+2. Pull aggregated performance stats on `/today`
+3. Add reputation score computation from feedback
+4. Version history tracking (Olas-inspired hash appending)
+
+### Phase 6: Agent-to-Agent Evaluation (v1.5)
+
+1. Implement inter-agent evaluation in execution_log
+2. Add evaluation scores (task_completion, output_quality, efficiency)
+3. Aggregate evaluations into reputation scores
+4. Enable orchestrator agents to rate spawned agents
+
+### Phase 7: External Compatibility (v2.0)
+
+1. Add AgentCard generation endpoint (A2A compatible)
 2. Implement ERC-8004 registration file export
 3. Add `/.well-known/agent.json` serving capability
-4. Wallet integration (separate DIP)
+4. Component registry for Olas-style composition (future)
+5. Wallet integration and x402 payments (separate DIP)
+
+### New Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `agents.yaml` | `.datacore/registry/` | Agent registry with capabilities, triggers, references |
+| `execution_log.yaml` | `.datacore/state/` | Local execution history (gitignored, synced) |
+| `datacortex agent` | CLI | Agent discovery commands (`list`, `find`) |
+
+### Improvements Checklist
+
+All improvements identified in the analysis are addressed:
+
+| Improvement | Section | Status |
+|-------------|---------|--------|
+| Agent Capability Registry | §1 | Core feature |
+| Semantic Pre-Fetch via Datacortex | §5 | `reads.contextual` |
+| Spec Linking in Frontmatter | §1 | `references.dips`, `references.specs` |
+| Module Auto-Registration | §3.3 | Install hooks |
+| Knowledge Location Matrix | §8 | Standardized paths |
+| Session Memory Embedding | §6.1 | Execution outputs logged |
+| Performance Tracking | §6 | Local + nightshift sync |
+| Agent-to-Agent Interactions | §7 | Spawns, evaluations |
 
 ## Open Questions
 
 1. **Embedding agent skills**: Should skills be embedded in datacortex for semantic discovery?
 
-2. **Reputation local storage**: Should we track agent execution success/failure locally before on-chain?
+2. **Session memory search**: Should execution outputs be embedded for future retrieval? (e.g., "What did gtd-research-processor find about tokenization?")
 
-3. **Multi-agent coordination**: How do `spawns` relationships affect knowledge sharing?
+3. **Multi-agent coordination**: How do `spawns` relationships affect knowledge sharing between parent/child agents?
 
 4. **Privacy levels**: Should registry entries have privacy classifications per DIP-0002?
 
 5. **Versioning**: How to handle breaking changes in agent capabilities?
 
+6. **Component reuse**: When should we extract common patterns into Olas-style components?
+
 ## References
 
 ### External Standards
 
-- [ERC-8004: Trustless Agents](https://eips.ethereum.org/EIPS/eip-8004) - Ethereum agent registry standard
-- [Google A2A Protocol](https://a2a-protocol.org/latest/specification/) - Agent-to-Agent interoperability
+- [ERC-8004: Trustless Agents](https://eips.ethereum.org/EIPS/eip-8004) - Ethereum agent registry standard (Identity, Reputation, Validation registries)
+- [Google A2A Protocol](https://a2a-protocol.org/latest/specification/) - Agent-to-Agent interoperability (AgentCard, skills schema)
+- [Virtuals Protocol](https://whitepaper.virtuals.io) - Agent Commerce Protocol (ACP) for agent-to-agent commerce and ratings
+- [Olas Protocol](https://olas.network/) - On-chain agent registry with NFT-based components, agents, and services
 - [x402 Payment Protocol](https://x402.org/) - HTTP 402 micropayments for agents
 - [A-MEM: Agentic Memory](https://arxiv.org/abs/2502.12110) - Zettelkasten-inspired agent memory
+
+### Protocol Pattern Origins
+
+| Pattern | Source | Usage in This DIP |
+|---------|--------|-------------------|
+| Three registries (Identity, Reputation, Validation) | ERC-8004 | Registry structure, future on-chain |
+| AgentCard with skills array | A2A Protocol | Skills-based capability discovery |
+| Agent-to-agent evaluation/ratings | Virtuals ACP | Inter-agent evaluation in execution_log |
+| Component → Agent → Service composition | Olas | Future component registry |
+| Version tracking via hash appending | Olas | version_history in performance metrics |
+| Tokenized agents (ERC-20/721) | Virtuals/Olas | Reserved erc8004/virtuals/olas fields |
 
 ### Internal References
 
 - [DIP-0009: GTD Specification](DIP-0009-gtd-specification.md) - Agent routing and execution
 - [DIP-0014: Tag Taxonomy](DIP-0014-tag-taxonomy.md) - Tag-based agent triggers
 - [DIP-0002: Layered Context](DIP-0002-layered-context-pattern.md) - Privacy levels for registry
+- [DIP-0004: Knowledge Database](DIP-0004-knowledge-database.md) - Datacortex integration
+- [DIP-0011: Nightshift Module](DIP-0011-nightshift-module.md) - Server-side execution and sync
 
 ### Research
 
 - [Agentic RAG Survey](https://arxiv.org/abs/2501.09136) - Dynamic retrieval patterns
 - [GraphRAG](https://neo4j.com/blog/genai/knowledge-graph-llm-multi-hop-reasoning/) - Knowledge graph reasoning
 - [ZBrain Knowledge Graphs](https://zbrain.ai/knowledge-graphs-for-agentic-ai/) - Agentic AI architecture
+- [LangChain Memory for Agents](https://blog.langchain.com/memory-for-agents/) - Agent memory patterns
+- [Letta Agent Memory](https://www.letta.com/blog/agent-memory) - MemGPT virtual memory approach
