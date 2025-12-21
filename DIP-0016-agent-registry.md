@@ -12,7 +12,7 @@
 | **Tags** | `agents`, `registry`, `discovery`, `erc-8004` |
 | **Affects** | `.datacore/agents/`, `.datacore/registry/`, `tags.yaml` |
 | **Specs** | `datacore-specification.md` |
-| **Agents** | `ai-task-executor`, `context-maintainer` |
+| **Agents** | `ai-task-executor`, `context-maintainer`, `agent-registry-auditor` |
 
 ## Summary
 
@@ -877,7 +877,183 @@ knowledge_locations:
       - "team"
 ```
 
-### 13. Future: Agent Wallets & Monetization
+### 13. Agent Registry Auditor
+
+Audit and upgrade agents for DIP-0016 compliance.
+
+#### 13.1 Audit Command
+
+```bash
+# Audit all agents
+/audit-agents
+
+# Audit specific agent
+/audit-agents gtd-research-processor
+
+# Audit and auto-fix
+/audit-agents --fix
+```
+
+#### 13.2 Compliance Checklist
+
+The auditor validates each agent against:
+
+**Registry Entry (Required):**
+
+| Check | Requirement | Auto-fixable |
+|-------|-------------|--------------|
+| `agents.yaml` entry exists | Agent must be registered | Yes |
+| `name` and `description` | Human-readable identity | Yes (from agent file) |
+| `version` | Semantic version | Yes (default 1.0.0) |
+| `source` | Path to agent .md file | Yes |
+| `skills` array | At least one skill defined | Partial |
+| `triggers.tags` | Tag-based routing | Yes (from tags.yaml) |
+
+**Knowledge Sources (Required):**
+
+| Check | Requirement | Auto-fixable |
+|-------|-------------|--------------|
+| `reads.required` | Files agent must read | No (needs analysis) |
+| `references.dips` | Relevant DIPs listed | Partial |
+| `writes` | Output locations | No (needs analysis) |
+
+**Relationships (Recommended):**
+
+| Check | Requirement | Auto-fixable |
+|-------|-------------|--------------|
+| `spawns` | Child agents listed | Yes (from agent prompt) |
+| `can_be_called_by` | Parent agents listed | Yes (inverse of spawns) |
+
+**Prompt Patterns (Recommended):**
+
+| Check | Requirement | Auto-fixable |
+|-------|-------------|--------------|
+| Think-Search-Generate | §5 pattern in prompt | Partial |
+| Agent Context section | §Agent Context in prompt | Yes (template) |
+| Multi-hop guidance | When to use graph traversal | Yes (template) |
+
+#### 13.3 Audit Output
+
+```yaml
+# audit-report.yaml
+audit_date: "2025-12-21"
+agents_scanned: 12
+agents_compliant: 3
+agents_need_upgrade: 9
+
+results:
+  gtd-research-processor:
+    status: "needs_upgrade"
+    score: 65  # 0-100
+    missing:
+      - registry_entry: "Not in agents.yaml"
+      - reads_required: "Not specified"
+      - references_dips: "DIP-0004 not listed"
+    present:
+      - source_file: ".datacore/agents/gtd-research-processor.md"
+      - has_skills: true (inferred from description)
+    recommendations:
+      - "Add to agents.yaml with skills array"
+      - "Add reads.required with tags.yaml, knowledge directories"
+      - "Add references.dips: [DIP-0004, DIP-0014]"
+      - "Inject Think-Search-Generate pattern into prompt"
+
+  ai-task-executor:
+    status: "compliant"
+    score: 95
+    missing: []
+    present:
+      - registry_entry: true
+      - all_fields: true
+    recommendations:
+      - "Consider adding performance.skill_metrics"
+```
+
+#### 13.4 Auto-Upgrade Workflow
+
+```
+1. SCAN
+   ├── Read all .datacore/agents/*.md files
+   ├── Read .datacore/modules/*/agents/*.md
+   └── Compare against agents.yaml
+
+2. ANALYZE
+   ├── Parse agent frontmatter and content
+   ├── Infer skills from description/examples
+   ├── Detect spawns from Task tool usage
+   └── Identify reads from file references
+
+3. GENERATE
+   ├── Create agents.yaml entries for missing agents
+   ├── Suggest reads.required based on file patterns
+   ├── Map to DIPs based on content keywords
+   └── Generate skills from capability analysis
+
+4. UPGRADE (with confirmation)
+   ├── Add registry entries to agents.yaml
+   ├── Inject Agent Context section into prompts
+   ├── Add Think-Search-Generate pattern
+   └── Update CLAUDE.md agent tables
+```
+
+#### 13.5 Agent Definition
+
+Create `agent-registry-auditor` agent:
+
+```yaml
+# In agents.yaml
+agent-registry-auditor:
+  name: "Agent Registry Auditor"
+  description: "Audits agents for DIP-0016 compliance and generates upgrades"
+  version: "1.0.0"
+  source: ".datacore/agents/agent-registry-auditor.md"
+
+  skills:
+    - id: "compliance-audit"
+      name: "Compliance Audit"
+      description: "Scan agents and check DIP-0016 requirements"
+      tags: ["audit", "compliance", "registry"]
+
+    - id: "registry-generation"
+      name: "Registry Generation"
+      description: "Generate agents.yaml entries from agent files"
+      tags: ["generation", "registry"]
+
+    - id: "prompt-upgrade"
+      name: "Prompt Upgrade"
+      description: "Inject DIP-0016 patterns into agent prompts"
+      tags: ["upgrade", "patterns"]
+
+  triggers:
+    tags: [":AI:audit:agents:"]
+    patterns: ["audit.*agents", "check.*registry"]
+
+  reads:
+    required:
+      - ".datacore/registry/agents.yaml"
+      - ".datacore/dips/DIP-0016-agent-registry.md"
+      - ".datacore/tags.yaml"
+    contextual:
+      - query: "glob .datacore/agents/*.md"
+        when: "always"
+      - query: "glob .datacore/modules/*/agents/*.md"
+        when: "always"
+
+  writes:
+    - ".datacore/registry/agents.yaml"
+    - ".datacore/agents/"  # Upgraded prompts
+
+  references:
+    dips: ["DIP-0016", "DIP-0003"]
+    specs: []
+
+  spawns: []
+  can_be_called_by:
+    - "user"
+    - "context-maintainer"
+```
+
+### 14. Future: Agent Wallets & Monetization
 
 Reserved fields in the registry enable future scenarios:
 
@@ -1019,6 +1195,66 @@ olas:
 | `agents.yaml` | `.datacore/registry/` | Agent registry with capabilities, triggers, references |
 | `execution_log.yaml` | `.datacore/state/` | Local execution history (gitignored, synced) |
 | `datacortex agent` | CLI | Agent discovery commands (`list`, `find`) |
+| `agent-registry-auditor` | `.datacore/agents/` | Audits and upgrades agents for DIP-0016 compliance |
+| `/audit-agents` | `.datacore/commands/` | Command to trigger agent audits |
+
+### Existing Agent Upgrades
+
+**Yes, all existing agents need upgrading.** The auditor will handle this automatically.
+
+#### Upgrade Scope
+
+| Agent Type | Count | Upgrade Needed |
+|------------|-------|----------------|
+| Core agents (`.datacore/agents/`) | ~15 | Registry entry + patterns |
+| Module agents | ~10 | Registry entry + patterns |
+| **Total** | ~25 | Full compliance |
+
+#### What Gets Upgraded
+
+1. **Registry Entry**: Every agent gets an entry in `agents.yaml`
+2. **Skills Array**: Capabilities extracted from description
+3. **Reads/Writes**: Knowledge sources documented
+4. **References**: Relevant DIPs linked
+5. **Prompt Injection** (optional): Think-Search-Generate pattern
+
+#### Upgrade Strategy
+
+```
+Phase 1: Registry Bootstrap
+├── Run /audit-agents to scan all agents
+├── Generate agents.yaml with all entries
+├── Review and confirm accuracy
+└── Commit initial registry
+
+Phase 2: Knowledge Linking
+├── Analyze each agent's file reads
+├── Add reads.required entries
+├── Link relevant DIPs
+└── Document writes paths
+
+Phase 3: Prompt Patterns (optional)
+├── Inject Agent Context section
+├── Add Think-Search-Generate where appropriate
+├── Test agent behavior
+└── Iterate on patterns
+
+Phase 4: Continuous Compliance
+├── Run /audit-agents weekly
+├── Auto-register new agents
+├── Track compliance scores
+└── Flag regressions
+```
+
+#### Estimated Effort
+
+| Task | Effort | Automation |
+|------|--------|------------|
+| Initial registry generation | Low | Fully automated |
+| Skills extraction | Low | Mostly automated |
+| Reads/writes analysis | Medium | Needs review |
+| Prompt upgrades | Medium | Template-based |
+| **Total bootstrap** | ~2 hours | With auditor |
 
 ### Improvements Checklist
 
