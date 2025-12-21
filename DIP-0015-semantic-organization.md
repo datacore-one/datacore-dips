@@ -45,11 +45,15 @@ This section helps agents understand when and how to apply this DIP.
 
 | Question | Answer |
 |----------|--------|
-| Where does a PDF contract go? | `1-tracks/legal/contracts/[type]/` - with its related contracts |
-| Does it need a companion .md? | Only if non-AI-readable (Keynote, PSD, video) |
-| Where do old financials go? | `4-archive/finance/statements/[year]/` |
-| How to handle 60MB video? | Git LFS tracks it; create companion .md with description |
-| Personal vs team knowledge? | Route by subject: personal topics → 0-personal, org topics → [N]-org |
+| Personal or org space? | Ask: "If I left, should this stay with the org?" Yes → org, No → personal |
+| My notes on org topic? | Personal (0-personal/) - it's your perspective, not official |
+| Official company doc? | Org space ([N]-org/) - shared team asset |
+| Where does a contract go? | Org: `1-tracks/legal/contracts/[type]/` |
+| Does it need a companion? | Only if non-AI-readable (Keynote, PSD, video) |
+| Where do old financials go? | Org: `4-archive/finance/statements/[year]/` |
+| Personal draft about work? | Personal: `notes/1-active/` - not official yet |
+| General concept zettel? | Personal: broader applicability beyond org |
+| Org-specific concept zettel? | Org: `3-knowledge/zettel/` - company knowledge |
 
 ### Related Agents
 
@@ -425,15 +429,86 @@ ingest-processor (per item)
 | Companions | Same folder as source | Non-AI-readable files |
 | Index updates | `_index.md` files | All new content |
 
+#### Space Routing
+
+Before determining the semantic folder, determine **which space** the content belongs to:
+
+**Routing Decision Tree:**
+
+```
+Is this official organizational content?
+├── YES → Route to org space (e.g., 1-datafund/)
+│   Examples:
+│   - Company contracts, agreements
+│   - Official financial statements
+│   - Brand assets, approved marketing
+│   - Team decisions, meeting notes
+│   - Product specs, roadmaps
+│
+└── NO → Route to personal space (0-personal/)
+    ├── Personal writings/thoughts about org topics
+    ├── Draft ideas not yet shared
+    ├── Personal notes from meetings
+    ├── Research for personal learning
+    └── Any content that is "mine" not "ours"
+```
+
+**Key Distinction:**
+
+| Attribute | Personal (0-personal/) | Organizational ([N]-space/) |
+|-----------|------------------------|----------------------------|
+| **Ownership** | Individual | Team/company |
+| **Visibility** | Private by default | Shared with team |
+| **Authority** | My perspective | Official position |
+| **Examples** | My notes on strategy meeting | Approved strategy document |
+| | Draft pitch ideas | Signed investor agreement |
+| | Personal research on competitors | Official market analysis |
+| | My writings about the company | Published blog posts |
+
+**Routing Examples (Datafund import):**
+
+| File | Route To | Rationale |
+|------|----------|-----------|
+| `investor-agreement-signed.pdf` | 1-datafund/1-tracks/legal/ | Official binding contract |
+| `my-thoughts-on-fundraising.md` | 0-personal/notes/ | Personal perspective |
+| `pitch-deck-v3.key` | 1-datafund/1-tracks/comms/ | Official company asset |
+| `pitch-ideas-draft.md` | 0-personal/notes/1-active/ | Personal draft, not official |
+| `brand-guidelines.pdf` | 1-datafund/3-knowledge/ | Official reference |
+| `competitor-notes.md` | Depends on formality | If official analysis → org; if personal research → personal |
+| `meeting-notes-2024-03.md` | 1-datafund/journal/ or 0-personal/ | If team meeting notes → org; if personal notes → personal |
+
+**When Unclear:**
+
+1. Ask: "Would this be shared in a team handoff?"
+   - Yes → organizational
+   - No → personal
+
+2. Ask: "Does this represent the company's position or mine?"
+   - Company → organizational
+   - Mine → personal
+
+3. Ask: "If I left, should this stay with the org?"
+   - Yes → organizational
+   - No → personal
+
+**Cross-Space Knowledge:**
+
+When extracting zettels or insights from organizational documents:
+- **Zettel about org-specific concept** (e.g., "Verity tokenization model") → org space
+- **Zettel about general concept** (e.g., "RWA regulatory framework") → personal space (broader applicability)
+- **Personal insight about org topic** → personal space
+
 #### Processing Decisions
 
-| Content Type | Destination | Processing Level |
-|--------------|-------------|------------------|
-| Active contracts | `1-tracks/legal/contracts/` | Full analysis, extract obligations |
-| Current financials | `1-tracks/finance/` | Full analysis |
-| Reference docs | `3-knowledge/` | Extract zettels, literature notes |
-| Historical/outdated | `4-archive/` | Companion only |
-| Large media | Semantic location | Companion required |
+| Content Type | Space | Destination | Processing Level |
+|--------------|-------|-------------|------------------|
+| Active contracts | Org | `1-tracks/legal/contracts/` | Full analysis, extract obligations |
+| Current financials | Org | `1-tracks/finance/` | Full analysis |
+| Official reference | Org | `3-knowledge/` | Extract zettels, literature notes |
+| Personal writings | Personal | `notes/1-active/` or `notes/pages/` | Personal processing |
+| Historical/outdated | Org | `4-archive/` | Companion only |
+| Personal research | Personal | `notes/2-knowledge/` | Extract personal zettels |
+| Large media | Depends | Semantic location | Companion required |
 
 #### Quality Verification
 
