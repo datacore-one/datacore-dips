@@ -390,7 +390,222 @@ def generate_agentcard(agent_id: str) -> dict:
     }
 ```
 
-### 5. Knowledge Pre-Fetch Pattern
+### 5. Think-Search-Generate Pattern
+
+Adopt the Generate-on-Graph (GoG) cognitive pattern for agent execution:
+
+#### 5.1 Three-Phase Execution
+
+```markdown
+## Agent Execution Pattern (inject into agent prompts)
+
+Execute tasks using the Think-Search-Generate pattern:
+
+### Phase 1: THINK
+- Decompose the task into sub-questions
+- Identify what knowledge you need
+- Decide: Do I need to search, or do I already know?
+
+### Phase 2: SEARCH
+For each knowledge gap:
+1. **Semantic search**: `datacortex search "{question}" --top 5`
+2. **Graph traversal**: Follow wiki-links from results (multi-hop)
+3. **Direct read**: Load specific files from `reads.required`
+
+### Phase 3: GENERATE
+- Synthesize answer from retrieved knowledge
+- Cite sources with [[wiki-links]]
+- If uncertain, return to SEARCH phase
+```
+
+#### 5.2 Agentic RAG Decision Pattern
+
+Agents decide *when* and *what* to retrieve, not just *how*:
+
+```yaml
+# In agent execution
+retrieval_decisions:
+  - condition: "task mentions specific concept"
+    action: "datacortex search for that concept"
+
+  - condition: "task requires current state"
+    action: "read org files directly"
+
+  - condition: "task spans multiple topics"
+    action: "multi-hop: search → follow links → search again"
+
+  - condition: "sufficient context already loaded"
+    action: "skip retrieval, generate directly"
+```
+
+### 6. Multi-Hop Reasoning via Datacortex
+
+Leverage the knowledge graph for chained lookups:
+
+#### 6.1 Graph Traversal Pattern
+
+```bash
+# Single-hop: direct semantic search
+datacortex search "data tokenization" --top 5
+
+# Multi-hop: follow connections from results
+datacortex search "data tokenization" --top 3 --expand 1
+
+# Output includes:
+# - Direct matches (hop 0)
+# - Connected documents via wiki-links (hop 1)
+# - Shared tags cluster (hop 1)
+```
+
+#### 6.2 Reasoning Path Tracking
+
+```yaml
+# In execution_log.yaml
+reasoning_paths:
+  - execution_id: "exec-2025-12-21-001"
+    hops:
+      - hop: 0
+        query: "data tokenization"
+        results: ["Data-Tokenization.md", "RWA-Overview.md"]
+      - hop: 1
+        source: "Data-Tokenization.md"
+        followed_links: ["Verity-Protocol.md", "SPV-Structure.md"]
+      - hop: 2
+        source: "Verity-Protocol.md"
+        followed_links: ["Data-Marketplace.md"]
+    final_context: ["Data-Tokenization.md", "Verity-Protocol.md", "SPV-Structure.md"]
+```
+
+#### 6.3 When to Use Multi-Hop
+
+| Task Type | Hops | Example |
+|-----------|------|---------|
+| Factual lookup | 0 | "What is data tokenization?" |
+| Contextual understanding | 1 | "How does tokenization relate to Verity?" |
+| Strategic synthesis | 2+ | "What's our competitive advantage in data markets?" |
+
+### 7. Tiered Memory Architecture
+
+Implement MemGPT-inspired tiered retrieval:
+
+#### 7.1 Memory Tiers
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ TIER 0: Working Memory (Context Window)                 │
+│ - Current task description                              │
+│ - CLAUDE.md base context                                │
+│ - reads.required files                                  │
+│ - Recent conversation history                           │
+│ Capacity: ~100K tokens                                  │
+└─────────────────────────────────────────────────────────┘
+                          ↓ overflow
+┌─────────────────────────────────────────────────────────┐
+│ TIER 1: Hot Storage (Datacortex Cache)                  │
+│ - Recent search results                                 │
+│ - Frequently accessed zettels                           │
+│ - Session memory (last 7 days)                          │
+│ Access: datacortex search (< 1s)                        │
+└─────────────────────────────────────────────────────────┘
+                          ↓ cache miss
+┌─────────────────────────────────────────────────────────┐
+│ TIER 2: Warm Storage (Full Knowledge Base)              │
+│ - All embedded documents                                │
+│ - Literature notes, zettels, pages                      │
+│ - Historical execution logs                             │
+│ Access: datacortex search with embedding (1-3s)         │
+└─────────────────────────────────────────────────────────┘
+                          ↓ not embedded
+┌─────────────────────────────────────────────────────────┐
+│ TIER 3: Cold Storage (File System)                      │
+│ - Non-embedded files                                    │
+│ - Archive content                                       │
+│ - Raw documents without companions                      │
+│ Access: glob/grep/read tools (variable)                 │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### 7.2 Tier Selection Logic
+
+```python
+def select_tier(query: str, urgency: str) -> str:
+    # Check working memory first
+    if query in current_context:
+        return "tier0_working"
+
+    # Hot storage for recent/frequent
+    if is_recent_query(query) or is_high_frequency_topic(query):
+        return "tier1_hot"
+
+    # Warm storage for embedded content
+    if has_embedding(query):
+        return "tier2_warm"
+
+    # Cold storage fallback
+    return "tier3_cold"
+```
+
+### 8. Session Memory Embedding
+
+Agent outputs become searchable knowledge for future sessions:
+
+#### 8.1 Memory Generation
+
+After each agent execution, generate memory entry:
+
+```yaml
+# Auto-generated after execution
+session_memories:
+  - id: "mem-2025-12-21-001"
+    source_execution: "exec-2025-12-21-001"
+    agent_id: "gtd-research-processor"
+    timestamp: "2025-12-21T10:15:32Z"
+
+    # Searchable summary (embedded in datacortex)
+    summary: |
+      Researched data tokenization for RWA markets.
+      Key finding: SPV structure enables fractional ownership.
+      Created zettel on tokenization mechanics.
+
+    # Structured insights
+    insights:
+      - "SPV structure is key enabler for data tokenization"
+      - "Regulatory clarity needed for RWA data assets"
+
+    # Tags for retrieval
+    tags: ["tokenization", "rwa", "verity", "research"]
+
+    # Links to outputs
+    outputs:
+      - "notes/2-knowledge/zettel/Data-Tokenization.md"
+```
+
+#### 8.2 Memory Embedding
+
+```bash
+# After execution, embed the summary
+datacortex embed \
+  --text "{summary}" \
+  --type session-memory \
+  --source "exec-2025-12-21-001" \
+  --tags "tokenization,rwa"
+```
+
+#### 8.3 Future Session Retrieval
+
+Agents can query past session insights:
+
+```bash
+# "What did we learn about tokenization?"
+datacortex search "tokenization" --type session-memory --top 5
+
+# Returns:
+# 1. [session-memory] 2025-12-21: SPV structure enables fractional ownership
+# 2. [session-memory] 2025-12-15: Tokenization requires clear data provenance
+# 3. [zettel] Data-Tokenization.md: Core concept explanation
+```
+
+### 9. Knowledge Pre-Fetch Pattern
 
 Standardize how agents gather context before execution:
 
@@ -408,14 +623,17 @@ Before executing your primary task:
 3. **Semantic Context**: Based on your task, these knowledge items are relevant:
    {datacortex_results}
 
-4. **Task-Specific**: {inferred_paths}
+4. **Session Memory**: Previous insights on this topic:
+   {session_memory_results}
+
+5. **Task-Specific**: {inferred_paths}
 ```
 
-### 6. Performance Tracking
+### 10. Performance Tracking
 
 Track agent execution locally and sync to nightshift server for aggregation.
 
-#### 6.1 Execution Log Format
+#### 10.1 Execution Log Format
 
 Create `.datacore/state/execution_log.yaml` (gitignored, synced to nightshift):
 
@@ -471,7 +689,7 @@ executions:
         status: "success"
 ```
 
-#### 6.2 Aggregated Performance Metrics
+#### 10.2 Aggregated Performance Metrics
 
 Add to registry as computed state (updated after each execution):
 
@@ -516,7 +734,7 @@ agents:
           retired: "2025-11-15"
 ```
 
-#### 6.3 Nightshift Sync
+#### 10.3 Nightshift Sync
 
 Performance data syncs bidirectionally with nightshift server:
 
@@ -537,11 +755,11 @@ performance stats   ←──pull──     Return aggregated data
 - On `/today` command (pull aggregated stats)
 - Nightshift batch completion (server-side aggregation)
 
-### 7. Agent-to-Agent Interactions
+### 11. Agent-to-Agent Interactions
 
 Track how agents collaborate, spawn, and evaluate each other.
 
-#### 7.1 Interaction Registry
+#### 11.1 Interaction Registry
 
 ```yaml
 # In agents.yaml
@@ -570,7 +788,7 @@ agents:
     delegates_to: []
 ```
 
-#### 7.2 Inter-Agent Evaluation (Virtuals ACP Pattern)
+#### 11.2 Inter-Agent Evaluation (Virtuals ACP Pattern)
 
 Agents can provide feedback on other agents' outputs:
 
@@ -596,7 +814,7 @@ evaluations:
     notes: "Created high-quality zettel but took longer than expected"
 ```
 
-#### 7.3 Composition Model (Olas Pattern)
+#### 11.3 Composition Model (Olas Pattern)
 
 Borrow from Olas: agents can be composed from reusable components.
 
@@ -623,7 +841,7 @@ agents:
     # Components + agent prompt = full capability
 ```
 
-### 8. Knowledge Location Matrix
+### 12. Knowledge Location Matrix
 
 Standardize where agents read from and write to:
 
@@ -659,7 +877,7 @@ knowledge_locations:
       - "team"
 ```
 
-### 9. Future: Agent Wallets & Monetization
+### 13. Future: Agent Wallets & Monetization
 
 Reserved fields in the registry enable future scenarios:
 
@@ -809,13 +1027,26 @@ All improvements identified in the analysis are addressed:
 | Improvement | Section | Status |
 |-------------|---------|--------|
 | Agent Capability Registry | §1 | Core feature |
-| Semantic Pre-Fetch via Datacortex | §5 | `reads.contextual` |
+| Semantic Pre-Fetch via Datacortex | §9 | `reads.contextual` + session memory |
 | Spec Linking in Frontmatter | §1 | `references.dips`, `references.specs` |
 | Module Auto-Registration | §3.3 | Install hooks |
-| Knowledge Location Matrix | §8 | Standardized paths |
-| Session Memory Embedding | §6.1 | Execution outputs logged |
-| Performance Tracking | §6 | Local + nightshift sync |
-| Agent-to-Agent Interactions | §7 | Spawns, evaluations |
+| Knowledge Location Matrix | §12 | Standardized paths |
+| Session Memory Embedding | §8 | Embedded summaries, searchable |
+| Performance Tracking | §10 | Local + nightshift sync |
+| Agent-to-Agent Interactions | §11 | Spawns, evaluations, composition |
+
+**Research Patterns Implemented:**
+
+| Pattern | Source | Section |
+|---------|--------|---------|
+| Think-Search-Generate | Generate-on-Graph | §5 |
+| Agentic RAG Decisions | Agentic RAG Survey | §5.2 |
+| Multi-Hop Reasoning | GraphRAG | §6 |
+| Tiered Memory | MemGPT | §7 |
+| Session Memory | A-MEM Zettelkasten | §8 |
+| Agent Composition | Olas Protocol | §11.3 |
+| Agent Evaluation | Virtuals ACP | §11.2 |
+| Version Hash Tracking | Olas Protocol | §10.2 |
 
 ## Open Questions
 
