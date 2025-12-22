@@ -91,6 +91,7 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 
 | DIP | Title | Status |
 |-----|-------|--------|
+| [0007](DIP-0007-inbox-done-option.md) | Inbox DONE Option | Draft |
 | [0009](DIP-0009-gtd-specification.md) | GTD System Specification | Implemented |
 | [0010](DIP-0010-external-sync-architecture.md) | External Sync Architecture | Implemented |
 | [0011](DIP-0011-nightshift-module.md) | Nightshift Module | Implemented |
@@ -123,15 +124,15 @@ The following DIPs are planned to complete full specification coverage:
 
 | DIP | Title | Purpose | Priority |
 |-----|-------|---------|----------|
-| **0007** | Module Specification | module.yaml schema, installation, hooks, lifecycle | High |
 | **0017** | Installation & Upgrade | Bootstrap, upgrades, migrations | Medium |
 | **0018** | Sync Architecture | ./sync script, multi-repo handling | Medium |
 | **0019** | Journal Format | Personal and team journal structure | Low |
 | **0020** | External Services | n8n, Gamma, and service integration patterns | Low |
+| **0021** | Module Specification | module.yaml schema, installation, hooks, lifecycle | High |
 
 ### Relationship to `datacore-specification.md`
 
-With DIP-0007 through DIP-0020 complete, the monolithic `datacore-specification.md` can be reduced to a ~10KB overview document that:
+With DIP-0017 through DIP-0021 complete, the monolithic `datacore-specification.md` can be reduced to a ~10KB overview document that:
 1. Introduces Datacore philosophy and concepts
 2. Links to specific DIPs for detailed specifications
 3. Provides quick-start guidance
@@ -142,12 +143,12 @@ With DIP-0007 through DIP-0020 complete, the monolithic `datacore-specification.
 |--------------|------------|
 | Overview & Philosophy | Remains in spec (unique) |
 | Core Concepts (Spaces) | Remains in spec (unique) |
-| Core Concepts (Modules) | → DIP-0007 |
+| Core Concepts (Modules) | → DIP-0021 |
 | Architecture | → DIP-0003, DIP-0015 |
 | Knowledge Layer | → DIP-0003, DIP-0004, DIP-0015 |
-| Task Management (GTD) | → DIP-0009 |
+| Task Management (GTD) | → DIP-0007, DIP-0009 |
 | Agents & Commands | → DIP-0016 |
-| Configuration | → DIP-0007 |
+| Configuration | → DIP-0021 |
 | Git & Contribution | → DIP-0001, DIP-0002 |
 | External Sync | → DIP-0010 |
 | Operations | → DIP-0017, DIP-0018 |
