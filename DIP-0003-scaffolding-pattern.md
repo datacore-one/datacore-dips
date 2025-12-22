@@ -404,6 +404,7 @@ Start: [[Datafund-Core-Purpose]]
 
 - [DIP-0002: Layered Context Pattern](./DIP-0002-layered-context-pattern.md)
 - [DIP-0001: Contribution Model](./DIP-0001-contribution-model.md)
+- [DIP-0017: Outbox & Archive Pattern](./DIP-0017-outbox-archive-pattern.md) - Archive criteria per category
 - McKinsey (2025): "The Agentic Organization"
 - Peter Senge: "The Fifth Discipline"
 - HBR (2024): "A New Approach to Knowledge-Sharing Within Organizations"

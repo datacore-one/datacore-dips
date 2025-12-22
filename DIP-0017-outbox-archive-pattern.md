@@ -6,9 +6,9 @@
 | **Title** | Outbox & Archive Pattern |
 | **Author** | Datacore Team |
 | **Type** | Core |
-| **Status** | Draft |
+| **Status** | Active |
 | **Created** | 2025-12-22 |
-| **Updated** | 2025-12-22 |
+| **Updated** | 2025-12-23 |
 | **Tags** | `outbox`, `archive`, `organization`, `routing` |
 | **Affects** | All spaces, nightshift server |
 | **Specs** | `datacore-specification.md`, `DIP-0015` |
@@ -389,14 +389,14 @@ Migration steps:
 
 ### Reference Implementation
 
-Phases in this branch:
+Phases completed:
 
-1. **Phase 1**: Write DIP-0017, create outbox module skeleton
-2. **Phase 2**: Rename `4-archive/` → `4-outbox/` in all spaces
-3. **Phase 3**: Create archive repos on nightshift server
-4. **Phase 4**: Implement outbox-processor agent
-5. **Phase 5**: Implement archive search with datacortex
-6. **Phase 6**: Documentation and migration guide
+1. **Phase 1** ✓: Write DIP-0017, create outbox module skeleton
+2. **Phase 2** ✓: Rename `4-archive/` → `4-outbox/` in all spaces
+3. **Phase 3** ✓: Create archive repos on nightshift server
+4. **Phase 4** ✓: Implement outbox-processor agent (DIP-0016 compliant)
+5. **Phase 5** ✓: Implement archive search with datacortex
+6. **Phase 6** ✓: Documentation and migration guide
 
 ### Rollout Plan
 

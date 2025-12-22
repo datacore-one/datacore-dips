@@ -987,6 +987,7 @@ Cost: $0.32 | Duration: 38 min
 - DIP-0004: Knowledge Database
 - DIP-0009: GTD Specification
 - DIP-0010: External Sync Architecture
+- DIP-0017: Outbox & Archive Pattern (outbox processing schedules)
 - Datacore Specification v1.3
 - patterns.md: Multi-Source Synthesis, Coordinator-Subagent
 - corrections.md: Context quality requirements
