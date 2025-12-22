@@ -126,24 +126,55 @@ Content here...
 tags: [privacy-tech, verity, compliance]  # WRONG - arrays not allowed
 ```
 
-### Hierarchical Tags (Org-mode)
+### Org-mode Tag Syntax (IMPORTANT)
 
-Tags can be hierarchical using colon nesting:
+**Org-mode treats colons as tag separators, not hierarchy markers.**
+
+```org
+* Task heading                                    :AI:research:
+```
+
+This task has **TWO separate tags**: `AI` and `research`.
+
+```org
+* Another task                                    :verity:ops:legal:
+```
+
+This task has **THREE separate tags**: `verity`, `ops`, and `legal`.
+
+**Key principle:** `:a:b:c:` = 3 tags, not 1 hierarchical tag.
+
+### Hierarchical Convention (Datacore-specific)
+
+While org-mode sees flat tags, Datacore agents **interpret adjacent tags as logical hierarchy** for filtering and reporting:
 
 ```
-:space:track:project:aspect:
+:verity:ops:legal:  →  Interpreted as: verity → ops → legal
 ```
+
+**This is a convention, not org-mode native behavior.**
 
 **Examples:**
-- `:verity:ops:legal:contract:` - Verity operations, legal track, contract work
-- `:datafund:product:mvp:` - Datafund product, MVP work
-- `:personal:health:exercise:` - Personal health, exercise category
-- `:trading:research:analysis:` - Trading research, analysis
+- `:verity:ops:legal:` - 3 tags, interpreted as Verity/Operations/Legal
+- `:datafund:product:mvp:` - 3 tags, interpreted as Datafund/Product/MVP
+- `:personal:health:exercise:` - 3 tags, interpreted as Personal/Health/Exercise
 
-**Benefits:**
-- Precise filtering: `org-tags-view` can filter by any level
-- Financial tracking: Expenses tagged by project/track
-- Reporting: Aggregate by any hierarchy level
+**AI Delegation Tags:**
+
+```org
+* Research ZK proofs                              :AI:research:
+```
+
+- Tag 1: `AI` - Signals this task should be delegated to AI
+- Tag 2: `research` - Specifies the agent type (gtd-research-processor)
+
+Both tags are independent. A task can have `:research:` without `:AI:` (human research task).
+
+**Benefits of this convention:**
+- Org-mode filtering works on any individual tag (`+verity`, `+ops`, `+legal`)
+- Datacore agents can interpret tag sequences as hierarchy
+- Financial tracking: Filter by `+verity+ops` for all Verity operations
+- Reporting: Aggregate by any tag or tag combination
 
 ---
 
@@ -357,9 +388,15 @@ SCHEDULED: <2025-12-20 Fri>
 - [ ] Verify data handling terms
 ```
 
-**Tag breakdown:**
-- `:verity:ops:legal:contract:` - Hierarchical: Verity → Operations → Legal → Contract
-- `:AI:pm:` - Route to gtd-project-manager for tracking
+**Tag breakdown (6 separate tags):**
+- `verity` - Project identifier
+- `ops` - Operations track
+- `legal` - Legal category
+- `contract` - Specific aspect
+- `AI` - Signals AI delegation
+- `pm` - Routes to gtd-project-manager
+
+Datacore interprets `verity:ops:legal:contract` as logical hierarchy for filtering.
 
 ### Zettel with Inline Tags (Correct Format)
 
