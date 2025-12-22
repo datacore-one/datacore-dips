@@ -10,7 +10,7 @@
 | **Created** | 2025-12-21 |
 | **Updated** | 2025-12-21 |
 | **Tags** | `agents`, `registry`, `discovery`, `erc-8004` |
-| **Affects** | `.datacore/agents/`, `.datacore/registry/`, `tags.yaml` |
+| **Affects** | `.datacore/agents/`, `.datacore/commands/`, `.datacore/registry/`, `tags.yaml` |
 | **Specs** | `datacore-specification.md` |
 | **Agents** | `ai-task-executor`, `context-maintainer`, `agent-registry-auditor` |
 
@@ -1053,7 +1053,163 @@ agent-registry-auditor:
     - "context-maintainer"
 ```
 
-### 14. Future: Agent Wallets & Monetization
+### 14. Command Registry
+
+Commands are user-facing entry points that invoke agents. They benefit from the same registry and context patterns.
+
+#### 14.1 Command Registry Format
+
+Create `.datacore/registry/commands.yaml` alongside `agents.yaml`:
+
+```yaml
+# Command Registry v1.0.0
+version: "1.0.0"
+protocol: "datacore-command-registry/v1"
+
+commands:
+  today:
+    name: "Daily Briefing"
+    description: "Generate daily briefing with priorities, calendar, and nightshift results"
+    version: "1.0.0"
+    source: ".datacore/commands/today.md"
+
+    # Commands invoke agents
+    invokes:
+      - agent: "journal-coordinator"
+        when: "journal update needed"
+      - agent: "context-maintainer"
+        when: "context refresh needed"
+
+    # What the command reads
+    reads:
+      required:
+        - "org/next_actions.org"
+        - ".datacore/state/nightshift_results.yaml"
+        - ".datacore/settings.yaml"
+      contextual: []
+
+    # What the command writes
+    writes:
+      - "notes/journals/{date}.md"
+
+    # Governance references
+    references:
+      dips: ["DIP-0009", "DIP-0011"]
+      specs: []
+
+    # Related commands
+    related:
+      - "tomorrow"
+      - "gtd-daily-start"
+      - "wrap-up"
+
+  gtd-weekly-review:
+    name: "GTD Weekly Review"
+    description: "Comprehensive weekly review following GTD methodology"
+    version: "1.0.0"
+    source: ".datacore/commands/gtd-weekly-review.md"
+
+    invokes:
+      - agent: "scaffolding-auditor"
+        when: "knowledge scaffolding check"
+      - agent: "structural-integrity"
+        when: "folder structure validation"
+
+    reads:
+      required:
+        - "org/next_actions.org"
+        - "org/projects.org"
+        - "org/someday.org"
+        - ".datacore/dips/DIP-0009-gtd-specification.md"
+      contextual: []
+
+    writes:
+      - "notes/journals/{date}.md"
+      - "org/next_actions.org"
+
+    references:
+      dips: ["DIP-0009"]
+      specs: []
+
+    related:
+      - "gtd-daily-start"
+      - "gtd-daily-end"
+      - "gtd-monthly-strategic"
+```
+
+#### 14.2 Command Context Pattern
+
+Similar to Agent Context, commands include a context section:
+
+```markdown
+## Command Context
+
+### When to Reference DIP-0009
+
+**Always reference when:**
+- Processing GTD items
+- Routing to specialized agents
+- Updating org-mode files
+
+**Key decisions this DIP informs:**
+- Task state transitions (TODO → DONE)
+- :AI: tag routing rules
+- Weekly review checklist
+
+### Quick Reference
+
+| Question | Answer |
+|----------|--------|
+| Where are tasks? | `org/next_actions.org` |
+| Which agents can I invoke? | See `invokes` in registry |
+| What DIPs govern this? | DIP-0009 (GTD) |
+
+### Agents This Command Invokes
+
+| Agent | Purpose |
+|-------|---------|
+| `journal-coordinator` | Journal updates |
+| `structural-integrity` | Folder validation |
+
+### Integration Points
+
+- **DIP-0009** - GTD workflow
+- **Nightshift** - Async execution results
+```
+
+#### 14.3 Command vs Agent Distinction
+
+| Aspect | Command | Agent |
+|--------|---------|-------|
+| **Trigger** | User invokes `/command` | Spawned by Task tool |
+| **Scope** | Orchestration, workflow | Processing, generation |
+| **Registry** | `commands.yaml` | `agents.yaml` |
+| **Context Section** | "Command Context" | "Agent Context" |
+| **Relationships** | `invokes` agents | `spawns` other agents |
+
+#### 14.4 Command Audit
+
+The `/audit-agents` command also audits commands:
+
+```bash
+# Audit all commands
+/audit-agents --commands
+
+# Full audit (agents + commands)
+/audit-agents --all
+```
+
+**Command Compliance Checklist:**
+
+| Check | Requirement | Auto-fixable |
+|-------|-------------|--------------|
+| `commands.yaml` entry exists | Command must be registered | Yes |
+| `invokes` documented | Agents called by command | Partial |
+| `reads.required` specified | Input files documented | No |
+| Command Context section | In command .md file | Yes (template) |
+| `references.dips` linked | Governing DIPs listed | Partial |
+
+### 15. Future: Agent Wallets & Monetization
 
 Reserved fields in the registry enable future scenarios:
 
@@ -1193,10 +1349,11 @@ olas:
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | `agents.yaml` | `.datacore/registry/` | Agent registry with capabilities, triggers, references |
+| `commands.yaml` | `.datacore/registry/` | Command registry with agent invocations |
 | `execution_log.yaml` | `.datacore/state/` | Local execution history (gitignored, synced) |
 | `datacortex agent` | CLI | Agent discovery commands (`list`, `find`) |
 | `agent-registry-auditor` | `.datacore/agents/` | Audits and upgrades agents for DIP-0016 compliance |
-| `/audit-agents` | `.datacore/commands/` | Command to trigger agent audits |
+| `/audit-agents` | `.datacore/commands/` | Command to trigger agent/command audits |
 
 ### Existing Agent Upgrades
 
