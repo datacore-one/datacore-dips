@@ -86,6 +86,7 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 | [0003](DIP-0003-scaffolding-pattern.md) | Scaffolding Pattern | Implemented |
 | [0004](DIP-0004-knowledge-database.md) | Knowledge Database | Implemented |
 | [0015](DIP-0015-semantic-organization.md) | Semantic Organization | Implemented |
+| [0017](DIP-0017-outbox-archive-pattern.md) | Outbox & Archive Pattern | Draft |
 
 ### GTD & Task Management
 
@@ -124,8 +125,8 @@ The following DIPs are planned to complete full specification coverage:
 
 | DIP | Title | Purpose | Priority |
 |-----|-------|---------|----------|
-| **0017** | Installation & Upgrade | Bootstrap, upgrades, migrations | Medium |
 | **0018** | Sync Architecture | ./sync script, multi-repo handling | Medium |
+| **0022** | Installation & Upgrade | Bootstrap, upgrades, migrations | Medium |
 | **0019** | Journal Format | Personal and team journal structure | Low |
 | **0020** | External Services | n8n, Gamma, and service integration patterns | Low |
 | **0021** | Module Specification | module.yaml schema, installation, hooks, lifecycle | High |

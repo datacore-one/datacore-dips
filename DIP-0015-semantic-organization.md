@@ -50,7 +50,7 @@ This section helps agents understand when and how to apply this DIP.
 | Official company doc? | Org space ([N]-org/) - shared team asset |
 | Where does a contract go? | Org: `1-tracks/legal/contracts/[type]/` |
 | Does it need a companion? | Only if non-AI-readable (Keynote, PSD, video) |
-| Where do old financials go? | Org: `4-archive/finance/statements/[year]/` |
+| Where do old financials go? | Org: `4-outbox/archive/` → moves to `[space]-archive/` on server |
 | Personal draft about work? | Personal: `notes/1-active/` - not official yet |
 | General concept zettel? | Personal: broader applicability beyond org |
 | Org-specific concept zettel? | Org: `3-knowledge/zettel/` - company knowledge |
@@ -164,17 +164,9 @@ Content is organized by **role and purpose**, not by format:
 │   ├── zettel/                # Atomic concepts
 │   ├── literature/            # Source summaries
 │   └── reference/             # People, companies, glossary
-├── 4-archive/                 # Historical content
-│   ├── _index.md
-│   ├── contracts/             # Expired contracts
-│   ├── finance/
-│   │   └── statements/
-│   │       ├── 2018/
-│   │       ├── 2019/
-│   │       └── ...
-│   ├── pitchdecks/            # Superseded decks
-│   └── product/
-│       └── wireframes/
+├── 4-outbox/                  # Content routing OUT (see DIP-0017)
+│   ├── _routing.yaml          # Routing rules for this space
+│   └── archive/               # Queue for archive repo on server
 ├── .datacore/                 # Configuration
 └── CLAUDE.md                  # Space context
 ```
@@ -189,7 +181,7 @@ Numbers indicate processing stage:
 | `1-` | Active | Current work, tracks |
 | `2-` | Projects | Code repositories |
 | `3-` | Knowledge | Permanent reference |
-| `4-` | Archive | Historical content |
+| `4-` | Outbox | Routing OUT (archive, delivery, publish) |
 
 #### Canonical Templates
 
@@ -363,8 +355,8 @@ Each document goes through systematic deep processing:
 **Phase 2: ASSESS**
 - **Still active/binding?** → `1-tracks/` (contracts, current projects)
 - **Reference value?** → `3-knowledge/` (strategic docs, concepts)
-- **Historical only?** → `4-archive/` (old statements, superseded)
-- **Superseded?** → `4-archive/` with note pointing to replacement
+- **Historical only?** → `4-outbox/archive/` → moves to archive repo (see DIP-0017)
+- **Superseded?** → `4-outbox/archive/` with note pointing to replacement
 
 **Relevance assessment by type:**
 
@@ -506,7 +498,7 @@ When extracting zettels or insights from organizational documents:
 | Current financials | Org | `1-tracks/finance/` | Full analysis |
 | Official reference | Org | `3-knowledge/` | Extract zettels, literature notes |
 | Personal writings | Personal | `notes/1-active/` or `notes/pages/` | Personal processing |
-| Historical/outdated | Org | `4-archive/` | Companion only |
+| Historical/outdated | Org | `4-outbox/archive/` | Companion only, routed to archive repo |
 | Personal research | Personal | `notes/2-knowledge/` | Extract personal zettels |
 | Large media | Depends | Semantic location | Companion required |
 
@@ -656,6 +648,7 @@ This branch: `dip-0015-semantic-organization`
 - [DIP-0003: Scaffolding Pattern](./DIP-0003-scaffolding-pattern.md) - Index files and navigation
 - [DIP-0009: GTD Specification](./DIP-0009-gtd-specification.md) - GTD workflow and agents
 - [DIP-0011: Module System](./DIP-0011-module-system.md) - Module architecture
+- [DIP-0017: Outbox & Archive Pattern](./DIP-0017-outbox-archive-pattern.md) - 4-outbox folder, archive repos
 - `datacore-specification.md` - Current structure documentation
 
 ## Related Agents
