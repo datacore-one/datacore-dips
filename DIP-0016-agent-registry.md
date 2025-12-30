@@ -149,8 +149,8 @@ agents:
         - pattern: "space knowledge directories based on task category"
 
     writes:
-      - "notes/2-knowledge/zettel/"
-      - "notes/2-knowledge/literature/"
+      - "3-knowledge/zettel/"
+      - "3-knowledge/literature/"
 
     # === References ===
     references:
@@ -193,7 +193,7 @@ agents:
       contextual: []
 
     writes:
-      - "notes/journals/"
+      - "journal/"
       - "org/next_actions.org"
 
     references:
@@ -577,7 +577,7 @@ session_memories:
 
     # Links to outputs
     outputs:
-      - "notes/2-knowledge/zettel/Data-Tokenization.md"
+      - "3-knowledge/zettel/Data-Tokenization.md"
 ```
 
 #### 8.2 Memory Embedding
@@ -656,9 +656,9 @@ executions:
     # Outcome
     status: "success"  # success, partial, failed, timeout
     outputs:
-      - path: "notes/2-knowledge/zettel/Data-Tokenization.md"
+      - path: "3-knowledge/zettel/Data-Tokenization.md"
         type: "zettel"
-      - path: "notes/2-knowledge/literature/RWA-Report-2024.md"
+      - path: "3-knowledge/literature/RWA-Report-2024.md"
         type: "literature-note"
 
     # Quality signals (for reputation)
@@ -851,10 +851,10 @@ knowledge_locations:
   personal:
     inbox: "0-personal/org/inbox.org"
     next_actions: "0-personal/org/next_actions.org"
-    journals: "0-personal/notes/journals/"
-    zettel: "0-personal/notes/2-knowledge/zettel/"
-    literature: "0-personal/notes/2-knowledge/literature/"
-    active_notes: "0-personal/notes/1-active/"
+    journals: "0-personal/journal/"
+    zettel: "0-personal/3-knowledge/zettel/"
+    literature: "0-personal/3-knowledge/literature/"
+    active_notes: "0-personal/1-active/"
 
   org:  # Template for org spaces
     inbox: "{space}/org/inbox.org"
@@ -1090,7 +1090,7 @@ commands:
 
     # What the command writes
     writes:
-      - "notes/journals/{date}.md"
+      - "journal/{date}.md"
 
     # Governance references
     references:
@@ -1124,7 +1124,7 @@ commands:
       contextual: []
 
     writes:
-      - "notes/journals/{date}.md"
+      - "journal/{date}.md"
       - "org/next_actions.org"
 
     references:

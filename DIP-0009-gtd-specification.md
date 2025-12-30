@@ -352,7 +352,7 @@ Related: [[Wiki Link 1]], [[Wiki Link 2]]
 | Tag | Agent | Capability | Output Location |
 |-----|-------|------------|-----------------|
 | `:AI:content:` | `gtd-content-writer` | Blog, email, docs, social | `content/[type]/` |
-| `:AI:research:` | `gtd-research-processor` | URL analysis, literature notes, zettels | `notes/2-knowledge/` |
+| `:AI:research:` | `gtd-research-processor` | URL analysis, literature notes, zettels | `3-knowledge/` |
 | `:AI:data:` | `gtd-data-analyzer` | Metrics, reports, insights | `content/reports/` |
 | `:AI:pm:` | `gtd-project-manager` | Status tracking, blockers | journal + org-mode |
 

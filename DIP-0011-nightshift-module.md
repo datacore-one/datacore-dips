@@ -508,7 +508,7 @@ requires_action: acknowledge
 
 ### Personal Journal Entry
 
-`0-personal/notes/journals/2025-12-11.md`:
+`0-personal/journal/2025-12-11.md`:
 
 ```markdown
 ## Nightshift Summary
