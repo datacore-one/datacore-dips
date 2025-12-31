@@ -8,15 +8,15 @@
 | **Type** | Standards Track |
 | **Status** | Draft |
 | **Created** | 2025-12-21 |
-| **Updated** | 2025-12-21 |
-| **Tags** | `agents`, `registry`, `discovery`, `erc-8004` |
+| **Updated** | 2025-12-31 |
+| **Tags** | `agents`, `registry`, `discovery`, `hooks`, `lifecycle`, `erc-8004` |
 | **Affects** | `.datacore/agents/`, `.datacore/commands/`, `.datacore/registry/`, `tags.yaml` |
 | **Specs** | `datacore-specification.md` |
 | **Agents** | `ai-task-executor`, `context-maintainer`, `agent-registry-auditor` |
 
 ## Summary
 
-This DIP introduces a machine-readable agent registry system that enables dynamic agent discovery, capability advertising, knowledge source linking, performance tracking, and agent-to-agent coordination. The design is forward-compatible with [ERC-8004 Trustless Agents](https://eips.ethereum.org/EIPS/eip-8004), [Google A2A Protocol](https://a2a-protocol.org/latest/specification/), [Virtuals Agent Commerce Protocol](https://whitepaper.virtuals.io), and [Olas Protocol](https://olas.network/), enabling future scenarios where agents have wallets, charge for services, rate each other, and operate across organizational boundaries.
+This DIP introduces a machine-readable agent registry system that enables dynamic agent discovery, capability advertising, knowledge source linking, performance tracking, agent-to-agent coordination, and **lifecycle hooks for automated context injection and execution management**. The hook system enables automatic DIP/spec loading before agent execution, standardized validation, error recovery, and learning extraction without modifying individual agent prompts. The design is forward-compatible with [ERC-8004 Trustless Agents](https://eips.ethereum.org/EIPS/eip-8004), [Google A2A Protocol](https://a2a-protocol.org/latest/specification/), [Virtuals Agent Commerce Protocol](https://whitepaper.virtuals.io), and [Olas Protocol](https://olas.network/), enabling future scenarios where agents have wallets, charge for services, rate each other, and operate across organizational boundaries.
 
 ## Agent Context
 
@@ -31,12 +31,16 @@ This section helps agents understand when and how to apply this DIP.
 - Tracking agent performance or interactions
 - Installing modules that provide agents
 - Generating external-facing agent metadata (AgentCard, ERC-8004)
+- Configuring agent lifecycle hooks (pre, post, error)
+- Understanding what context gets auto-injected before execution
 
 **Key decisions this DIP informs:**
 - Agent discovery uses registry, NOT hardcoded routing
 - Agent context includes pre-fetched knowledge from `reads.required`
 - Agent interactions are logged for performance tracking
 - New agents must be registered before they can be routed to
+- Hooks automate context injection - agents don't manually read DIPs
+- Error handling follows standard retry/escalation patterns
 
 ### Quick Reference for Agents
 
@@ -48,6 +52,9 @@ This section helps agents understand when and how to apply this DIP.
 | Can I spawn another agent? | Check `spawns` field - only listed agents can be spawned |
 | Where do I log my results? | Check `writes` paths and log to `execution_log` |
 | How is my performance tracked? | Via `performance` metrics in registry state |
+| What hooks run before I execute? | Check `hooks.pre` - context injection, validation |
+| What hooks run after I complete? | Check `hooks.post` - learning extraction, metrics |
+| What happens if I fail? | Check `hooks.on_error` - retry schedule, escalation |
 
 ### Related Agents
 
@@ -1248,6 +1255,567 @@ olas:
   staking_enabled: false
 ```
 
+### 16. Agent Lifecycle Hooks
+
+Hooks execute at specific points in the agent lifecycle, enabling automatic context injection, validation, error recovery, and learning extraction without modifying individual agent prompts.
+
+#### 16.1 Hook Lifecycle
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        AGENT LIFECYCLE                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐  │
+│  │   PRE    │───>│  AGENT   │───>│ VALIDATE │───>│   POST   │  │
+│  │  HOOKS   │    │EXECUTION │    │  HOOKS   │    │  HOOKS   │  │
+│  └──────────┘    └────┬─────┘    └──────────┘    └──────────┘  │
+│                       │                                         │
+│                       │ on error                                │
+│                       v                                         │
+│                  ┌──────────┐                                   │
+│                  │  ERROR   │                                   │
+│                  │  HOOKS   │                                   │
+│                  └──────────┘                                   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Hook Type | Trigger | Purpose | Can Abort? |
+|-----------|---------|---------|------------|
+| `pre` | Before agent execution | Context injection, validation, setup | Yes |
+| `post` | After successful completion | Learning extraction, metrics, cleanup | No |
+| `validate` | Before marking complete | Quality checks, output validation | Yes (retry) |
+| `on_error` | On agent failure | Error classification, retry, escalation | No |
+
+#### 16.2 Registry Schema Extension
+
+Add `hooks` field to agent entries:
+
+```yaml
+agents:
+  gtd-inbox-processor:
+    # ... existing fields ...
+
+    # === Hooks Configuration ===
+    hooks:
+      pre:
+        - type: context-inject
+          config:
+            auto_load_reads: true      # Load all reads.required
+            auto_load_dips: true       # Load all references.dips
+            inject_session_memory: true # Query recent relevant sessions
+
+        - type: validate-preconditions
+          config:
+            required_files:
+              - "{space}/org/inbox.org"
+            required_state:
+              - "inbox_not_empty"
+
+      post:
+        - type: learning-extract
+          config:
+            extract_patterns: true
+            extract_corrections: true
+            target: "{space}/.datacore/learning/"
+
+        - type: metrics-log
+          config:
+            log_duration: true
+            log_tokens: true
+            log_outputs: true
+
+        - type: journal-append
+          config:
+            summary_length: "brief"
+            include_outputs: true
+
+      validate:
+        - type: output-exists
+          config:
+            check_writes: true
+
+        - type: quality-gate
+          config:
+            min_output_length: 100
+            require_structured_response: true
+
+      on_error:
+        - type: classify-error
+          config:
+            transient_patterns:
+              - "rate_limit"
+              - "timeout"
+              - "network"
+            permanent_patterns:
+              - "not_found"
+              - "permission_denied"
+
+        - type: retry-schedule
+          config:
+            max_retries: 3
+            backoff: [3600, 10800, 21600]  # 1h, 3h, 6h
+            only_transient: true
+
+        - type: escalate
+          config:
+            after_retries: 3
+            target: "human_queue"
+            notify: true
+```
+
+#### 16.3 Built-in Hook Types
+
+##### Pre-Execution Hooks
+
+**`context-inject`** - Automatically loads context before agent execution:
+
+```yaml
+type: context-inject
+config:
+  auto_load_reads: true      # Load reads.required files
+  auto_load_dips: true       # Load references.dips (Agent Context section only)
+  auto_load_specs: true      # Load references.specs
+  inject_session_memory: true # Query datacortex for recent session insights
+  max_context_tokens: 50000  # Limit injected context size
+```
+
+This is the primary hook for automatic DIP loading. When `auto_load_dips: true`:
+1. Hook reads agent's `references.dips` field
+2. For each DIP, loads only the "Agent Context" section (not full DIP)
+3. Injects formatted context before agent prompt
+
+**`validate-preconditions`** - Checks preconditions before execution:
+
+```yaml
+type: validate-preconditions
+config:
+  required_files:
+    - "{space}/org/inbox.org"
+    - ".datacore/tags.yaml"
+  required_state:
+    - "inbox_not_empty"
+    - "git_clean"
+  abort_on_failure: true
+```
+
+**`discover-spaces`** - Standardized space discovery for coordinators:
+
+```yaml
+type: discover-spaces
+config:
+  pattern: "[0-9]-*/"
+  filter_by_git_activity: true    # Only spaces with recent git changes
+  activity_window: "24h"
+  exclude: ["4-archive"]
+```
+
+##### Post-Execution Hooks
+
+**`learning-extract`** - Extracts patterns and corrections from execution:
+
+```yaml
+type: learning-extract
+config:
+  extract_patterns: true
+  extract_corrections: true
+  extract_principles: true
+  target: "{space}/.datacore/learning/"
+  format: "append"
+```
+
+**`metrics-log`** - Logs execution metrics to `execution_log.yaml`:
+
+```yaml
+type: metrics-log
+config:
+  log_duration: true
+  log_tokens: true
+  log_outputs: true
+  log_spawned_agents: true
+```
+
+**`journal-append`** - Appends summary to daily journal:
+
+```yaml
+type: journal-append
+config:
+  summary_length: "brief"  # brief, standard, detailed
+  include_outputs: true
+  target: "{space}/notes/journals/{date}.md"
+```
+
+##### Validation Hooks
+
+**`output-exists`** - Verifies agent produced expected outputs:
+
+```yaml
+type: output-exists
+config:
+  check_writes: true
+  min_file_size: 100
+```
+
+**`quality-gate`** - Validates output quality:
+
+```yaml
+type: quality-gate
+config:
+  min_output_length: 100
+  require_structured_response: true
+  forbidden_patterns:
+    - "TODO"
+    - "FIXME"
+    - "placeholder"
+```
+
+##### Error Hooks
+
+**`classify-error`** - Classifies errors as transient or permanent:
+
+```yaml
+type: classify-error
+config:
+  transient_patterns:
+    - "rate_limit"
+    - "timeout"
+    - "connection"
+  permanent_patterns:
+    - "not_found"
+    - "permission_denied"
+```
+
+**`retry-schedule`** - Schedules retry for transient failures:
+
+```yaml
+type: retry-schedule
+config:
+  max_retries: 3
+  backoff: [3600, 10800, 21600]  # seconds
+  only_transient: true
+  queue: "nightshift"
+```
+
+**`escalate`** - Escalates to human queue:
+
+```yaml
+type: escalate
+config:
+  after_retries: 3
+  target: "human_queue"
+  notify: true
+```
+
+#### 16.4 DIP Auto-Loading Detail
+
+The primary use case - automatic DIP loading - works as follows:
+
+**Registry Configuration:**
+
+```yaml
+agents:
+  gtd-inbox-processor:
+    references:
+      dips: ["DIP-0009", "DIP-0014"]
+    hooks:
+      pre:
+        - type: context-inject
+          config:
+            auto_load_dips: true
+            dip_section: "Agent Context"
+```
+
+**Injection Format:**
+
+The hook injects DIP context as:
+
+```markdown
+---
+## Injected Context (auto-loaded by hooks)
+
+### DIP-0009: GTD Specification
+
+**When to reference:**
+- Processing GTD items
+- Updating task states
+- Routing to specialized agents
+
+**Quick Reference:**
+| Question | Answer |
+|----------|--------|
+| Where are tasks? | `org/next_actions.org` |
+| Valid states? | TODO, NEXT, WAITING, DONE |
+
+### DIP-0014: Tag Taxonomy
+
+**When to reference:**
+- Adding tags to items
+- Querying by tag
+...
+
+---
+```
+
+This eliminates the need for each agent prompt to include "read DIP-0009 first".
+
+### 17. Hook Profiles
+
+Common hook combinations as reusable profiles:
+
+```yaml
+# In agents.yaml
+profiles:
+  gtd-processor:
+    description: "Standard GTD processing agent"
+    hooks:
+      pre:
+        - type: context-inject
+          config:
+            auto_load_dips: true
+        - type: validate-preconditions
+          config:
+            required_state: ["inbox_not_empty"]
+      post:
+        - type: learning-extract
+        - type: metrics-log
+      on_error:
+        - type: retry-schedule
+          config:
+            max_retries: 3
+
+  coordinator:
+    description: "Orchestrator that spawns subagents"
+    hooks:
+      pre:
+        - type: discover-spaces
+          config:
+            filter_by_git_activity: true
+        - type: context-inject
+      post:
+        - type: aggregate-results
+        - type: journal-append
+
+  research:
+    description: "Research and knowledge creation"
+    hooks:
+      pre:
+        - type: context-inject
+          config:
+            inject_session_memory: true
+      post:
+        - type: learning-extract
+        - type: embed-outputs
+          config:
+            target: "datacortex"
+```
+
+**Usage in agent:**
+
+```yaml
+agents:
+  gtd-inbox-processor:
+    profile: gtd-processor  # Inherits all hooks from profile
+    hooks:
+      # Additional agent-specific hooks
+      validate:
+        - type: output-exists
+```
+
+#### 17.1 Hook Inheritance
+
+Hooks can be defined at multiple levels:
+
+```yaml
+# Global defaults (apply to all agents)
+defaults:
+  hooks:
+    pre:
+      - type: context-inject
+        config:
+          auto_load_reads: true
+          auto_load_dips: true
+    post:
+      - type: metrics-log
+
+# Agent-specific (extends/overrides defaults)
+agents:
+  gtd-inbox-processor:
+    hooks:
+      pre:
+        - inherit: defaults  # Include default pre hooks
+        - type: validate-preconditions
+      post:
+        - inherit: defaults
+        - type: learning-extract
+```
+
+**Inheritance rules:**
+1. `inherit: defaults` explicitly includes default hooks
+2. Without `inherit`, agent hooks **replace** defaults for that hook type
+3. Hooks execute in order: inherited first, then agent-specific
+
+### 18. Hook Executor
+
+The hook executor integrates with the agent spawning process.
+
+#### 18.1 Execution Flow
+
+```python
+def execute_agent(agent_id: str, task: Task) -> ExecutionResult:
+    executor = HookExecutor(".datacore/registry/agents.yaml")
+
+    # 1. Pre-hooks
+    continue_exec, injected_context = executor.execute_pre_hooks(
+        agent_id, task.description
+    )
+    if not continue_exec:
+        return ExecutionResult(status="aborted", message=injected_context)
+
+    # 2. Build prompt with injected context
+    prompt = build_prompt(agent_id, task, injected_context)
+
+    try:
+        # 3. Execute agent
+        result = spawn_agent(agent_id, prompt)
+
+        # 4. Validate hooks
+        passed, message = executor.execute_validate_hooks(agent_id, result)
+        if not passed:
+            return handle_validation_failure(agent_id, result, message)
+
+        # 5. Post-hooks
+        executor.execute_post_hooks(agent_id, result)
+
+        return result
+
+    except Exception as e:
+        # 6. Error hooks
+        instructions = executor.execute_error_hooks(agent_id, e)
+
+        if instructions.get("retry"):
+            schedule_retry(agent_id, task, instructions["retry_delay"])
+        elif instructions.get("escalate"):
+            escalate_to_human(agent_id, task, e)
+
+        return ExecutionResult(status="failed", error=str(e))
+```
+
+#### 18.2 Context Inject Implementation
+
+```python
+def hook_context_inject(agent_id: str, task_context: str, config: dict) -> str:
+    """Inject context before agent execution."""
+    registry = load_yaml(".datacore/registry/agents.yaml")
+    agent = registry["agents"][agent_id]
+    injected = []
+
+    # 1. Load required files
+    if config.get("auto_load_reads"):
+        for path in agent.get("reads", {}).get("required", []):
+            content = read_file(resolve_path(path))
+            injected.append(f"## {path}\n\n{content}")
+
+    # 2. Load DIPs (Agent Context section only)
+    if config.get("auto_load_dips"):
+        for dip in agent.get("references", {}).get("dips", []):
+            dip_path = f".datacore/dips/{dip}.md"
+            section = config.get("dip_section", "Agent Context")
+            content = extract_section(read_file(dip_path), section)
+            injected.append(f"## {dip} Context\n\n{content}")
+
+    # 3. Session memory
+    if config.get("inject_session_memory"):
+        query = f"type:session-memory related to {task_context}"
+        results = datacortex_search(query, top=3)
+        if results:
+            injected.append(f"## Recent Session Insights\n\n{format_results(results)}")
+
+    # 4. Truncate if needed
+    combined = "\n\n---\n\n".join(injected)
+    max_tokens = config.get("max_context_tokens", 50000)
+    if count_tokens(combined) > max_tokens:
+        combined = truncate_to_tokens(combined, max_tokens)
+
+    return combined
+```
+
+#### 18.3 Hook State Persistence
+
+Hooks can persist state across executions:
+
+```yaml
+# In .datacore/state/hook_state.yaml
+hook_state:
+  retry_counts:
+    gtd-inbox-processor:
+      task_id_123: 2  # 2 retries so far
+
+  last_executions:
+    gtd-inbox-processor: "2025-12-31T10:30:00Z"
+
+  space_cache:
+    discovered_spaces: ["0-personal", "1-datafund"]
+    cache_time: "2025-12-31T10:00:00Z"
+```
+
+#### 18.4 Hook Debugging
+
+Debug mode for hook development:
+
+```yaml
+# In settings.yaml
+hooks:
+  debug: true
+  log_level: "verbose"
+  dry_run: false
+```
+
+Output:
+
+```
+[HOOK] Pre-execution for gtd-inbox-processor
+  [context-inject] Loading reads.required: 2 files
+  [context-inject] Loading DIPs: DIP-0009, DIP-0014
+  [context-inject] Session memory: 3 results
+  [context-inject] Total injected: 4,521 tokens
+  [validate-preconditions] Checking inbox_not_empty: PASS
+[HOOK] Pre-execution complete (234ms)
+
+... agent execution ...
+
+[HOOK] Post-execution for gtd-inbox-processor
+  [learning-extract] Extracted: 2 patterns, 1 correction
+  [metrics-log] Duration: 45s, Tokens: 12,500 in / 3,200 out
+  [journal-append] Appended to 2025-12-31.md
+[HOOK] Post-execution complete (89ms)
+```
+
+#### 18.5 Custom Hooks
+
+Users can define custom hooks:
+
+```yaml
+# In .datacore/hooks/custom-hooks.yaml
+custom_hooks:
+  notify-slack:
+    type: custom
+    script: ".datacore/hooks/notify-slack.py"
+    trigger: post
+    config:
+      channel: "#ai-tasks"
+
+# Usage in agent
+agents:
+  gtd-content-writer:
+    hooks:
+      post:
+        - type: custom
+          name: notify-slack
+          config:
+            channel: "#content"
+```
+
 ## Rationale
 
 ### Why This Design?
@@ -1344,16 +1912,40 @@ olas:
 4. Component registry for Olas-style composition (future)
 5. Wallet integration and x402 payments (separate DIP)
 
+### Phase 8: Lifecycle Hooks (v2.1)
+
+1. Implement HookExecutor class with pre/post/validate/error phases
+2. Add `context-inject` hook for automatic DIP/spec loading
+3. Add `validate-preconditions` hook for pre-flight checks
+4. Add `learning-extract` hook for automatic pattern capture
+5. Add `metrics-log` hook integrated with execution_log
+6. Implement hook profiles (gtd-processor, coordinator, research)
+7. Add hook inheritance system (defaults, profiles, agent-specific)
+8. Create hook state persistence in `.datacore/state/hook_state.yaml`
+9. Add `discover-spaces` hook for coordinator standardization
+10. Implement error hooks (classify-error, retry-schedule, escalate)
+
+### Phase 9: Hook Ecosystem (v2.2)
+
+1. Custom hook script support (`.datacore/hooks/`)
+2. Hook debugging mode with verbose logging
+3. Hook testing utilities
+4. Integration with nightshift for scheduled hook execution
+5. Hook metrics and performance tracking
+
 ### New Components
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `agents.yaml` | `.datacore/registry/` | Agent registry with capabilities, triggers, references |
+| `agents.yaml` | `.datacore/registry/` | Agent registry with capabilities, triggers, references, hooks |
 | `commands.yaml` | `.datacore/registry/` | Command registry with agent invocations |
 | `execution_log.yaml` | `.datacore/state/` | Local execution history (gitignored, synced) |
+| `hook_state.yaml` | `.datacore/state/` | Hook state persistence (retry counts, caches) |
+| `custom-hooks.yaml` | `.datacore/hooks/` | Custom hook definitions |
 | `datacortex agent` | CLI | Agent discovery commands (`list`, `find`) |
 | `agent-registry-auditor` | `.datacore/agents/` | Audits and upgrades agents for DIP-0016 compliance |
 | `/audit-agents` | `.datacore/commands/` | Command to trigger agent/command audits |
+| HookExecutor | `.datacore/lib/` | Hook execution engine (Python class) |
 
 ### Existing Agent Upgrades
 
@@ -1427,6 +2019,12 @@ All improvements identified in the analysis are addressed:
 | Session Memory Embedding | §8 | Embedded summaries, searchable |
 | Performance Tracking | §10 | Local + nightshift sync |
 | Agent-to-Agent Interactions | §11 | Spawns, evaluations, composition |
+| Lifecycle Hooks | §16 | Pre/post/validate/error hooks |
+| Automatic DIP Loading | §16.4 | `context-inject` hook |
+| Hook Profiles | §17 | Reusable hook combinations |
+| Hook Executor | §18 | Execution engine integration |
+| Error Recovery | §16.3 | Classify, retry, escalate hooks |
+| Learning Extraction | §16.3 | Automatic pattern capture |
 
 **Research Patterns Implemented:**
 
@@ -1455,6 +2053,18 @@ All improvements identified in the analysis are addressed:
 
 6. **Component reuse**: When should we extract common patterns into Olas-style components?
 
+7. **Hook execution timeout**: Should hooks have timeouts? What's a reasonable default?
+
+8. **Hook dependencies**: Can hooks depend on other hooks' output within the same phase?
+
+9. **Async post-hooks**: Should post-hooks run synchronously or can they be queued for background execution?
+
+10. **Hook versioning**: How to handle hook config changes when agent versions change?
+
+11. **Hook metrics**: Should hook execution time be tracked separately from agent metrics?
+
+12. **Hook failures**: If a post-hook fails, should the agent execution still be marked successful?
+
 ## References
 
 ### External Standards
@@ -1476,6 +2086,8 @@ All improvements identified in the analysis are addressed:
 | Component → Agent → Service composition | Olas | Future component registry |
 | Version tracking via hash appending | Olas | version_history in performance metrics |
 | Tokenized agents (ERC-20/721) | Virtuals/Olas | Reserved erc8004/virtuals/olas fields |
+| Lifecycle hooks (pre/post/error) | Git Hooks | Agent lifecycle management (§16) |
+| Cross-cutting concerns via hooks | AOP | Context injection, logging, error handling |
 
 ### Internal References
 
@@ -1492,3 +2104,5 @@ All improvements identified in the analysis are addressed:
 - [ZBrain Knowledge Graphs](https://zbrain.ai/knowledge-graphs-for-agentic-ai/) - Agentic AI architecture
 - [LangChain Memory for Agents](https://blog.langchain.com/memory-for-agents/) - Agent memory patterns
 - [Letta Agent Memory](https://www.letta.com/blog/agent-memory) - MemGPT virtual memory approach
+- [Git Hooks](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) - Lifecycle hook inspiration
+- [Aspect-Oriented Programming](https://en.wikipedia.org/wiki/Aspect-oriented_programming) - Cross-cutting concerns pattern
