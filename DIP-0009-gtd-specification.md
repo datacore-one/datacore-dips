@@ -567,6 +567,58 @@ org-mode ←→ Sync Engine ←→ Adapter ←→ External Tool
 
 ---
 
+## Agent Context
+
+This section provides essential information for agents working with GTD tasks and workflows.
+
+### Key Files
+
+| File | Purpose | Agent Access |
+|------|---------|--------------|
+| `org/inbox.org` | Single capture point | Read/Write (inbox-processor) |
+| `org/next_actions.org` | Active tasks by focus area | Read/Write (all GTD agents) |
+| `org/nightshift.org` | AI task queue | Read/Write (nightshift, ai-task-executor) |
+| `org/research_learning.org` | Research pipeline | Read/Write (research-processor) |
+| `org/archive.org` | Completed/canceled tasks | Read only (for context) |
+
+### Task State Rules
+
+**CRITICAL**: Agents MUST respect terminal states:
+- `DONE` and `CANCELED` are terminal - never modify these tasks
+- Always add `CLOSED:` timestamp when transitioning to terminal state
+- Include required properties on state transitions (e.g., `:WAITING_ON:` for WAITING)
+
+### AI Delegation Tags
+
+| Tag | Routes To | Autonomous |
+|-----|-----------|------------|
+| `:AI:content:` | gtd-content-writer | Yes |
+| `:AI:research:` | gtd-research-processor | Yes |
+| `:AI:data:` | gtd-data-analyzer | Yes |
+| `:AI:pm:` | gtd-project-manager | Yes |
+| `:AI:technical:` | CTO queue | No (human review) |
+
+### Task Processing Pattern
+
+```python
+# Standard task processing flow
+1. Parse task from org-mode (heading, properties, tags)
+2. Validate state transition is allowed
+3. Execute task (agent-specific work)
+4. Update task state and properties
+5. Add CLOSED timestamp if terminal
+6. Log execution to journal
+7. Return structured JSON status
+```
+
+### Quality Standards
+
+All GTD agents MUST:
+- Log all actions to journal (`notes/journals/YYYY-MM-DD.md`)
+- Flag uncertain decisions for human review
+- Return JSON with `{status, message, outputs, needs_review}`
+- Respect focus area hierarchy (TIER 1 > TIER 2 > PERSONAL > RESEARCH)
+
 ## References
 
 - [GTD Methodology](https://gettingthingsdone.com/) - David Allen's original work

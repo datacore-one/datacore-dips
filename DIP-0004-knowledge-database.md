@@ -945,6 +945,94 @@ Rebuild complete in 28.4 seconds
 - **Multi-device sync**: Conflict resolution across devices
 - **AI query interface**: Natural language to SQL translation
 
+## Agent Context
+
+This section provides essential information for agents using the knowledge database.
+
+### Database Locations
+
+| Database | Path | Scope |
+|----------|------|-------|
+| Root | `~/.datacore/knowledge.db` | Cross-space queries |
+| Space | `[space]/.datacore/knowledge.db` | Space-isolated queries |
+
+### Common Queries
+
+```python
+# AI tasks pending execution
+SELECT * FROM tasks
+WHERE tags LIKE '%:AI:%' AND state='TODO'
+ORDER BY priority;
+
+# Inbox entries to process
+SELECT * FROM inbox_entries
+WHERE processed=false;
+
+# Full-text search
+SELECT * FROM files
+WHERE files_fts MATCH 'search term';
+
+# Tasks completed this week
+SELECT * FROM tasks
+WHERE closed_at >= date('now', '-7 days');
+
+# Similar notes (shared terms)
+SELECT f2.* FROM files f1
+JOIN terms t1 ON f1.id = t1.file_id
+JOIN terms t2 ON t1.term = t2.term
+JOIN files f2 ON t2.file_id = f2.id
+WHERE f1.path = ? AND f1.id != f2.id
+GROUP BY f2.id ORDER BY COUNT(*) DESC LIMIT 5;
+```
+
+### Key Tables
+
+| Table | Purpose | Agents Using |
+|-------|---------|--------------|
+| `tasks` | Org-mode TODO items | ai-task-executor, gtd-* |
+| `inbox_entries` | Unprocessed inbox items | gtd-inbox-processor |
+| `files` | All indexed content | All research agents |
+| `files_fts` | Full-text search | gtd-research-processor |
+| `learning_entries` | Patterns and corrections | session-learning |
+| `sessions` | Work session tracking | journal agents |
+
+### Query Library
+
+Use the standard query library at `.datacore/lib/db_queries.py`:
+
+```python
+from db_queries import DatacoreDB
+db = DatacoreDB()
+
+# Common operations
+tasks = db.get_ai_tasks(space='personal')
+inbox = db.get_inbox_entries(processed=False)
+results = db.search_content('query', types=['zettel'])
+similar = db.get_similar_notes(file_id=123, limit=5)
+```
+
+### Write-Back Protocol
+
+1. Agent writes to DB (INSERT/UPDATE/DELETE)
+2. System creates entry in `pending_writes` table
+3. Write-back engine applies changes to source files
+4. Checksums validated to prevent conflicts
+
+**Key rule**: Source files (markdown, org) remain source of truth. DB is derived index.
+
+### Sync Commands
+
+```bash
+# Incremental sync (changed files only)
+python zettel_db.py sync
+
+# Full rebuild from source files
+python zettel_db.py rebuild
+
+# Apply pending writes to files
+python zettel_db.py write-back
+```
+
 ## References
 
 - DIP-0002: Layered Context Pattern

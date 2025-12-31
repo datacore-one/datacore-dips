@@ -636,6 +636,95 @@ maturity: seedling
 
 ---
 
+## Agent Context
+
+This section provides essential information for agents working with tags.
+
+### Tag Format Rules
+
+| System | Format | Example |
+|--------|--------|---------|
+| Org-mode headings | `:tag1:tag2:` | `:verity:ops:legal:` |
+| Org-mode AI delegation | `:AI:type:` | `:AI:content:` |
+| PKM/CRM notes | `#tag` inline at end | `#privacy-tech, #verity` |
+| Frontmatter | Single values only | `type: zettel` |
+
+**CRITICAL**: PKM notes MUST NOT use `tags: [array]` in frontmatter. Use inline `#tag` format at end of content.
+
+### Tag Normalization
+
+All tags normalize to **kebab-case**:
+- `Privacy Tech` → `privacy-tech`
+- `privacy_tech` → `privacy-tech`
+- `PrivacyTech` → `privacy-tech`
+
+### Registry Locations
+
+| Priority | Path | Scope |
+|----------|------|-------|
+| 1 (highest) | `.datacore/tags.yaml` | System reserved |
+| 2 | `[space]/.datacore/tags.yaml` | Space-specific |
+| 3 | `.datacore/modules/[module]/tags.yaml` | Module tags |
+
+### AI Task Routing
+
+```yaml
+# System registry: .datacore/tags.yaml
+ai:
+  content:
+    routes-to: gtd-content-writer
+  research:
+    routes-to: gtd-research-processor
+  data:
+    routes-to: gtd-data-analyzer
+  pm:
+    routes-to: gtd-project-manager
+  technical:
+    routes-to: cto-queue
+    autonomous: false  # Human review required
+```
+
+### Template for Generated Notes
+
+**Correct format** for zettels and literature notes:
+
+```markdown
+---
+type: zettel
+created: YYYY-MM-DD
+source: "[[Source Name]]"
+maturity: seedling
+---
+
+# Title
+
+Content...
+
+#tag1, #tag2, #tag3
+```
+
+### Tag Validation
+
+Agents SHOULD validate tags against registries:
+
+```python
+# Load and merge registries
+from pathlib import Path
+import yaml
+
+def load_tags():
+    registries = [
+        '.datacore/tags.yaml',
+        f'{space}/.datacore/tags.yaml'
+    ]
+    tags = {}
+    for reg in registries:
+        if Path(reg).exists():
+            data = yaml.safe_load(Path(reg).read_text())
+            tags.update(data.get('tags', {}))
+    return tags
+```
+
 ## References
 
 - DIP-0003: Scaffolding Pattern (content types, categories)

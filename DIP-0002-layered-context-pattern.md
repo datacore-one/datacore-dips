@@ -301,6 +301,81 @@ Migration script provided in implementation.
 1. How to handle merge conflicts between layers?
 2. Should composed files include layer markers for debugging? (Currently: yes)
 
+## Agent Context
+
+This section provides essential information for agents working with layered context files.
+
+### Layer Files
+
+| Layer | Suffix | Tracked | Purpose |
+|-------|--------|---------|---------|
+| PUBLIC | `.base.md` | Yes (PR upstream) | Generic, reusable content |
+| SPACE | `.space.md` | Yes (space repo) | Space-specific customizations |
+| PRIVATE | `.local.md` | No (gitignored) | Personal notes, secrets |
+| OUTPUT | `.md` | No (generated) | Composed runtime file |
+
+### Composition Order
+
+```
+[NAME].base.md   →  Layer 1 (PUBLIC)
+  + [NAME].space.md  →  Layer 2 (SPACE)
+  + [NAME].local.md  →  Layer 3 (PRIVATE)
+  ─────────────────
+  = [NAME].md        →  Output (composed)
+```
+
+Later layers extend/override earlier layers.
+
+### Key Commands
+
+```bash
+# Rebuild all composed files
+python .datacore/lib/context_merge.py rebuild --path .
+
+# Rebuild specific component
+python .datacore/lib/context_merge.py rebuild --path .datacore/modules/trading
+
+# Validate no private content in PUBLIC layers
+python .datacore/lib/context_merge.py validate --path .
+```
+
+### Applied To
+
+| Component | Base Location | Example |
+|-----------|---------------|---------|
+| CLAUDE.md | `CLAUDE.base.md` | System context |
+| Agents | `agents/[name].base.md` | Agent prompts |
+| Commands | `commands/[name].base.md` | Command prompts |
+| Module context | `modules/[name]/CLAUDE.base.md` | Module instructions |
+
+### Content Rules
+
+**PUBLIC layer (.base.md)** - MUST NOT contain:
+- Email addresses
+- Phone numbers
+- API keys, passwords, secrets
+- Dollar amounts
+- Personal identifiers
+
+**SPACE layer (.space.md)** - Can contain:
+- Space-specific processes
+- Team contacts (non-personal)
+- Project names, work areas
+
+**PRIVATE layer (.local.md)** - For:
+- Personal preferences
+- Private notes
+- Local overrides
+- Sensitive information
+
+### Agent Requirements
+
+When modifying context files:
+1. Identify correct layer (PUBLIC/SPACE/PRIVATE)
+2. Edit layer file directly, not composed `.md`
+3. Run rebuild after edits
+4. Validate before commit if PUBLIC
+
 ## References
 
 - [DIP-0001: Contribution Model](./DIP-0001-contribution-model.md)

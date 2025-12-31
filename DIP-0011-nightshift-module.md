@@ -981,6 +981,73 @@ Cost: $0.32 | Duration: 38 min
 
 ---
 
+## Agent Context
+
+This section provides essential information for agents involved in nightshift task execution.
+
+### Key Files
+
+| File | Purpose | Agent Access |
+|------|---------|--------------|
+| `org/nightshift.org` | Task queue (QUEUED/EXECUTING/DONE/FAILED) | Read/Write |
+| `[space]/0-inbox/nightshift-*.md` | Output files | Write only |
+| `[space]/journal/*.md` | Execution reports | Append |
+| `.datacore/state/nightshift/` | Analytics, execution records | Read/Write |
+| `.datacore/learning/patterns.md` | Extracted success patterns | Read |
+| `.datacore/learning/corrections.md` | Failure learnings | Read |
+
+### Nightshift States
+
+| State | Meaning | Transitions To |
+|-------|---------|----------------|
+| `QUEUED` | Waiting in queue | EXECUTING |
+| `EXECUTING` | Currently processing | DONE, FAILED |
+| `DONE` | Completed with quality gates passed | (terminal) |
+| `FAILED` | Needs human review | QUEUED (retry) |
+
+### Context Enhancement
+
+Before executing any task, Context Enhancer provides:
+```yaml
+context_package:
+  semantic_matches: []      # datacortex RAG results
+  relevant_indexes: []      # _index.md files
+  connected_concepts: []    # Wiki-linked notes
+  applicable_patterns: []   # From patterns.md
+  relevant_corrections: []  # From corrections.md
+  recent_context: []        # Last 7 days journal
+  context_quality: 0.0-1.0  # Quality score
+```
+
+**Quality threshold**: If `context_quality < 0.6`, flag for expanded search.
+
+### Evaluation Thresholds
+
+| Outcome | Score | Variance | Action |
+|---------|-------|----------|--------|
+| Approved | ≥0.80 | <0.15 | Mark DONE |
+| Approved with notes | ≥0.70 | <0.20 | Mark DONE, log feedback |
+| Needs revision | <0.70 | ≥0.20 | Retry (max 2) or escalate |
+
+### Output File Format
+
+```markdown
+---
+nightshift_id: exec-YYYY-MM-DD-NNN
+task: "Task description"
+score: 0.85
+status: approved|needs_review
+---
+[Output content]
+```
+
+### Git Sync Protocol
+
+- Pull before any operation
+- Claim tasks via commit: `nightshift: claim <task-id>`
+- Complete tasks via commit: `nightshift: complete <task-id>`
+- Server only modifies: `org/next_actions.org`, `[space]/0-inbox/*`, `[space]/journal/*`
+
 ## References
 
 - DIP-0002: Layered Context Pattern
