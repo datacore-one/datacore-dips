@@ -6,7 +6,7 @@
 | **Title** | Learning Architecture |
 | **Author** | Gregor |
 | **Type** | Standards Track |
-| **Status** | Draft |
+| **Status** | Draft (Loop 3 partially implemented) |
 | **Created** | 2026-01-23 |
 | **Updated** | 2026-01-23 |
 | **Tags** | `learning`, `patterns`, `absorption`, `consolidation`, `cognitive` |
@@ -291,6 +291,66 @@ Track all absorptions in `.datacore/learning/absorption-log.md`:
 
 ### 4. Loop 3: User Learning
 
+#### 4.0 Knowledge Surfacing System (Implemented 2026-01-23)
+
+**Status:** Implemented in `/today` and `/gtd-weekly-review` commands.
+
+**Problem Solved:** Knowledge extracted during ingest (e.g., from Roam exports) sits in `3-knowledge/` folders and is never accessed. This creates "write-only" knowledge bases where valuable insights never influence future work.
+
+**Solution:** Multi-layer surfacing with state tracking:
+
+| Layer | Frequency | Mechanism | Effort |
+|-------|-----------|-----------|--------|
+| Daily Nugget | Each `/today` | Surface 1 recent item | Zero (passive) |
+| Weekly Review | `/gtd-weekly-review` | Review all recent items | Low (reflection) |
+| Application Tasks | GTD inbox | Create actionable tasks | Medium (intentional) |
+
+**State Tracking:**
+
+```yaml
+# .datacore/state/knowledge-surfacing.yaml
+items:
+  0-personal/3-knowledge/pages/effective-meetings-guide.md:
+    extracted: 2026-01-23
+    last_surfaced: 2026-01-24
+    surfaced_count: 1
+    applied: false
+    application_task: "Apply WDWBW framework in next team meeting"
+```
+
+**Daily Nugget Selection Algorithm:**
+1. Scan `3-knowledge/` for files modified in past 30 days
+2. Check if file has associated application task
+3. Prioritize items with upcoming application tasks (contextually relevant)
+4. If no upcoming tasks, surface oldest un-surfaced item
+5. Update `last_surfaced` and `surfaced_count`
+
+**Contextual Triggers** (optional calendar integration):
+- Meetings today → surface meetings guide
+- Project kickoff → surface project canvas methodology
+- DevRel work → surface DevRel frameworks
+
+**Application Task Pattern:**
+
+When knowledge is extracted, create corresponding GTD tasks:
+
+```org
+* TODO Apply WDWBW framework in next team meeting :knowledge:meetings:
+SCHEDULED: <2026-01-27 Mon>
+:PROPERTIES:
+:CREATED: [2026-01-23 Thu]
+:SOURCE: 3-knowledge/pages/effective-meetings-guide.md
+:END:
+Use the "Who Does What By When" framework from the effective meetings guide.
+```
+
+**Key Insight:** Knowledge extraction alone is insufficient. The three-layer surfacing (daily/weekly/tasks) ensures extracted knowledge influences future decisions. This addresses the "write-only knowledge base" anti-pattern.
+
+**Files:**
+- `.datacore/commands/today.md` - Knowledge Nugget section
+- `.datacore/commands/gtd-weekly-review.md` - Knowledge Review section (Step 14)
+- `.datacore/state/knowledge-surfacing.yaml` - Surfacing state
+
 #### 4.1 Spaced Repetition Engine
 
 Track user knowledge for retention:
@@ -451,6 +511,16 @@ Relevance = (category_match × 0.4) + (keyword_similarity × 0.3) +
 ├── user-knowledge.yaml      # Spaced repetition state
 └── archive/                 # Pruned patterns
     └── 2025-Q4-patterns.md
+
+.datacore/state/
+├── knowledge-surfacing.yaml # Knowledge surfacing state (implemented)
+└── structure_version.yaml   # Migration tracking
+
+[space]/3-knowledge/         # Knowledge artifacts (surfacing source)
+├── pages/                   # Generic methodology
+├── literature/              # Book/paper notes
+├── zettel/                  # Atomic concepts
+└── [domain]/                # Domain-specific knowledge
 ```
 
 ## Rationale
@@ -521,19 +591,66 @@ Not all changes carry equal risk:
 - Build absorption targets (agents, CLAUDE.md, commands)
 
 ### Phase 4: User Learning (Week 9-12)
-- Implement spaced repetition engine
-- Create /teach command
-- Integrate active recall into /today
+- ✅ **Knowledge Surfacing** (implemented 2026-01-23)
+  - Daily nugget in `/today` command
+  - Weekly review in `/gtd-weekly-review` command
+  - State tracking in `.datacore/state/knowledge-surfacing.yaml`
+  - Application task pattern for intentional first use
+- ⏳ Implement full spaced repetition engine (user-knowledge.yaml)
+- ⏳ Create /teach command
+- ⏳ Integrate active recall questions into /today
 
 ### Reference Implementation
 
-TBD - Link to PR when available
+**Knowledge Surfacing (implemented):**
+- `.datacore/commands/today.md` - Knowledge Nugget section
+- `.datacore/commands/gtd-weekly-review.md` - Step 14: Knowledge Review
+- `.datacore/state/knowledge-surfacing.yaml` - State tracking
+- Commit: `32e904a` (2026-01-23)
+
+**Pattern:** Selective extraction during ingest (e.g., 4,949 Roam files → 6 knowledge artifacts) combined with multi-layer surfacing ensures knowledge flows into active use rather than accumulating in folders.
 
 ### Rollout Plan
 
 1. **Alpha**: Enable for 2-datacore space only
 2. **Beta**: Enable for 0-personal space
 3. **GA**: Enable for all spaces, document in CLAUDE.base.md
+
+## Learnings from Implementation
+
+### Knowledge Surfacing (2026-01-23)
+
+**Context:** Processing 4,949 Roam export files during ingest revealed the "write-only knowledge base" problem acutely. Valuable methodology was extracted but would never be accessed without active surfacing.
+
+**Key Learnings:**
+
+1. **Selective Extraction Over Bulk Import**
+   - 4,949 files → 6 knowledge artifacts (0.1% extraction rate)
+   - Quality-first: only permanent insights, reusable patterns, strategic learnings
+   - Operational content (meeting notes, daily journals) → archive, not knowledge base
+
+2. **Multi-Layer Reinforcement**
+   - Single-layer (extraction only) creates write-only storage
+   - Three layers ensure accountability:
+     - Daily: passive exposure (zero effort)
+     - Weekly: reflection (low effort)
+     - Tasks: intentional application (medium effort)
+
+3. **Command Enhancement Over Agent Modification**
+   - Added features at command level (markdown prompts) rather than agent code
+   - Preserves agent stability while enabling workflow iteration
+   - State tracking separate from command execution
+
+4. **Contextual Surfacing Increases Relevance**
+   - Calendar integration: meetings today → surface meetings guide
+   - Task association: upcoming application task → prioritize that item
+   - Recency weighting: newer extractions surface more frequently initially
+
+**Patterns Captured:**
+- `PAT-2026-0123-001`: Selective Knowledge Extraction Over Bulk Import
+- `PAT-2026-0123-002`: Spaced Repetition for Knowledge Surfacing
+- `PAT-2026-0123-003`: State-Tracked Knowledge Surfacing in Daily Workflows
+- `PAT-2026-0123-004`: Command Enhancement Without Core Agent Modification
 
 ## Open Questions
 
