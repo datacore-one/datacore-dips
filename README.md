@@ -86,13 +86,13 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 | [0003](DIP-0003-scaffolding-pattern.md) | Scaffolding Pattern | Implemented |
 | [0004](DIP-0004-knowledge-database.md) | Knowledge Database | Implemented |
 | [0015](DIP-0015-semantic-organization.md) | Semantic Organization | Implemented |
-| [0017](DIP-0017-outbox-archive-pattern.md) | Outbox & Archive Pattern | Draft |
+| [0017](DIP-0017-outbox-archive-pattern.md) | Outbox & Archive Pattern | Active |
+| [0019](DIP-0019-learning-architecture.md) | Learning Architecture | Draft |
 
 ### GTD & Task Management
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0007](DIP-0007-inbox-done-option.md) | Inbox DONE Option | Draft |
 | [0009](DIP-0009-gtd-specification.md) | GTD System Specification | Implemented |
 | [0010](DIP-0010-external-sync-architecture.md) | External Sync Architecture | Implemented |
 | [0011](DIP-0011-nightshift-module.md) | Nightshift Module | Implemented |
@@ -110,12 +110,19 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 |-----|-------|--------|
 | [0000](DIP-0000-template.md) | DIP Template | Implemented |
 
+### Infrastructure & Security
+
+| DIP | Title | Status |
+|-----|-------|--------|
+| [0018](DIP-0018-credential-management-DRAFT.md) | Credential Management | Draft |
+
 ### Historical / Superseded
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| 0005 | GitHub-Based Onboarding | Draft (unfinished) |
-| 0006 | Open Questions Management | Superseded by DIP-0013 |
+| [0005](DIP-0005-github-onboarding.md) | GitHub-Based Onboarding | Draft (unfinished) |
+| [0006](DIP-0006-open-questions-management.md) | Open Questions Management | Draft (superseded by DIP-0013) |
+| [0007](DIP-0007-inbox-done-option.md) | Inbox DONE Option | Draft (unfinished) |
 
 ---
 
@@ -125,11 +132,11 @@ The following DIPs are planned to complete full specification coverage:
 
 | DIP | Title | Purpose | Priority |
 |-----|-------|---------|----------|
-| **0018** | Sync Architecture | ./sync script, multi-repo handling | Medium |
-| **0022** | Installation & Upgrade | Bootstrap, upgrades, migrations | Medium |
-| **0019** | Journal Format | Personal and team journal structure | Low |
-| **0020** | External Services | n8n, Gamma, and service integration patterns | Low |
+| **0020** | Journal Format | Personal and team journal structure | Low |
 | **0021** | Module Specification | module.yaml schema, installation, hooks, lifecycle | High |
+| **0022** | Installation & Upgrade | Bootstrap, upgrades, migrations | Medium |
+| **0023** | Sync Architecture | ./sync script, multi-repo handling | Medium |
+| **0024** | External Services | n8n, Gamma, and service integration patterns | Low |
 
 ### Relationship to `datacore-specification.md`
 
