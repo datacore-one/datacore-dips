@@ -137,6 +137,7 @@ The following DIPs are planned to complete full specification coverage:
 | **0022** | Installation & Upgrade | Bootstrap, upgrades, migrations | Medium |
 | **0023** | Sync Architecture | ./sync script, multi-repo handling | Medium |
 | **0024** | External Services | n8n, Gamma, and service integration patterns | Low |
+| **0025** | Chat Interface Architecture | Telegram, Slack, Discord, Email integrations | Medium |
 
 ### Relationship to `datacore-specification.md`
 
@@ -160,7 +161,8 @@ With DIP-0017 through DIP-0021 complete, the monolithic `datacore-specification.
 | Git & Contribution | → DIP-0001, DIP-0002 |
 | External Sync | → DIP-0010 |
 | Operations | → DIP-0017, DIP-0018 |
-| Integrations | → DIP-0010, DIP-0020 |
+| Integrations | → DIP-0010, DIP-0024 |
+| Chat Interfaces | → DIP-0025 |
 
 ## Contributing
 
