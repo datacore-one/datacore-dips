@@ -6,7 +6,7 @@
 | **Title** | Search & Research Architecture |
 | **Author** | Gregor, Claude (AI-assisted) |
 | **Type** | Core |
-| **Status** | Draft |
+| **Status** | Implementation |
 | **Created** | 2026-02-18 |
 | **Updated** | 2026-02-18 |
 | **Tags** | `search`, `research`, `agents`, `ingest`, `mcp`, `architecture` |
@@ -710,7 +710,7 @@ To disable a specific source, set `enabled: false` in `sources.yaml` rather than
 #### 7.2 MCP Server Configuration
 
 ```json
-// .claude/settings.json (project-level mcpServers)
+// .mcp.json (project-level MCP server configuration)
 {
   "mcpServers": {
     "perplexity": {
@@ -858,60 +858,56 @@ Gemini's 2M context is valuable for large-scale synthesis but adds latency, cost
 | 5. Wire orchestrators | Point to new agents, test overnight pipeline | Medium — needs testing |
 | 6. Retire old agents | Add aliases, mark deprecated | Low — aliases preserve routing |
 
-### Agent Aliases
+### Agent Deprecation
 
-During transition, old names route to new agents:
+Old agent names are marked deprecated with `superseded_by` pointing to their replacement. This follows the existing pattern established by `gtd-process-inbox` in `agents.yaml`:
 
 ```yaml
-# registry/agents.yaml
+# registry/agents.yaml — deprecated entries use empty skeleton
 gtd-research-processor:
+  description: "[DEPRECATED] Use knowledge-extractor instead"
   deprecated: true
-  alias: knowledge-extractor
+  superseded_by: knowledge-extractor
 
 ingest-processor:
   deprecated: true
-  alias: knowledge-extractor
+  superseded_by: knowledge-extractor
 
 conversation-processor:
   deprecated: true
-  alias: knowledge-extractor
-  note: "Routes to conversation-parser sub-agent"
+  superseded_by: knowledge-extractor
 
 daily-research-processor:
   deprecated: true
-  alias: research-orchestrator
+  superseded_by: research-orchestrator
 
 research-link-processor:
   deprecated: true
-  alias: research-synthesizer
+  superseded_by: research-synthesizer
 
 nlm-podcast-creator:
   deprecated: true
-  alias: podcast-creator
+  superseded_by: podcast-creator
 
 research-post-processor:
   deprecated: true
-  removed: true
-  note: "Absorbed into research-orchestrator pipeline"
+  superseded_by: research-orchestrator  # absorbed
 
 action-item-extractor:
   deprecated: true
-  removed: true
-  note: "Absorbed into research-orchestrator pipeline"
+  superseded_by: research-orchestrator  # absorbed
 ```
 
 ### DIP-0016 Schema Extension
 
-The alias mechanism introduces new fields to the agent registry schema:
+The deprecation mechanism uses two fields already present in the agent registry schema (established by `gtd-process-inbox` precedent):
 
 | Field | Purpose |
 |-------|---------|
 | `deprecated` | `true` if agent is replaced by a newer agent |
-| `alias` | Name of the replacement agent |
-| `removed` | `true` if agent no longer exists (absorbed into another) |
-| `note` | Migration guidance |
+| `superseded_by` | Name of the replacement agent |
 
-These fields should be formally added to DIP-0016's registry schema in a follow-up amendment.
+Command-level hook profiles (e.g., `search-pipeline` applied to `/search` command rather than an agent) are a future DIP-0016 extension.
 
 ### `:AI:research:` Routing
 
