@@ -1003,6 +1003,75 @@ TBD — branch `dip-0021-search-research`
 
 9. **Source authority weighting**: The `authority` field in source registry enables weighted synthesis. How aggressively should this weight findings? A peer-reviewed paper vs. a blog post might both contain valuable information.
 
+## Appendix A: Three-Layer Model Applied to Existing Workflows
+
+These examples validate the three-layer architecture by mapping it against existing Datacore workflows that weren't designed with this model in mind. They demonstrate that the search/research/ingest distinction is a natural pattern that already exists implicitly in the system.
+
+### A.1 Email Processing (`/mails`)
+
+The mail module processes email inboxes through classification, auto-filtering, and human review. Mapped against the three layers:
+
+**Search layer** (enriching classification):
+- When classifying actionable emails, search Datacortex for related context ("You have 3 notes about this sender/topic")
+- Perplexity lookup for unknown senders or referenced companies (quick background enrichment)
+- Surface relevant CRM entries during classification to improve routing decisions
+
+**Research layer** (newsletter and link processing):
+- Newsletter emails contain curated URLs — extract and queue to `research_learning.org` for overnight processing
+- Actionable emails referencing external reports/documents trigger `/research` for deep processing
+- Weekly digest: synthesize themes across the week's email-sourced URLs into a briefing
+
+**Ingest layer** (email-to-knowledge):
+- Email attachments (PDFs, documents) processed through `knowledge-extractor` → literature notes + zettels
+- Important email threads processed as conversations → `conversation-parser` sub-agent extracts decisions, commitments, action items
+- Meeting invites with agendas feed the meetings module and create knowledge artifacts
+
+**Hook integration:**
+
+| Hook | Email use case |
+|------|---------------|
+| `pre_search` | Inject sender context from CRM during classification |
+| `post_extract` | Route extracted action items from email attachments to `org/inbox.org` |
+| `post_ingest` | Update CRM with new entities discovered in email content |
+
+**Current gap**: The mail module classifies and filters but doesn't feed the knowledge pipeline. With this architecture, every email interaction is an opportunity to capture knowledge, not just manage tasks.
+
+### A.2 Trading Workflows (`/start-trading`, `/close-trading`, `/weekly-trading-review`)
+
+The trading module manages morning routines, trade validation, evening reviews, and weekly analysis. Mapped against the three layers:
+
+**Search layer** (market intelligence):
+- `/start-trading` morning routine: search Datacortex for relevant journal entries + Perplexity for overnight market developments
+- `/validate-trade` pre-trade check: search for your existing notes on the asset + current web sentiment
+- Real-time enrichment: when reviewing a position, instant context from both internal trading journal and external market data
+
+**Research layer** (deep market analysis):
+- `/weekly-trading-review`: trigger `/research` for assets in the portfolio — gather analyst reports, on-chain data, sentiment analysis
+- Overnight market research: queue topics from trading journal observations for deep overnight processing
+- Competitive/thematic research: "DeFi regulatory outlook Q2 2026" → full research pipeline with synthesis
+- Crypto-specific sources (CoinGlass, DeFiLlama) feed structured data into reports (not prose)
+
+**Ingest layer** (trading knowledge):
+- `/close-trading` evening review: process the day's trading decisions and market observations into structured knowledge
+- Trade journal entries → `knowledge-extractor` extracts patterns, mistakes, strategy refinements as zettels
+- External analyst reports (PDFs, articles) saved during the day → overnight ingest into literature notes
+- Weekly performance data → structured analysis that feeds back into trading strategy zettels
+
+**Hook integration:**
+
+| Hook | Trading use case |
+|------|-----------------|
+| `pre_search` | Inject current portfolio positions as context for market searches |
+| `post_discover` | Filter research sources to crypto/finance relevant providers |
+| `post_extract` | Tag trading-related zettels with position/asset references |
+| `research_complete` | Update trading journal with research findings, flag contradictions with current thesis |
+
+**Current gap**: The trading module operates as a self-contained system with its own analysis. With this architecture, market research feeds the knowledge base and trading insights compound over time rather than staying locked in daily journal entries.
+
+### A.3 Key Insight
+
+Both workflows reveal the same pattern: existing Datacore modules already implicitly operate across all three layers but without the formal architecture to connect them. The three-layer model turns ad-hoc information flow into a systematic knowledge pipeline where every interaction — email, trade, research — contributes to the same growing knowledge base.
+
 ## References
 
 - **DIP-0004**: Knowledge Database (Datacortex) — search infrastructure this builds on
