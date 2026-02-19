@@ -144,7 +144,7 @@ Session Work --> session-learning --> patterns.md (raw capture, unchanged)
     frequency: 5
     last_accessed: 2026-01-30
   feedback_signals: {positive: 3, negative: 0, neutral: 2}
-  provenance: {origin: "gregor/personal", chain: [], license: "cc-by-sa-4.0"}
+  provenance: {origin: "user/personal", chain: [], license: "cc-by-sa-4.0"}
   tags: [org-mode, validation]
   abstract: null               # Reference to ABS-ID if user has generalized
   derived_from: null           # If re-instantiated from foreign abstract engram
