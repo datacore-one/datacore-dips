@@ -229,7 +229,7 @@ context_package:
 | Tag | Agent |
 |-----|-------|
 | `:AI:` | ai-task-executor (routes) |
-| `:AI:research:` | gtd-research-processor |
+| `:AI:research:` | research-orchestrator |
 | `:AI:content:` | gtd-content-writer |
 | `:AI:data:` | gtd-data-analyzer |
 | `:AI:pm:` | gtd-project-manager |
@@ -546,7 +546,7 @@ executions:
     resources:
       tokens_used: 45000
       cost_usd: 0.12
-      agent: "gtd-research-processor"
+      agent: "research-orchestrator"
       executor: "server:personal"
 
     evaluations:

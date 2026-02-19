@@ -110,11 +110,18 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 |-----|-------|--------|
 | [0000](DIP-0000-template.md) | DIP Template | Implemented |
 
+### System Architecture
+
+| DIP | Title | Status |
+|-----|-------|--------|
+| [0021](DIP-0021-search-research-architecture.md) | Search & Research Architecture | Implemented |
+
 ### Infrastructure & Security
 
 | DIP | Title | Status |
 |-----|-------|--------|
 | [0018](DIP-0018-credential-management-DRAFT.md) | Credential Management | Draft |
+| [0020](DIP-0020-whatsapp-module.md) | WhatsApp Module | Draft |
 
 ### Historical / Superseded
 
@@ -132,8 +139,8 @@ The following DIPs are planned to complete full specification coverage:
 
 | DIP | Title | Purpose | Priority |
 |-----|-------|---------|----------|
-| **0020** | Journal Format | Personal and team journal structure | Low |
-| **0021** | Module Specification | module.yaml schema, installation, hooks, lifecycle | High |
+| **0026** | Journal Format | Personal and team journal structure | Low |
+| **0027** | Module Specification | module.yaml schema, installation, hooks, lifecycle | High |
 | **0022** | Installation & Upgrade | Bootstrap, upgrades, migrations | Medium |
 | **0023** | Sync Architecture | ./sync script, multi-repo handling | Medium |
 | **0024** | External Services | n8n, Gamma, and service integration patterns | Low |

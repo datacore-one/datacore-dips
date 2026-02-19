@@ -12,7 +12,7 @@
 | **Tags** | `organization`, `files`, `structure`, `git-lfs`, `companion`, `media-index` |
 | **Affects** | `.gitattributes`, all spaces |
 | **Specs** | `datacore-specification.md` |
-| **Agents** | `ingest-coordinator`, `ingest-processor`, `structural-integrity` |
+| **Agents** | `ingest-orchestrator`, `knowledge-extractor`, `structural-integrity` |
 
 ## Summary
 
@@ -59,8 +59,8 @@ This section helps agents understand when and how to apply this DIP.
 
 | Agent | Uses This DIP For |
 |-------|-------------------|
-| `ingest-coordinator` | Determining file destinations |
-| `ingest-processor` | Creating companions, routing content |
+| `ingest-orchestrator` | Determining file destinations |
+| `knowledge-extractor` | Creating companions, routing content |
 | `structural-integrity` | Auditing organization compliance |
 | `session-learning` | Routing zettels to correct space |
 
@@ -470,14 +470,14 @@ Each document goes through systematic deep processing:
 #### Agent Architecture
 
 ```
-ingest-coordinator
+ingest-orchestrator
 ├── Scans inbox folders or provided path
 ├── Inventories all items (files + folders)
 ├── Groups by type/context for batch efficiency
-├── Spawns ingest-processor for each item
+├── Spawns knowledge-extractor for each item
 └── Aggregates results and reports summary
 
-ingest-processor (per item)
+knowledge-extractor (per item)
 ├── Phase 1: READ - Analyze content
 ├── Phase 2: ASSESS - Determine destination
 ├── Phase 3: EXTRACT - Pull out knowledge
@@ -656,8 +656,8 @@ Structural Integrity enforces:
 - Companion markdown files - For non-AI-readable content
 - `/ingest` command - Automated file import with deep processing
 - `/structural-integrity` command - Structure audit and maintenance
-- `ingest-coordinator` agent - Orchestrates file import
-- `ingest-processor` agent - Processes individual items
+- `ingest-orchestrator` agent - Orchestrates file import
+- `knowledge-extractor` agent - Processes individual items
 - `structural-integrity` agent - Audits organizational structure
 
 ### Interface Changes
@@ -731,8 +731,8 @@ This branch: `dip-0015-semantic-organization`
 
 ## Related Agents
 
-- `ingest-coordinator.md` - File import orchestrator
-- `ingest-processor.md` - Per-item processor
+- `ingest-orchestrator.md` - File import orchestrator
+- `knowledge-extractor.md` - Per-item processor
 - `structural-integrity.md` - Structure auditor
 
 ## Related Commands

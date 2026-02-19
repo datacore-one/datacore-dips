@@ -352,7 +352,7 @@ Related: [[Wiki Link 1]], [[Wiki Link 2]]
 | Tag | Agent | Capability | Output Location |
 |-----|-------|------------|-----------------|
 | `:AI:content:` | `gtd-content-writer` | Blog, email, docs, social | `content/[type]/` |
-| `:AI:research:` | `gtd-research-processor` | URL analysis, literature notes, zettels | `3-knowledge/` |
+| `:AI:research:` | `research-orchestrator` | URL analysis, literature notes, zettels | `3-knowledge/` |
 | `:AI:data:` | `gtd-data-analyzer` | Metrics, reports, insights | `content/reports/` |
 | `:AI:pm:` | `gtd-project-manager` | Status tracking, blockers | journal + org-mode |
 
@@ -593,7 +593,7 @@ This section provides essential information for agents working with GTD tasks an
 | Tag | Routes To | Autonomous |
 |-----|-----------|------------|
 | `:AI:content:` | gtd-content-writer | Yes |
-| `:AI:research:` | gtd-research-processor | Yes |
+| `:AI:research:` | research-orchestrator | Yes |
 | `:AI:data:` | gtd-data-analyzer | Yes |
 | `:AI:pm:` | gtd-project-manager | Yes |
 | `:AI:technical:` | CTO queue | No (human review) |

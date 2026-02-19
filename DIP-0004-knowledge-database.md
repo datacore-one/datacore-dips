@@ -581,7 +581,7 @@ COMMIT;
 | **gtd-inbox-processor** | Parse org, find category section | `SELECT * FROM tasks WHERE category=? AND heading LIKE ?` |
 | **gtd-data-analyzer** | Grep journals, manual math | `SELECT category, COUNT(*), SUM(effort) FROM tasks WHERE closed_at BETWEEN ? AND ? GROUP BY category` |
 | **gtd-project-manager** | Parse org for PROJECT + WAITING | `SELECT p.*, t.heading as blocker FROM projects p LEFT JOIN tasks t ON t.project_id=p.id AND t.state='WAITING'` |
-| **gtd-research-processor** | Glob zettels, grep content | `SELECT * FROM files WHERE type='zettel' AND content_fts MATCH ?` |
+| **knowledge-extractor** | Glob zettels, grep content | `SELECT * FROM files WHERE type='zettel' AND content_fts MATCH ?` |
 | **session-learning** | Read journals, grep patterns | `SELECT * FROM learning_entries WHERE type='pattern' AND tags @> ?` |
 | **context-maintainer** | Count files, parse CLAUDE.md | `SELECT * FROM context_metadata WHERE space IS NULL` |
 | **scaffolding-auditor** | Multi-file scan | `SELECT * FROM scaffolding_requirements WHERE space=? AND status='missing'` |
@@ -992,7 +992,7 @@ GROUP BY f2.id ORDER BY COUNT(*) DESC LIMIT 5;
 | `tasks` | Org-mode TODO items | ai-task-executor, gtd-* |
 | `inbox_entries` | Unprocessed inbox items | gtd-inbox-processor |
 | `files` | All indexed content | All research agents |
-| `files_fts` | Full-text search | gtd-research-processor |
+| `files_fts` | Full-text search | knowledge-extractor |
 | `learning_entries` | Patterns and corrections | session-learning |
 | `sessions` | Work session tracking | journal agents |
 
