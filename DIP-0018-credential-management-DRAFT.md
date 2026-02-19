@@ -89,7 +89,7 @@ Before implementing this DIP, ensure:
     └── .env                          # Project-specific credentials
 
 # Secrets Repository (separate, on private server)
-gregor@nightshift:Data/0-personal-secrets.git/
+user@nightshift-server:Data/0-personal-secrets.git/
 ├── install.sh                        # Bootstrap script
 ├── restore.sh                        # Secrets-only restore
 ├── README.md                         # Documentation
@@ -421,7 +421,7 @@ Is it machine-specific (SSH key, GPG key)?
 **Three Storage Locations**:
 
 1. **Secrets Repository** (separate git repo on private server)
-   - **Location**: `gregor@nightshift:Data/0-personal-secrets.git/`
+   - **Location**: `user@nightshift-server:Data/0-personal-secrets.git/`
    - **Contents**: Critical credentials, SSH/GPG keys, machine configs
    - **Encryption**: GPG-encrypted at rest
    - **Sync**: Manual pull/push, never auto-synced
@@ -1102,7 +1102,7 @@ $ datacore creds backup
 
 Backing up credentials to secrets repository...
 
-Secrets repository: gregor@nightshift:Data/0-personal-secrets.git/
+Secrets repository: user@nightshift-server:Data/0-personal-secrets.git/
 
 Files to backup:
   .datacore/env/.env
@@ -1446,7 +1446,7 @@ exit 0
 
 Primary strategy: Single authoritative server (nightshift) with manual backups
 
-1. **Primary**: nightshift server (`gregor@nightshift:Data/0-personal-secrets.git/`)
+1. **Primary**: nightshift server (`user@nightshift-server:Data/0-personal-secrets.git/`)
 2. **Backup 1**: Encrypted USB drive (monthly export, stored in safe)
 3. **Backup 2**: Encrypted cloud backup (optional, via `gpg --encrypt | aws s3 cp`)
 
@@ -1454,9 +1454,9 @@ Replication procedure:
 ```bash
 # Monthly backup to USB drive
 cd /Volumes/BACKUP_USB/
-git clone gregor@nightshift:Data/0-personal-secrets.git
+git clone user@nightshift-server:Data/0-personal-secrets.git
 tar czf secrets-$(date +%Y%m%d).tar.gz 0-personal-secrets.git/
-gpg --encrypt --recipient gregor@example.com secrets-*.tar.gz
+gpg --encrypt --recipient your-email@example.com secrets-*.tar.gz
 rm -rf 0-personal-secrets.git secrets-*.tar.gz  # Keep only .gpg file
 ```
 
