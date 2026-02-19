@@ -8,7 +8,7 @@
 | **Type** | Standards Track |
 | **Status** | Draft |
 | **Created** | 2026-01-23 |
-| **Updated** | 2026-01-31 |
+| **Updated** | 2026-02-19 |
 | **Tags** | `learning`, `engrams`, `absorption`, `consolidation`, `cognitive`, `ACT-R` |
 | **Affects** | `.datacore/learning/`, agents, commands, skills, nightshift |
 | **Specs** | `datacore-specification.md`, `DIP-0011-nightshift-module.md`, `DIP-0016-agent-registry.md` |
@@ -132,23 +132,49 @@ Session Work --> session-learning --> patterns.md (raw capture, unchanged)
   consolidated: false         # true after surviving reconsolidation event
   type: behavioral            # behavioral | terminological | procedural | architectural
   scope: agent:dip-preparer   # agent:X | command:X | global | space:X
+  visibility: private         # private | public | template (controls exchange eligibility)
   statement: "Validate org-mode syntax before writing to .org files."
   rationale: "Three incidents of malformed entries in January 2026."
   contraindications:
     - "Quick-capture to inbox where speed > validation"
   source_patterns: [PAT-2026-0125-003, PAT-2026-0129-001]
   derivation_count: 3         # Independent times captured (from duplicates)
+  knowledge_type:              # SOAR + Bloom's classification (optional)
+    memory_class: procedural   # semantic | episodic | procedural | metacognitive
+    cognitive_level: apply     # remember | understand | apply | analyze | evaluate | create
+  domain: "gtd/org-mode"      # SKOS-style domain taxonomy (optional)
+  relations:                   # SKOS relationship graph (optional)
+    broader: []                # Parent concepts
+    narrower: []               # Child concepts
+    related: [ENG-2026-0115-003]  # Peer concepts
+    conflicts: []              # Contradicting engrams
   activation:
     retrieval_strength: 0.85   # Decays with time (ACT-R base-level)
     storage_strength: 0.6      # Only increases (reinforcement, consolidation)
     frequency: 5
     last_accessed: 2026-01-30
   feedback_signals: {positive: 3, negative: 0, neutral: 2}
-  provenance: {origin: "user/personal", chain: [], license: "cc-by-sa-4.0"}
+  provenance:
+    origin: "user/personal"
+    chain: []
+    signature: null            # Cryptographic signature for exchange (nullable)
+    license: "cc-by-sa-4.0"
   tags: [org-mode, validation]
+  pack: null                   # Pack ID if engram came from an installed pack
   abstract: null               # Reference to ABS-ID if user has generalized
   derived_from: null           # If re-instantiated from foreign abstract engram
 ```
+
+#### v2 Field Reference
+
+| Field | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `visibility` | enum | `private` | `private` = local only, `public` = exchange-eligible, `template` = starter pack content |
+| `knowledge_type` | object | (optional) | SOAR memory class + Bloom's cognitive level for injection prioritization |
+| `domain` | string | (optional) | SKOS-style hierarchical domain (e.g., `gtd/org-mode`, `dev/typescript`) |
+| `relations` | object | (optional) | SKOS graph: `broader`, `narrower`, `related`, `conflicts` arrays of engram IDs |
+| `pack` | string\|null | `null` | Source pack ID when engram originates from an installed pack |
+| `provenance.signature` | string\|null | `null` | Cryptographic signature for exchange verification |
 
 ### 3. Activation and Forgetting (ACT-R Inspired)
 
@@ -316,6 +342,23 @@ Skills (Claude Code's native extensibility) are the delivery mechanism for engra
 | `daily-review` | Presents candidates, contradictions, fading engrams | Yes (`/daily-review`) |
 | `learn` | Quick engram creation: `/learn "statement"` | Yes |
 | `forget` | Quick retirement: `/forget ENG-ID` | Yes |
+
+#### MCP Server (`@datacore-one/mcp`)
+
+The `@datacore-one/mcp` package exposes engram operations as MCP tools, enabling any MCP-compatible agent (not just Claude Code) to interact with the engram system:
+
+| MCP Tool | Maps To | Purpose |
+|----------|---------|---------|
+| `learn` | `/learn` skill | Create candidate engrams with v2 schema |
+| `inject` | `engram-inject` skill | Context-aware engram injection with token budget |
+| `search` | Datacortex query | Search knowledge base and engrams |
+| `capture` | Journal/knowledge write | Capture notes and journal entries |
+| `ingest` | `/ingest` command | Process external content into knowledge |
+| `status` | System overview | Engram counts, pack info, storage health |
+| `discover` | Pack registry | Browse available engram packs |
+| `install` | Pack management | Install/upgrade engram packs |
+
+The MCP server uses the same v2 engram schema, storage paths, and injection algorithm as the native skills. It auto-detects Datacore installations at `~/Data/.datacore/` or falls back to standalone mode at `~/Datacore/`.
 
 #### Skills as Exchange Format
 
