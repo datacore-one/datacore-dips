@@ -7,7 +7,7 @@
 | Module | nightshift |
 | Status | Draft |
 | Created | 2025-12-10 |
-| Author | Gregor, Claude |
+| Author | User, Claude |
 | Depends On | DIP-0002, DIP-0004, DIP-0009, DIP-0010 |
 
 ## Summary
@@ -188,7 +188,7 @@ context_package:
     - "Research tasks should include pricing comparison table"
 
   recent_context:
-    - "2025-12-09: Discussed Verity pricing, leaning toward usage-based"
+    - "2025-12-09: Discussed Project Alpha pricing, leaning toward usage-based"
 
   context_quality: 0.85
   gaps_identified:
@@ -383,7 +383,7 @@ If needs_revision:
 * TODO Research competitor X :AI:research:
   :PROPERTIES:
   :CREATED: [2025-12-10 Tue]
-  :SPACE: datafund
+  :SPACE: teamspace
   :PRIORITY: A
   :END:
 
@@ -406,7 +406,7 @@ If needs_revision:
   :PROPERTIES:
   :NIGHTSHIFT_COMPLETED: [2025-12-10 Tue 02:27]
   :NIGHTSHIFT_SCORE: 0.85
-  :NIGHTSHIFT_OUTPUT: 1-datafund/0-inbox/nightshift-001-research.md
+  :NIGHTSHIFT_OUTPUT: 1-teamspace/0-inbox/nightshift-001-research.md
   :END:
 ```
 
@@ -419,8 +419,8 @@ If needs_revision:
 Outputs always go to `0-inbox/` of the relevant space:
 
 ```
-Task with :SPACE: datafund
-  → Output: 1-datafund/0-inbox/nightshift-{id}-{type}.md
+Task with :SPACE: teamspace
+  → Output: 1-teamspace/0-inbox/nightshift-{id}-{type}.md
 
 Task in 0-personal/org/next_actions.org
   → Output: 0-personal/0-inbox/nightshift-{id}-{type}.md
@@ -478,7 +478,7 @@ requires_action: acknowledge
 
 ### Space Journal Entry
 
-`1-datafund/journal/2025-12-11.md`:
+`1-teamspace/journal/2025-12-11.md`:
 
 ```markdown
 ## Nightshift Report
@@ -515,7 +515,7 @@ requires_action: acknowledge
 
 Overnight processed 5 tasks:
 - 0-personal: 1 task
-- 1-datafund: 4 tasks
+- 1-teamspace: 4 tasks
 
 **Action needed**: 1 item requires review
 
@@ -535,7 +535,7 @@ executions:
   - id: "exec-2025-12-10-001"
     task_id: "abc123"
     task_type: ":AI:research:"
-    space: "1-datafund"
+    space: "1-teamspace"
 
     timing:
       queued_at: "2025-12-10T23:00:00Z"
@@ -621,7 +621,7 @@ External Services (GitHub, Calendar) = Different systems, need sync
 | Server Type | Can Execute | Cannot Execute |
 |-------------|-------------|----------------|
 | Personal server | All spaces | - |
-| Team server (datafund) | Only 1-datafund | 0-personal, others |
+| Team server (teamspace) | Only 1-teamspace | 0-personal, others |
 
 ### Configuration
 
@@ -637,17 +637,17 @@ nightshift:
 nightshift:
   servers:
     personal:
-      url: "nightshift.gregor.io"
+      url: "nightshift.example.com"
       ssh_key: "~/.ssh/nightshift_personal"
       spaces: ["*"]
       is_default: true
 
-# 1-datafund/.datacore/settings.local.yaml
+# 1-teamspace/.datacore/settings.local.yaml
 nightshift:
   servers:
-    datafund:
-      url: "nightshift.datafund.io"
-      spaces: ["1-datafund"]
+    teamspace:
+      url: "nightshift.team.example.com"
+      spaces: ["1-teamspace"]
       is_default: true
 ```
 
