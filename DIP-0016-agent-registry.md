@@ -1443,7 +1443,7 @@ type: journal-append
 config:
   summary_length: "brief"  # brief, standard, detailed
   include_outputs: true
-  target: "{space}/notes/journals/{date}.md"
+  target: "{space}/journal/{date}.md"
 ```
 
 ##### Validation Hooks

@@ -614,7 +614,7 @@ This section provides essential information for agents working with GTD tasks an
 ### Quality Standards
 
 All GTD agents MUST:
-- Log all actions to journal (`notes/journals/YYYY-MM-DD.md`)
+- Log all actions to journal (`journal/YYYY-MM-DD.md`)
 - Flag uncertain decisions for human review
 - Return JSON with `{status, message, outputs, needs_review}`
 - Respect focus area hierarchy (TIER 1 > TIER 2 > PERSONAL > RESEARCH)
