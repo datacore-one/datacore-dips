@@ -1,9 +1,9 @@
 # DIP-0009: GTD System Specification
 
-> **Status**: Draft - NEEDS REVIEW
+> **Status**: Draft
 > **Author**: Gregor
 > **Created**: 2025-12-04
-> **Updated**: 2025-12-04
+> **Updated**: 2026-02-21
 > **Supersedes**: `.datacore/gtd-spec.md` (operational manual to be archived)
 
 ## Summary
@@ -312,6 +312,251 @@ Action items:
 Related: [[Wiki Link 1]], [[Wiki Link 2]]
 ```
 
+### Part 3.5: Rich Task Standard
+
+Nightshift tasks execute poorly when they lack context. A heading like `* TODO Create Verity roadmap :AI:` gives the executor nothing to work with. The Rich Task Standard defines the full set of properties that make tasks self-contained and executable.
+
+#### Rich Task Format
+
+```org
+*** TODO [#B] Verb-driven specific outcome              :AI:pm:
+SCHEDULED: <2026-02-22 Sun>
+:PROPERTIES:
+:ID:       550e8400-e29b-41d4-a716-446655440000
+:CREATED:  [2026-02-21 Fri 14:30]
+:SOURCE:   inbox
+:EFFORT:   Moderate
+:CONTEXT: |
+  Why this matters. What prompted it. Background.
+:KEY_FILES: |
+  - path/to/relevant/file.md
+  - GitHub: org/repo#42
+:CURRENT_STATUS: |
+  What exists already. What was last done.
+  Journal 2026-02-20 ## Session 1: "Discussed roadmap scope with Crt"
+:ACCEPTANCE_CRITERIA: |
+  - What "done" looks like (verifiable)
+  - Expected output format
+:TOOLS: |
+  - Read CANVAS.md before starting
+  - Check GitHub issues via gh CLI
+:DEPENDS_ON: |
+  BLOCKS 550e8400-e29b-41d4-a716-446655440001 "Deploy CI pipeline"
+  AFTER 550e8400-e29b-41d4-a716-446655440002 "Finalize MVP spec"
+  WAITING "legal review of data classification"
+:ROLE: |
+  You are a technical project manager with deep knowledge
+  of the Verity codebase and Datafund's 8-week PoC timeline.
+:END:
+
+Context paragraph with additional details.
+
+Related: [[Wiki Link 1]], [[Wiki Link 2]]
+
+Action items:
+- [ ] Specific step 1
+- [ ] Specific step 2
+```
+
+#### Field Definitions
+
+| Field | Location | Required | Purpose |
+|---|---|---|---|
+| `:ID:` | PROPERTIES | When task is a dependency target | RFC 4122 v4 UUID. Format: `[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}` |
+| `:CREATED:` | PROPERTIES | Always | Creation timestamp `[YYYY-MM-DD Day HH:MM]` |
+| `:SOURCE:` | PROPERTIES | Always | Origin: `inbox`, `meeting`, `email`, `research`, `idea`, `conversation`, `system` |
+| `:EFFORT:` | PROPERTIES | Always | Wall-clock time. Values: `Quick` (<30min), `Moderate` (30-120min), `Significant` (>2hr) |
+| `:CONTEXT:` | PROPERTIES | For :AI: tasks | Why this matters, background, what prompted it |
+| `:KEY_FILES:` | PROPERTIES | When applicable | Files/repos the executor should read before starting |
+| `:CURRENT_STATUS:` | PROPERTIES | When applicable | What exists, what was last done, journal references |
+| `:ACCEPTANCE_CRITERIA:` | PROPERTIES | When applicable | Verifiable definition of "done" |
+| `:TOOLS:` | PROPERTIES | When applicable | Approach hints, specific tools/commands to use |
+| `:DEPENDS_ON:` | PROPERTIES | When applicable | Task ordering (see DEPENDS_ON grammar below) |
+| `:ROLE:` | PROPERTIES | Optional | Persona/expertise hint for AI executor |
+| body text | After `:END:` | Optional | Additional notes, wiki-links, sub-tasks, checklist |
+
+**Not included** (with rationale):
+- ~~SKILLS~~ — Redundant with `:AI:subtype:` tag (DIP-0014). The tag IS the routing hint.
+- ~~RELATED~~ — Wiki-links belong in body text per existing convention.
+- ~~ENGRAMS~~ — Resolved at runtime by execution pipeline via `engram_selector.py`. Hardcoded IDs rot as engrams are consolidated/retired.
+
+#### Multiline Property Convention
+
+Datacore extends org-mode PROPERTIES with a multiline continuation syntax:
+
+```org
+:PROPERTY_NAME: |
+  Line 1 of content
+  Line 2 of content
+  Indented continuation until next :KEY: or :END:
+```
+
+**Rules:**
+1. The marker is a property whose stripped value is exactly `|` (just the pipe character)
+2. Subsequent lines are continuation lines until the next `:KEY:` pattern or `:END:`
+3. A value like `:SOURCE: inbox | meeting` is NOT multiline (stripped value is `"inbox | meeting"`, not `"|"`)
+4. Empty multiline (`:CONTEXT: |` followed by `:END:`) produces an empty string
+5. This is a **Datacore-specific extension** — all Datacore Python tooling MUST support it
+
+#### DEPENDS_ON Grammar
+
+```
+DEPENDS_ON     ::= dep_line (NEWLINE dep_line)*
+dep_line       ::= dep_type SPACE target
+dep_type       ::= "BLOCKS" | "AFTER" | "WAITING"
+target         ::= uuid_ref | free_text
+uuid_ref       ::= UUID [SPACE DQUOTE label DQUOTE]
+free_text      ::= DQUOTE text DQUOTE
+
+UUID           ::= /[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/
+```
+
+**UUID generation protocol:** `:ID:` UUIDs are generated at task creation time by the enrichment agent (gtd-inbox-processor, /continue, /wrap-up). Use Python's `uuid.uuid4()` or equivalent. Tasks that are never referenced by DEPENDS_ON do not need an `:ID:`.
+
+**Dependency types:**
+
+| Type | Meaning | Enforcement | Missing UUID behavior |
+|---|---|---|---|
+| `BLOCKS` | Target task cannot start until this completes | Hard — queue builder skips blocked tasks | Skip dep, log warning |
+| `AFTER` | Should run after target (ordering preference) | Soft — queue builder prefers this order | Silently ignore |
+| `WAITING` | Blocked on external input (no task reference) | Hard — stays in WAITING state | N/A (no UUID) |
+
+#### Journal Reference Format in CURRENT_STATUS
+
+When referencing journal entries:
+```
+Journal YYYY-MM-DD ## Section Heading: "Brief quote or summary"
+```
+
+#### Backward Compatibility
+
+Existing bare tasks (heading + TODO state only) remain valid. The Rich Task Standard is **additive** — fields are populated when available. A task with only CREATED and SOURCE is still a valid task. No bulk migration required. Existing bare tasks get enriched when they pass through an enrichment agent.
+
+#### Cross-References
+
+- Task routing via `:AI:subtype:` tags: DIP-0014 (Tag Taxonomy)
+- `:recurring:` tag: registered by this DIP as a task lifecycle tag
+- Agent/command discoverability: DIP-0016 (Agent Registry)
+- Nightshift execution pipeline: DIP-0011 (Nightshift Module)
+- Engram resolution at runtime: DIP-0019 (Learning Architecture)
+
+### Part 3.6: Recurring Tasks
+
+#### Types
+
+| Type | Schedule | Example | Mechanism |
+|---|---|---|---|
+| **Habit** | Fixed interval | Take B12, Exercise | org-mode `:STYLE: habit` + `.+Nd` repeater (existing) |
+| **Scheduled AI task** | Calendar-based | Daily research digest | `.+Nd` repeater + `:AI:` + `:recurring:` tags |
+| **Event-triggered** | On condition | Process inbox when >10 items | Hook/watchdog (future, out of scope) |
+
+#### Recurring AI Task Format
+
+```org
+*** TODO [#B] Daily research digest                   :AI:research:recurring:
+SCHEDULED: <2026-02-22 Sun .+1d>
+:PROPERTIES:
+:CREATED:  [2026-02-01 Sat]
+:SOURCE:   system
+:EFFORT:   Moderate
+:CONTEXT: |
+  Scan configured news sources for topics relevant to
+  Datafund, data economy, AI agents, tokenization.
+:ACCEPTANCE_CRITERIA: |
+  - Literature notes created for top 3-5 findings
+  - Zettels extracted for novel concepts
+  - Action items created if strategic opportunity found
+:TOOLS: |
+  - Use exa/perplexity for web search
+  - Use research-orchestrator pipeline
+:ROLE: |
+  You are a research analyst for Datafund, scanning for
+  competitive intelligence and strategic opportunities.
+:END:
+```
+
+The `:recurring:` tag marks the task as a **template** (never directly executed). The `.+Nd` repeater defines the schedule.
+
+#### Recurrence Lifecycle
+
+1. Template lives in `next_actions.org` with `:recurring:` tag and `.+Nd` repeater
+2. `/tomorrow` command detects templates where SCHEDULED date <= today
+3. `/tomorrow` creates an **instance** in `nightshift.org`:
+   - Copies all properties from template
+   - Removes `:recurring:` tag (instance is not a template)
+   - Injects fresh `:CURRENT_STATUS:` from journals + last execution output
+4. Nightshift executes the instance
+5. Template stays in `next_actions.org`; org-mode advances SCHEDULED date by repeater interval
+
+**Hard rule:** Nightshift MUST skip tasks with `:recurring:` tag — only instances (no `:recurring:` tag) are executed.
+
+**Instance failure:** If nightshift execution fails on an instance, mark the instance as DONE with a `FAILED` note. The template is unaffected — next scheduled date still advances, and the next instance will be created normally. Failed instances appear in the morning `/today` briefing for human review.
+
+**Stale schedule:** If a template's SCHEDULED date is far in the past, `/tomorrow` creates ONE instance for today only — no backfill. Update template SCHEDULED to today + interval before creating the instance.
+
+### Part 3.7: Task Creation Protocol
+
+#### Tiered Enrichment
+
+| Tier | When | What | Cost |
+|---|---|---|---|
+| **Full** | `:AI:` tagged tasks | 3-phase enrichment (Discovery, Judgment, Output) | ~30s agent time |
+| **Light** | Human tasks, quick captures | Required fields only (CREATED, SOURCE, CONTEXT sentence, EFFORT) | ~2s |
+| **Passthrough** | Tasks arriving with existing properties from upstream | Preserve all existing fields, do not modify or strip | 0 |
+
+**Full enrichment phases** (for `:AI:` tagged tasks):
+
+1. **Discovery:** Search knowledge base for related files (Glob/Grep in `3-knowledge/`). Scan existing tasks for duplicates. Query `engram_selector.py` for relevant patterns. Check journals (last 7 days) for related context.
+2. **Judgment:** Filter matches by relevance. Assess EFFORT and PRIORITY. Identify KEY_FILES. Draft CURRENT_STATUS (including journal references). Write verifiable ACCEPTANCE_CRITERIA. Select ROLE if specialized domain.
+3. **Output:** Write in Rich Task Standard format with all applicable fields. Generate `:ID:` UUID via `uuid.uuid4()` if task may be a dependency target. If `:ID:` already exists (re-enrichment), preserve existing UUID (idempotent).
+
+**Passthrough explained:** Tasks from mail module arrive as bare inbox entries and will be enriched when gtd-inbox-processor processes them. `route_tasks.py` moves tasks between files without modification — it preserves whatever properties exist. Neither of these need to enrich; they are transport, not creation.
+
+#### Task Creators and Compliance
+
+| Creator | Enrichment tier | Notes |
+|---|---|---|
+| gtd-inbox-processor | Full (for :AI:), Light (for human) | Primary enrichment chokepoint |
+| /wrap-up, /continue | Full+ | BOOTSTRAP format already exceeds standard |
+| research-orchestrator | Partial (adds SOURCE, CONTEXT) | Downstream inbox-processor does full enrichment |
+| gtd-project-manager | Partial (adds project context) | Downstream inbox-processor does full enrichment |
+| transcription-processor | Partial (adds meeting context) | Creates with meeting-specific fields |
+| mail module | Passthrough | Deposits in inbox; inbox-processor enriches |
+| route_tasks.py | Passthrough | Transport only; preserves existing properties |
+
+#### Fallback for Sparse Context
+
+When discovery finds no matches (new topic area):
+- Still populate all required fields
+- Use CONTEXT to describe what IS known (even one sentence)
+- Leave KEY_FILES, CURRENT_STATUS empty rather than fabricating
+- Do NOT generate hallucinated file paths or status
+
+### Part 3.8: Task Dependencies and Queue Ordering
+
+#### Queue Ordering Algorithm
+
+Nightshift `build_queue()` MUST:
+
+1. Parse `:DEPENDS_ON:` from all queued tasks
+2. Resolve UUID references: look up `:ID:` properties across all tasks **in the current nightshift.org queue** (queue-local scope). Log warning for unresolved UUIDs. Duplicate UUIDs: log warning, use first match.
+3. Build directed graph (edges from dependency to dependent)
+4. **Cycle detection and breaking:** Run Kahn's algorithm. If nodes remain (cycle exists):
+   a. Among remaining edges, select the BLOCKS edge with lowest task priority (C < B < A)
+   b. Tie-break: oldest `:CREATED:` date. Final tie-break: arbitrary (first in sorted list — deterministic, always terminates)
+   c. Remove that edge, log warning
+   d. Re-run Kahn's. Repeat until no nodes remain (guaranteed: each iteration removes at least one edge from a finite set)
+5. **Topological sort:** Kahn's algorithm produces the execution order
+6. **Within same topological level** (tasks whose longest-path-from-root distance is equal): sort by priority score (existing `calculate_priority()` in `queue_optimizer.py`)
+7. Tasks with unresolved BLOCKS dependencies (UUID not found in queue): mark as WAITING with reason, exclude from queue. Tasks referencing missing UUIDs in AFTER: silently ignore (soft constraint).
+
+#### WAITING Resolution
+
+WAITING dependencies (external blockers) are resolved by:
+1. Human removes the WAITING line from `:DEPENDS_ON:`
+2. Human changes task state from WAITING to TODO/NEXT
+3. `/today` and `/gtd-daily-start` surface WAITING tasks for review
+
 ---
 
 ## Part 4: AI Agent Architecture
@@ -398,6 +643,27 @@ Related: [[Wiki Link 1]], [[Wiki Link 2]]
 - Task completion rate > 80%
 - Quality approval rate > 90%
 - Time saved: 10-20h/week
+
+### Nightshift Execution Context
+
+When nightshift executes a task, `build_task_prompt()` in `execute.py` reads Rich Task Standard properties to construct a complete execution prompt. The prompt structure:
+
+1. **Agent routing preamble** (always present) — agent type from `:AI:subtype:` tag mapping
+2. **Working directory** — `data_dir` path
+3. **Role** (optional) — from `:ROLE:` property
+4. **Task heading + metadata** — title, priority, effort, tags
+5. **Context sections** (omit if empty) — CONTEXT, CURRENT_STATUS, KEY_FILES, ACCEPTANCE_CRITERIA, TOOLS
+6. **Applicable engrams** (runtime-resolved) — from `engram_selector.py` based on task description
+7. **Task body** — free-text content after `:END:`
+
+Sections with no content are omitted. This ensures bare tasks still produce valid (if minimal) prompts, while rich tasks give the executor full context.
+
+**Runtime engram injection** happens in `execute_task()`, not `build_task_prompt()`:
+```python
+engrams = select_engrams(scope='global', task_desc=task.title, limit=5)
+engram_text = format_injection(engrams, limit=5)
+prompt = build_task_prompt(task, data_dir, engram_text=engram_text)
+```
 
 ---
 
