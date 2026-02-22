@@ -8,7 +8,7 @@
 | **Type** | Standards Track |
 | **Status** | Draft |
 | **Created** | 2026-01-23 |
-| **Updated** | 2026-02-19 |
+| **Updated** | 2026-02-22 |
 | **Tags** | `learning`, `engrams`, `absorption`, `consolidation`, `cognitive`, `ACT-R` |
 | **Affects** | `.datacore/learning/`, agents, commands, skills, nightshift |
 | **Specs** | `datacore-specification.md`, `DIP-0011-nightshift-module.md`, `DIP-0016-agent-registry.md` |
@@ -159,11 +159,24 @@ Session Work --> session-learning --> patterns.md (raw capture, unchanged)
     chain: []
     signature: null            # Cryptographic signature for exchange (nullable)
     license: "cc-by-sa-4.0"
+  # Episodic memory fields (optional)
+  emotional_weight: 8        # 1-10, significance of this learning (default: 5)
+  confidence: 9              # 1-10, how certain this pattern holds (default: 5)
+  trigger_context: "Lost 3 months of data when agent overwrote file"
+  journal_ref: "0-personal/notes/journals/2026-02-22.md"
   tags: [org-mode, validation]
   pack: null                   # Pack ID if engram came from an installed pack
   abstract: null               # Reference to ABS-ID if user has generalized
   derived_from: null           # If re-instantiated from foreign abstract engram
 ```
+
+**Episodic Memory Fields** (optional, extend base schema):
+- `emotional_weight` (1-10): How significant was this learning? Higher weight = slower decay rate. Painful lessons (8+) persist longer. Default: 5.
+- `confidence` (1-10): How sure are we this pattern holds? Affects injection priority. Default: 5.
+- `trigger_context`: Brief description of what situation prompted this learning. Gives agents narrative context.
+- `journal_ref`: Path to journal entry where this was first captured. Anchors learning to a specific moment.
+
+**Decay modifier**: `effective_decay = base_decay * (1 - emotional_weight/20)`. An engram with emotional_weight=10 decays at half the normal rate.
 
 #### v2 Field Reference
 
