@@ -8,7 +8,7 @@
 | **Type** | Standards Track |
 | **Status** | Draft |
 | **Created** | 2026-01-23 |
-| **Updated** | 2026-02-22 |
+| **Updated** | 2026-02-25 |
 | **Tags** | `learning`, `engrams`, `absorption`, `consolidation`, `cognitive`, `ACT-R` |
 | **Affects** | `.datacore/learning/`, agents, commands, skills, nightshift |
 | **Specs** | `datacore-specification.md`, `DIP-0011-nightshift-module.md`, `DIP-0016-agent-registry.md` |
@@ -219,9 +219,63 @@ Cap: 10 directives + 5 "also consider" = 15 max per agent execution.
 
 After session-learning completes, `learning-reviewer` agent runs as a post-step:
 1. Reads new patterns.md entries from this session
-2. Runs contradiction detection vs active engrams
-3. Writes candidates to engrams.yaml (status: candidate)
-4. Recalculates decay on all existing engrams
+2. **Runs quality gates** on each pattern (5 sequential gates -- see Section 5a)
+3. Routes failed patterns to `reference.md` or reinforces existing engrams
+4. Rewrites passing patterns using the statement formula (observation + reasoning + applicability)
+5. Generates candidates with `_review_metadata` block
+6. Runs contradiction detection vs active engrams
+7. Writes candidates to engrams.yaml (status: candidate)
+8. Recalculates decay on all existing engrams
+9. Samples N existing engrams for legacy quality audit (configurable via `learning.legacy_audit_rate`)
+
+### 5a. Quality Gates
+
+Not every pattern deserves to be an engram. Excellent engrams encode **judgment that changes agent behavior**. Reference facts belong in documentation. The learning-reviewer applies five sequential gates before promoting a pattern to candidate status.
+
+| # | Gate | Question | Fail Routing |
+|---|------|----------|-------------|
+| 1 | Behavioral | Would an agent behave differently knowing this? | `reference.md` |
+| 2 | Documentation | Is this WHY/WHEN rather than WHERE/WHAT/HOW? | `reference.md` |
+| 3 | Specificity | Actionable but not a one-off? | `reference.md` or discard |
+| 4 | Scope | Still relevant in 3 months? | `reference.md` |
+| 5 | Redundancy | Not already covered by an active engram? | Reinforce existing |
+
+**Stop at first failure.** A pattern must pass all five gates to become a candidate.
+
+#### Statement Formula
+
+Patterns that pass all gates are rewritten as structured statements (25-60 words):
+
+```
+[Observation]: What the pattern is
+[Reasoning]: Why this matters / what judgment it encodes
+[Applicability]: When to apply, contraindications
+```
+
+#### Candidate Metadata
+
+Each candidate includes a `_review_metadata` block (uses existing underscore convention for non-schema fields):
+
+```yaml
+_review_metadata:
+  gates_passed: [behavioral, documentation, specificity, scope, redundancy]
+  value_proposition: "One sentence: why this engram matters"
+  quality_confidence: 7  # 1-10
+```
+
+This metadata is displayed during daily review (Step 5b of `/wrap-up`) to speed approve/reject decisions.
+
+#### reference.md
+
+Patterns that fail quality gates but have reference value are routed to `[space]/.datacore/learning/reference.md`. This prevents silent information loss while keeping the engram store clean. Reference entries record the failed gate and reason.
+
+#### Legacy Quality Audit
+
+Each review cycle, the reviewer samples N existing active engrams (configurable via `learning.legacy_audit_rate`, default: 3) and runs them through quality gates retroactively. Engrams that fail are flagged for user review -- not auto-retired. This gradually improves engram store quality without requiring bulk migration.
+
+#### Target Pass Rate
+
+Expected: 30-50% of patterns pass all gates. If pass rate is consistently above 50%, gates may be too loose. Below 30%, too strict. Track and adjust over time.
 
 ### 6. Daily Review (Loop 2)
 
@@ -404,7 +458,8 @@ Steps 6-12: unchanged
   patterns.md              # Raw capture (staging, unchanged)
   corrections.md           # Mistake log (unchanged)
   preferences.md           # Style preferences (unchanged)
-  engrams.yaml             # Active memory store (NEW)
+  engrams.yaml             # Active memory store
+  reference.md             # Patterns that failed quality gates (reference value)
   archive/                 # Retired/obsolete entries
     legacy-patterns.md     # Read-only legacy archive
     2025-Q4-patterns.md
@@ -505,6 +560,7 @@ learning:
   decay_rate: 0.05                   # retrieval_strength decay per day
   injection_cap: 15                  # max engrams injected per agent run
   abstraction_threshold: 2           # min derivation_count for abstraction prompt
+  legacy_audit_rate: 3               # existing engrams to re-evaluate per review cycle
 ```
 
 ## Open Questions
