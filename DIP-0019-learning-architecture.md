@@ -580,7 +580,105 @@ When engrams cluster by association strength and shared knowledge anchors, the s
 - **Lifecycle**: Schemas follow candidate -> active -> consolidated -> archived states; inactive for 90 days flagged for review; support merge/split operations
 - **Dashboard**: Schema visualization and manual curation interface
 
-### 12. Integration with /wrap-up
+### 12. Knowledge System Integration
+
+Engrams are one layer of a multi-layer knowledge system. This section defines how engrams relate to other knowledge artifacts and module-produced data, establishing clear conceptual boundaries and connection patterns.
+
+#### Knowledge Artifact Taxonomy
+
+| Artifact | Location | Purpose | Lifetime | Example |
+|----------|----------|---------|----------|---------|
+| **Zettel** | `3-knowledge/zettel/` | Atomic concept (WHAT) | Permanent | "Howey Test defines securities" |
+| **Literature note** | `3-knowledge/literature/` | Source summary (WHERE) | Permanent | Summary of SEC whitepaper |
+| **Engram** | `.datacore/learning/engrams.yaml` | Behavioral judgment (WHY/WHEN) | Decays | "Check Howey before token launch" |
+| **Pattern** | `.datacore/learning/patterns.md` | Raw observation (staging) | Transient | "Forgot Howey check on project X" |
+| **Journal entry** | `notes/journals/YYYY-MM-DD.md` | Episodic record (HAPPENED) | Permanent | "Today: reviewed token structure" |
+| **Reference** | `3-knowledge/reference/` | Lookup data (WHO/WHAT) | Permanent | Person profile, company card |
+| **Page** | `3-knowledge/pages/` | Wiki topic (HOW) | Permanent | "How to structure a token offering" |
+
+**The key distinction**: Zettels capture *concepts* (declarative knowledge). Engrams capture *judgment* (procedural/behavioral knowledge). A zettel says "Howey Test has four prongs." An engram says "Always run Howey analysis before recommending token structures — we missed it on Project X and had to restructure."
+
+#### Progressive Distillation
+
+Knowledge flows through stages of increasing abstraction. Each stage produces a different artifact type:
+
+```
+Source document (PDF, article, transcript)
+    │
+    ▼
+Literature note (3-knowledge/literature/)     ← "What does it say?"
+    │
+    ▼
+Zettel (3-knowledge/zettel/)                  ← "What concept does it represent?"
+    │
+    ▼
+Engram (.datacore/learning/engrams.yaml)      ← "What judgment does it encode?"
+    │
+    ▼
+Abstract engram (exchange-ready)              ← "What structure transfers?"
+    │
+    ▼
+Skill / CLAUDE.md (compiled knowledge)        ← "What always applies?"
+```
+
+Each stage is optional — a source can produce a zettel without a literature note, or an engram directly from a session without any zettel. The pipeline is not strictly linear.
+
+#### Connection Mechanisms
+
+Engrams connect to the knowledge system through three mechanisms:
+
+**1. Knowledge anchors** (engram → document): An engram's `knowledge_anchors` field points to the source documents that ground it. The inject engine surfaces these as `related_documents` so agents can read deeper.
+
+```yaml
+# Engram pointing back to its knowledge sources
+knowledge_anchors:
+  - path: "0-personal/3-knowledge/zettel/howey-test.md"
+    relevance: primary
+    snippet: "Four-prong test: investment of money, common enterprise..."
+  - path: "0-personal/3-knowledge/literature/SEC-Framework-2019.md"
+    relevance: supporting
+```
+
+**2. Associations** (engram ↔ engram): Weighted links between engrams enable spreading activation (Section 4). Associations are also the input for schema emergence (Section 11).
+
+**3. Journal refs** (engram → episodic context): The `journal_ref` and `trigger_context` fields anchor an engram to the specific episode where it was learned, providing narrative context for agents.
+
+#### Module Data Connections
+
+Modules produce domain-specific data that engrams can reference via knowledge anchors and that can trigger engram creation via the capture flow (Section 5).
+
+| Module | Data Produced | Engram Connection |
+|--------|--------------|-------------------|
+| **CRM** | Contact profiles (`contacts/people/`), interaction logs, landscape analysis | Anchor: relationship patterns reference contact notes. Trigger: repeated interaction patterns become engrams (e.g., "Always prepare context brief before meeting with [Contact]") |
+| **Meetings** | Action items, decisions, extracted zettels, standup reports | Anchor: decision rationale in meeting notes. Trigger: meeting patterns become engrams (e.g., "Timeebox technical discussions to 15 min in standup") |
+| **Trading** | Trade journal, PHS/IMR records, framework violation logs | Anchor: trade journal entries with emotional context. Trigger: trading patterns with `emotional_weight` (e.g., "Never add to position when IMR < 125%") |
+| **Research** | Literature notes, zettels, industry landscape, reports | Anchor: research outputs are natural anchor targets. Trigger: research insights become engrams when they encode judgment |
+| **Nightshift** | Execution logs, evaluation scores, failure analysis | Trigger: execution patterns become engrams (e.g., "Research tasks need 3+ sources for reliable synthesis") |
+
+**Module engram scoping**: Module-originated engrams use scoped identifiers (e.g., `scope: agent:crm-contact-maintainer`) so they inject only when the relevant module context is active. Module data referenced via knowledge anchors uses standard relative paths from the Datacore root.
+
+#### Datacortex Integration (DIP-0004)
+
+The Datacortex knowledge database indexes all content types. Engrams connect to Datacortex at two points:
+
+- **Semantic search fallback**: When keyword-based `selectAndSpread()` returns few results, `datacore.recall` falls back to Datacortex embeddings for semantic similarity matching across engrams, journal entries, and knowledge notes
+- **Knowledge anchor resolution**: Future enhancement — Datacortex can suggest knowledge anchors for engrams by finding semantically similar documents (Phase 2: document-to-engram extraction)
+
+#### What Goes Where (Decision Guide)
+
+| Signal | Artifact | Location |
+|--------|----------|----------|
+| "This is a fact/concept" | Zettel | `3-knowledge/zettel/` |
+| "This source says X" | Literature note | `3-knowledge/literature/` |
+| "I learned to do X because Y" | Engram | `.datacore/learning/engrams.yaml` |
+| "Today I did X" | Journal | `notes/journals/YYYY-MM-DD.md` |
+| "This person works at X" | Contact/Reference | `contacts/` or `3-knowledge/reference/` |
+| "This always applies, no exceptions" | CLAUDE.md / agent | `.datacore/` or `CLAUDE.md` layers |
+| "This is a procedure" | Page or agent context | `3-knowledge/pages/` or agent `.md` |
+
+The quality gate in Section 5a enforces the engram boundary: Gate 2 (Documentation) rejects WHERE/WHAT/HOW facts — those belong in zettels, pages, or reference. Only WHY/WHEN judgment passes through to become engrams.
+
+### 13. Integration with /wrap-up
 
 Current /wrap-up Step 5 runs session-learning. Learning review inserts as Step 5b:
 
@@ -600,7 +698,7 @@ Step 5b: LEARNING REVIEW (NEW - interactive)
 Steps 6-12: unchanged
 ```
 
-### 13. File Structure
+### 14. File Structure
 
 ```
 [space]/.datacore/learning/
@@ -617,7 +715,7 @@ Steps 6-12: unchanged
   knowledge-surfacing.yaml # Knowledge surfacing state
 ```
 
-### 14. Migration Strategy
+### 15. Migration Strategy
 
 **Do NOT purely abandon 18K lines. Do NOT bulk migrate.**
 
