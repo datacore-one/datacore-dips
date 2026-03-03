@@ -15,167 +15,9 @@
 | **Agents** | `session-learning`, `learning-reviewer` (new) |
 | **Skills** | `engram-inject`, `daily-review`, `learn`, `forget` |
 
-## Engram-Knowledge Integration
-
-> **Phase 1 implemented**: 2026-03-03. Design doc: `docs/plans/2026-03-02-engram-knowledge-integration-design.md`
-
-This extension connects engrams to the wider knowledge base, enabling multi-hop discovery and richer context injection. Phase 1 adds schema extensions, spreading activation, and structured injection results. Phases 2-3 (Hebbian co-access learning, schema emergence) are specified but not yet implemented.
-
-### Cognitive Science Foundations
-
-The integration draws on five cognitive science theories. These are structural analogies — human memory research does not transfer directly to LLM context injection, but the patterns are worth testing empirically.
-
-| Theory | Researcher(s) | Application in Datacore |
-|--------|---------------|------------------------|
-| **Spreading activation** | Collins & Loftus (1975) | Activating one engram lowers the threshold for associated engrams, enabling multi-hop discovery. Implemented in `selectAndSpread()`. |
-| **Encoding specificity** | Tulving & Thomson (1973) | Recall improves when retrieval cues match encoding context. Knowledge anchors preserve the source context in which an engram was created. |
-| **Schema theory** | Bartlett (1932) | Related memories cluster into schemas that activate as a group. Engram clusters form emergent schemas based on co-access patterns (Phase 3). |
-| **Dual coding** | Paivio (1971) | Concrete examples alongside abstract statements improve recall. The `dual_coding` field provides examples and analogies for richer encoding. |
-| **Hebbian learning** | Hebb (1949) | "Neurons that fire together wire together." Engrams co-injected in the same session strengthen their mutual `co_accessed` associations (Phase 2). |
-
-### Schema Extensions (Phase 1 — Implemented)
-
-Three new fields on `EngramSchema`:
-
-#### Knowledge Anchors
-
-Links from engrams to source documents — footnotes that tell agents which documents to read for depth. Grounded in Tulving's encoding specificity principle: preserving the source context in which knowledge was encoded improves retrieval quality.
-
-```yaml
-knowledge_anchors:
-  - path: "0-personal/3-knowledge/zettel/Data-Pricing-Models.md"
-    relevance: primary       # primary | supporting | example
-    snippet: "3-tier model: raw, enriched, insight-layer"
-    snippet_extracted_at: "2026-03-02"
-  - path: "0-personal/3-knowledge/literature/Fund-Tokenization.md"
-    relevance: supporting
-```
-
-- Paths relative to Datacore root (`~/Data/`), never absolute
-- Pack engrams use `pack://` prefix (resolved at install time)
-- Snippet provides preview without reading the file (~200 chars max)
-- If file does not exist at inject time, anchor is skipped (degraded, not broken)
-
-#### Associations
-
-Weighted, typed links to other engrams or documents. This is the graph structure that enables spreading activation (Collins & Loftus, 1975). Unlike the existing `relations` field (SKOS taxonomy), associations carry strength weights and type semantics that drive runtime injection behavior.
-
-```yaml
-associations:
-  - target_type: engram       # engram | document
-    target: "ENG-2026-0302-001"
-    strength: 0.8             # [0, 0.95]
-    type: semantic            # semantic | temporal | causal | co_accessed
-```
-
-- `target_type` discriminates between engram IDs and document paths
-- Learned automatically via Hebbian co-access (Phase 2) or set explicitly via `/learn`
-- Strength capped at 0.95 and decays over time for `co_accessed` type (Phase 2)
-- Relationship to `relations` field: `broader`/`narrower`/`related` map to `semantic` associations with strength 0.5; `conflicts` are handled by reconsolidation, not associations
-
-#### Dual Coding
-
-Concrete examples alongside abstract statements, based on Paivio's dual-coding theory (1971). Hypothesis: providing both abstract engram statements and concrete examples improves agent application of principles. To be validated empirically.
-
-```yaml
-dual_coding:
-  example: "Building permits: EUR 0.10 raw, EUR 2.50 enriched with GIS, EUR 25 as risk score"
-  analogy: "Like crude oil -> refined fuel -> petrochemical products"
-```
-
-- Optional field; at least one of `example` or `analogy` must be present if set
-- Displayed in injection output when engram count < 10 (detailed format)
-
-### Inject Engine: `selectAndSpread()` (Phase 1 — Implemented)
-
-Replaces the previous `selectEngrams()` with a two-pass algorithm implementing Collins & Loftus spreading activation at depth 1.
-
-#### Scoring Formula
-
-```
-Score = keyword_match          # existing behavior, normalized to [0, 10]
-      + anchor_boost           # [0, 2] — keyword overlap between task and anchor snippets
-      + schema_boost           # [0, 2] — Phase 3; = 0 until schemas.yaml is deployed
-```
-
-**keyword_match** [0, 10]: Raw composite score from `scoreEngram()` (termHits × retrieval_strength × feedback multipliers), normalized by dividing by the observed maximum across all engrams and multiplying by 10. Normalization occurs after the `minRelevance` filter to preserve absolute filtering behavior.
-
-**anchor_boost** [0, 2]: For each knowledge anchor, compute keyword intersection between task prompt words and the anchor's snippet text using the canonical tokenizer (`/\W+/`, lowercase, filter > 2 chars). Each anchor with >= 2 matching words (or >= 1 for single-keyword queries) contributes +0.5, capped at 2.0 total.
-
-#### Spreading Activation Algorithm
-
-After first-pass scoring and directive selection, the algorithm discovers related engrams through associations:
-
-1. Build visited set from directives and DIP-0019 consider pool
-2. For each directive, iterate its associations (falling back to `flattenRelations()` for engrams with `relations` but no `associations`)
-3. For each association target not in visited set: compute `spread_score = (source_score / max_first_pass) × association_strength`
-4. Select top candidates by spread_score, capped at `spread_cap` (default: 3) with `spread_budget` (default: 480 tokens)
-
-**Invariants**: depth limit = 1 hop; no engram appears in both directives and consider; cycle protection via visited set; lookup failures silently skipped.
-
-#### Three Independent Injection Pools
-
-| Pool | Source | Max Count | Token Budget |
-|------|--------|-----------|-------------|
-| **Directives** | First-pass scoring | `directive_cap` (10) | `maxTokens` (8000) |
-| **DIP-0019 consider** | Next-best from first pass | `consider_cap` (5) | 200 tokens |
-| **Spreading consider** | Association graph traversal | `spread_cap` (3) | `spread_budget` (480) |
-
-Combined ceiling: 18 engrams (10 + 5 + 3). Pack diversity limits (max 5 per pack) are enforced across directives and DIP-0019 consider pools.
-
-#### Token Estimation
-
-Per-engram token estimation replaces the hardcoded `TOKENS_PER_ENGRAM = 40`. The `estimateTokens()` function serializes wire-visible fields (excluding `associations` and scoring metadata) and divides character count by 4.
-
-#### InjectionResult
-
-```typescript
-interface InjectionResult {
-  directives: WireEngram[]       // agent receives these
-  consider: WireEngram[]         // DIP-0019 + spreading merged
-  related_documents: KnowledgeAnchor[]  // deduped, ranked, capped at 10
-  tokens_used: { directives: number; consider: number }
-}
-```
-
-The stripping pipeline removes internal metadata in two stages:
-1. `ScoredEngram` → `AgentEngram`: strips `associations` (internal graph metadata)
-2. `AgentEngram` → `WireEngram`: strips `keyword_match`, `raw_score`, `score` (scoring fields)
-
-`related_documents` are aggregated from all pools, deduplicated by path (keeping highest relevance), sorted by relevance rank then source engram score, and capped at 10.
-
-#### Configuration
-
-```yaml
-# .datacore/config.yaml (or settings.local.yaml)
-injection:
-  directive_cap: 10       # max directive engrams
-  consider_cap: 5         # max DIP-0019 consider engrams
-  spread_cap: 3           # max spreading-activation consider engrams
-  spread_budget: 480      # token budget for spreading consider
-```
-
-### Hebbian Co-Access Learning (Phase 2 — Specified, Not Implemented)
-
-When engrams are co-injected in the same session, their `co_accessed` association strengthens — implementing Hebb's (1949) principle that co-activated units form stronger connections.
-
-- **Session tracking**: MCP server generates a UUID `session_id` at `session.start`, passed to subsequent `inject` calls
-- **Write-back**: Association updates batched and written at `session.end` using atomic write
-- **Strength**: +0.05 per co-access (capped at 0.95), created at 0.1 for new pairs
-- **Decay**: All `co_accessed` associations decay by 0.95× daily; pruned below 0.05 (half-life ~14 days)
-- **Crash safety**: Best-effort; lost sessions are acceptable since frequent patterns recur
-
-### Schema Emergence (Phase 3 — Specified, Not Implemented)
-
-When engrams cluster by association strength and shared knowledge anchors, the system proposes schemas — implementing Bartlett's (1932) schema theory where related memories cluster into units that activate as a group.
-
-- **Detection**: Connected components in association graph (strength >= 0.4, 3+ engrams, 2+ shared anchors)
-- **Boost**: Schema-member engrams receive +2.0 `schema_boost` during injection
-- **Lifecycle**: Schemas inactive for 90 days flagged for review; support merge/split operations
-
 ## Summary
 
-This DIP establishes an engram-based learning architecture that replaces the write-only pattern capture loop with individually addressable, activation-weighted learning units (engrams). Learnings are captured as raw patterns (unchanged), promoted to engrams through daily review, injected into agent context at runtime via a skill-based hook, and optionally abstracted for cross-domain transfer.
+This DIP establishes an engram-based learning architecture that replaces the write-only pattern capture loop with individually addressable, activation-weighted learning units (engrams). Learnings are captured as raw patterns (unchanged), promoted to engrams through daily review, injected into agent context at runtime via a skill-based hook, and optionally abstracted for cross-domain transfer. The architecture connects engrams to the wider knowledge base via knowledge anchors, associations, and spreading activation, enabling multi-hop discovery and richer context injection.
 
 **Key changes from v1:**
 - Engrams replace flat pattern files as the active memory store
@@ -183,6 +25,8 @@ This DIP establishes an engram-based learning architecture that replaces the wri
 - Daily review replaces batch nightshift absorption
 - Runtime injection via `engram-inject` skill replaces baking into CLAUDE.md
 - Abstract engrams enable knowledge transfer across domains and Datacores
+- Knowledge anchors link engrams to source documents for depth retrieval
+- Spreading activation discovers related engrams through association graphs
 
 ## Agent Context
 
@@ -349,6 +193,55 @@ Session Work --> session-learning --> patterns.md (raw capture, unchanged)
 
 **Decay modifier**: `effective_decay = base_decay * (1 - emotional_weight/20)`. An engram with emotional_weight=10 decays at half the normal rate.
 
+#### Knowledge Anchors
+
+Links from engrams to source documents -- footnotes that tell agents which documents to read for depth. Grounded in Tulving's encoding specificity principle: preserving the source context in which knowledge was encoded improves retrieval quality.
+
+```yaml
+knowledge_anchors:
+  - path: "0-personal/3-knowledge/zettel/Data-Pricing-Models.md"
+    relevance: primary       # primary | supporting | example
+    snippet: "3-tier model: raw, enriched, insight-layer"
+    snippet_extracted_at: "2026-03-02"
+  - path: "0-personal/3-knowledge/literature/Fund-Tokenization.md"
+    relevance: supporting
+```
+
+- Paths relative to Datacore root (`~/Data/`), never absolute
+- Pack engrams use `pack://` prefix (resolved at install time)
+- Snippet provides preview without reading the file (~200 chars max)
+- If file does not exist at inject time, anchor is skipped (degraded, not broken)
+
+#### Associations
+
+Weighted, typed links to other engrams or documents. This is the graph structure that enables spreading activation (Collins & Loftus, 1975). Unlike the existing `relations` field (SKOS taxonomy), associations carry strength weights and type semantics that drive runtime injection behavior.
+
+```yaml
+associations:
+  - target_type: engram       # engram | document
+    target: "ENG-2026-0302-001"
+    strength: 0.8             # [0, 0.95]
+    type: semantic            # semantic | temporal | causal | co_accessed
+```
+
+- `target_type` discriminates between engram IDs and document paths
+- Learned automatically via Hebbian co-access (Phase 2) or set explicitly via `/learn`
+- Strength capped at 0.95 and decays over time for `co_accessed` type (Phase 2)
+- Relationship to `relations` field: `broader`/`narrower`/`related` map to `semantic` associations with strength 0.5; `conflicts` are handled by reconsolidation, not associations
+
+#### Dual Coding
+
+Concrete examples alongside abstract statements, based on Paivio's dual-coding theory (1971). Hypothesis: providing both abstract engram statements and concrete examples improves agent application of principles. To be validated empirically.
+
+```yaml
+dual_coding:
+  example: "Building permits: EUR 0.10 raw, EUR 2.50 enriched with GIS, EUR 25 as risk score"
+  analogy: "Like crude oil -> refined fuel -> petrochemical products"
+```
+
+- Optional field; at least one of `example` or `analogy` must be present if set
+- Displayed in injection output when engram count < 10 (detailed format)
+
 #### v2 Field Reference
 
 | Field | Type | Default | Purpose |
@@ -380,25 +273,73 @@ Session Work --> session-learning --> patterns.md (raw capture, unchanged)
 
 ### 4. Injection Selection: `selectAndSpread()`
 
-When an agent runs, the inject engine selects engrams via a two-pass algorithm implementing Collins & Loftus (1975) spreading activation at depth 1:
+When an agent runs, the inject engine selects engrams via a two-pass algorithm implementing Collins & Loftus (1975) spreading activation at depth 1.
 
-1. **Score and filter**: Keyword matching against task prompt (tags, domain, statement overlap) × decayed retrieval strength × feedback multipliers. Filter by `minRelevance` (default: 0.3).
+#### Scoring Formula
+
+```
+Score = keyword_match          # existing behavior, normalized to [0, 10]
+      + anchor_boost           # [0, 2] -- keyword overlap between task and anchor snippets
+      + schema_boost           # [0, 2] -- Phase 3; = 0 until schemas.yaml is deployed
+```
+
+**keyword_match** [0, 10]: Raw composite score from `scoreEngram()` (termHits x retrieval_strength x feedback multipliers), normalized by dividing by the observed maximum across all engrams and multiplying by 10. Normalization occurs after the `minRelevance` filter to preserve absolute filtering behavior.
+
+**anchor_boost** [0, 2]: For each knowledge anchor, compute keyword intersection between task prompt words and the anchor's snippet text using the canonical tokenizer (`/\W+/`, lowercase, filter > 2 chars). Each anchor with >= 2 matching words (or >= 1 for single-keyword queries) contributes +0.5, capped at 2.0 total.
+
+**schema_boost** [0, 2]: Schema-member engrams receive a boost when other members of the same schema are activated. Phase 3; currently = 0 until `schemas.yaml` is deployed.
+
+#### Algorithm Steps
+
+1. **Score and filter**: Keyword matching against task prompt (tags, domain, statement overlap) x decayed retrieval strength x feedback multipliers. Filter by `minRelevance` (default: 0.3).
 2. **Normalize and boost**: Normalize keyword scores to [0, 10]. Add `anchor_boost` [0, 2] from knowledge anchor snippet overlap (Tulving's encoding specificity). Add `schema_boost` [0, 2] from schema membership (Phase 3).
 3. **Fill directives**: Top-scoring engrams up to `directive_cap` (default: 10) within token budget. Per-engram token estimation via `estimateTokens()`.
 4. **DIP-0019 consider**: Next-best engrams not selected as directives, up to `consider_cap` (5), 200-token budget. Pack diversity limits enforced across pools.
-5. **Spreading activation**: For each directive, traverse `associations` (or `relations` fallback) to discover connected engrams not already selected. Score by `(source_score / max_first_pass) × association_strength`. Fill up to `spread_cap` (3), 480-token budget.
-6. **Aggregate**: Collect `related_documents` from knowledge anchors across all pools, deduplicate by path, sort by relevance, cap at 10. Strip internal metadata (associations, scoring fields) before returning.
+5. **Spreading activation**: For each directive, traverse `associations` (falling back to `flattenRelations()` for engrams with `relations` but no `associations`) to discover connected engrams not already selected. Compute `spread_score = (source_score / max_first_pass) x association_strength`. Fill up to `spread_cap` (3), `spread_budget` (480 tokens).
+6. **Aggregate**: Collect `related_documents` from knowledge anchors across all pools, deduplicate by path (keeping highest relevance), sort by relevance rank then source engram score, cap at 10. Strip internal metadata (associations, scoring fields) before returning.
 
-**Pools**: 10 directives + 5 DIP-0019 consider + 3 spreading consider = 18 max per injection.
+**Invariants**: Depth limit = 1 hop; no engram appears in both directives and consider; cycle protection via visited set; lookup failures silently skipped.
 
-**Configuration** (`config.yaml`):
+#### Three Independent Injection Pools
+
+| Pool | Source | Max Count | Token Budget |
+|------|--------|-----------|-------------|
+| **Directives** | First-pass scoring | `directive_cap` (10) | `maxTokens` (8000) |
+| **DIP-0019 consider** | Next-best from first pass | `consider_cap` (5) | 200 tokens |
+| **Spreading consider** | Association graph traversal | `spread_cap` (3) | `spread_budget` (480) |
+
+Combined ceiling: 18 engrams (10 + 5 + 3). Pack diversity limits (max 5 per pack) are enforced across directives and DIP-0019 consider pools.
+
+#### Token Estimation
+
+Per-engram token estimation replaces the hardcoded `TOKENS_PER_ENGRAM = 40`. The `estimateTokens()` function serializes wire-visible fields (excluding `associations` and scoring metadata) and divides character count by 4.
+
+#### InjectionResult
+
+```typescript
+interface InjectionResult {
+  directives: WireEngram[]       // agent receives these
+  consider: WireEngram[]         // DIP-0019 + spreading merged
+  related_documents: KnowledgeAnchor[]  // deduped, ranked, capped at 10
+  tokens_used: { directives: number; consider: number }
+}
+```
+
+The stripping pipeline removes internal metadata in two stages:
+1. `ScoredEngram` -> `AgentEngram`: strips `associations` (internal graph metadata)
+2. `AgentEngram` -> `WireEngram`: strips `keyword_match`, `raw_score`, `score` (scoring fields)
+
+`related_documents` are aggregated from all pools, deduplicated by path (keeping highest relevance), sorted by relevance rank then source engram score, and capped at 10.
+
+#### Configuration
 
 ```yaml
+# .datacore/config.yaml (or settings.local.yaml)
 injection:
-  directive_cap: 10
-  consider_cap: 5
-  spread_cap: 3
-  spread_budget: 480
+  directive_cap: 10       # max directive engrams
+  consider_cap: 5         # max DIP-0019 consider engrams
+  spread_cap: 3           # max spreading-activation consider engrams
+  spread_budget: 480      # token budget for spreading consider
 ```
 
 ### 5. Capture Flow (Loop 1 - Unchanged)
@@ -619,7 +560,27 @@ The MCP server uses the same v2 engram schema, storage paths, and injection algo
 
 When abstract engrams reach high fitness, they can be promoted to skills -- the ultimate form of absorption (production compilation in ACT-R). Skills are self-contained, follow open standards, and can be distributed via plugin marketplace.
 
-### 10. Integration with /wrap-up
+### 10. Hebbian Co-Access Learning
+
+When engrams are co-injected in the same session, their `co_accessed` association strengthens -- implementing Hebb's (1949) principle that co-activated units form stronger connections.
+
+- **Session tracking**: MCP server generates a UUID `session_id` at `session.start`, passed to subsequent `inject` calls
+- **Write-back**: Association updates batched and written at `session.end` using atomic write
+- **Strength**: +0.05 per co-access (capped at 0.95), created at 0.1 for new pairs
+- **Decay**: All `co_accessed` associations decay by 0.95x daily; pruned below 0.05 (half-life ~14 days)
+- **Crash safety**: Best-effort; lost sessions are acceptable since frequent patterns recur
+
+### 11. Schema Emergence
+
+When engrams cluster by association strength and shared knowledge anchors, the system proposes schemas -- implementing Bartlett's (1932) schema theory where related memories cluster into units that activate as a group.
+
+- **Detection**: Connected components in association graph (strength >= 0.4, 3+ engrams, 2+ shared anchors)
+- **Boost**: Schema-member engrams receive +2.0 `schema_boost` during injection (see Section 4, scoring formula)
+- **Storage**: `schemas.yaml` -- emergent cluster definitions with member engrams and confidence scores
+- **Lifecycle**: Schemas follow candidate -> active -> consolidated -> archived states; inactive for 90 days flagged for review; support merge/split operations
+- **Dashboard**: Schema visualization and manual curation interface
+
+### 12. Integration with /wrap-up
 
 Current /wrap-up Step 5 runs session-learning. Learning review inserts as Step 5b:
 
@@ -639,7 +600,7 @@ Step 5b: LEARNING REVIEW (NEW - interactive)
 Steps 6-12: unchanged
 ```
 
-### 11. File Structure
+### 13. File Structure
 
 ```
 [space]/.datacore/learning/
@@ -656,7 +617,7 @@ Steps 6-12: unchanged
   knowledge-surfacing.yaml # Knowledge surfacing state
 ```
 
-### 12. Migration Strategy
+### 14. Migration Strategy
 
 **Do NOT purely abandon 18K lines. Do NOT bulk migrate.**
 
@@ -683,21 +644,22 @@ Engrams injected at runtime are reversible by setting `status: retired`. CLAUDE.
 
 Premature abstraction creates useless platitudes ("always plan ahead"). Only humans reliably detect structural similarity across domains. The protege effect means articulating the abstraction deepens the user's own understanding.
 
-### Cognitive Architecture Mapping
+### Cognitive Science Foundations
 
-| Datacore Component | Cognitive Analog | Source |
-|--------------------|------------------|--------|
-| patterns.md | Episodic memory (raw episodes) | Tulving (1972) |
-| engrams.yaml | Semantic memory (consolidated) | McClelland et al. (1995) |
-| Activation decay | Base-level learning equation | Anderson (1995), ACT-R |
-| Reconsolidation | Memory reconsolidation | Nader et al. (2000) |
-| Abstract engrams | Schema abstraction | Bartlett (1932) |
-| `selectAndSpread()` | Spreading activation | Collins & Loftus (1975) |
-| knowledge_anchors | Encoding specificity | Tulving & Thomson (1973) |
-| dual_coding | Dual coding theory | Paivio (1971) |
-| co_accessed associations | Hebbian learning | Hebb (1949) |
-| Schema emergence | Schema theory | Bartlett (1932) |
-| Compiled to CLAUDE.md | Production compilation | Anderson (1995), ACT-R |
+The architecture draws on established cognitive science theories. These are structural analogies -- human memory research does not transfer directly to LLM context injection, but the patterns are worth testing empirically.
+
+| Theory | Researcher(s) | Application in Datacore |
+|--------|---------------|------------------------|
+| **Spreading activation** | Collins & Loftus (1975) | Activating one engram lowers the threshold for associated engrams, enabling multi-hop discovery. Implemented in `selectAndSpread()`. |
+| **Encoding specificity** | Tulving & Thomson (1973) | Recall improves when retrieval cues match encoding context. Knowledge anchors preserve the source context in which an engram was created. |
+| **Schema theory** | Bartlett (1932) | Related memories cluster into schemas that activate as a group. Engram clusters form emergent schemas based on co-access patterns (Section 11). |
+| **Dual coding** | Paivio (1971) | Concrete examples alongside abstract statements improve recall. The `dual_coding` field provides examples and analogies for richer encoding. |
+| **Hebbian learning** | Hebb (1949) | "Neurons that fire together wire together." Engrams co-injected in the same session strengthen their mutual `co_accessed` associations (Section 10). |
+| **ACT-R base-level learning** | Anderson (1995) | Activation decays with time, reinforced by access. Retrieval strength determines injection priority (Section 3). |
+| **Production compilation** | Anderson (1995) | Frequently accessed patterns compile into procedural rules. High-fitness engrams promote to skills or CLAUDE.md (Section 9). |
+| **Memory reconsolidation** | Nader et al. (2000) | Recalled memories become labile and can be updated. Contradicting engrams trigger reconsolidation review (Section 3). |
+| **Complementary learning** | McClelland et al. (1995) | Fast episodic capture (patterns.md) + slow semantic consolidation (engrams.yaml). Two-loop architecture mirrors hippocampal/neocortical systems. |
+| **Schema abstraction** | Gick & Holyoak (1983) | Structural similarity across domains enables analogical transfer. Abstract engrams generalize concrete instances (Section 7). |
 
 ## Backwards Compatibility
 
@@ -718,6 +680,7 @@ Premature abstraction creates useless platitudes ("always plan ahead"). Only hum
 ## Implementation
 
 ### Phase 1: Core Infrastructure (Implemented)
+
 - Create `engrams.yaml` schema and per-space files
 - Create `engram-inject` skill
 - Create `daily-review` skill
@@ -734,28 +697,28 @@ Premature abstraction creates useless platitudes ("always plan ahead"). Only hum
   - Three independent injection pools: directives (10), DIP-0019 consider (5), spreading consider (3)
 
 ### Phase 2: Integration + Hebbian Learning
+
 - Add Step 5b to `/wrap-up`
 - Deferred review support in `/today`
 - Register new agents in registry
-- Hebbian co-access learning with decay and write-back at `session.end`
+- Hebbian co-access learning with session tracking, strength updates, and decay (see Section 10)
+- Write-back at `session.end` using atomic write
 - Document-to-engram extraction in `knowledge-extractor`
 - Batch zettel-to-engram nightshift task
 
 ### Phase 3: Schema Emergence + Migration
 
-**Schema Emergence** (Bartlett, 1932):
-- `schemas.yaml` — emergent cluster definitions with member engrams and confidence scores
-- Schema detection algorithm: co-access frequency + association density analysis
-- Schema boost in `scoreEngram()` — engrams belonging to activated schemas get relevance boost
-- Schema lifecycle: candidate → active → consolidated → archived
+- `schemas.yaml` -- emergent cluster definitions with member engrams and confidence scores (see Section 11)
+- Schema detection algorithm: connected components in association graph (strength >= 0.4, 3+ engrams, 2+ shared anchors)
+- Schema boost in `scoreEngram()` -- engrams belonging to activated schemas get +2.0 relevance boost
+- Schema lifecycle: candidate -> active -> consolidated -> archived
 - Dashboard for schema visualization and manual curation
-
-**Migration**:
 - `relations` field fully replaced by `associations` (run `flattenRelations` migration)
 - One-time consolidation pass on existing engrams
 - Archive obsolete entries, queue candidates for daily review
 
 ### Phase 4: Exchange Protocol
+
 - `learning-publisher` agent for promoting to exchange
 - `learning-subscriber` agent for importing
 - Skills-as-exchange-format pipeline
@@ -786,18 +749,19 @@ learning:
 - [Session-learning agent](../.datacore/agents/session-learning.md)
 - [DIP-0011: Nightshift Module](./DIP-0011-nightshift-module.md)
 - [DIP-0016: Agent Registry](./DIP-0016-agent-registry.md)
+- Design doc: `docs/plans/2026-03-02-engram-knowledge-integration-design.md`
 
 ### Cognitive Science
-- Anderson, J.R. (1995). *Cognitive Psychology and its Implications*. W.H. Freeman. — ACT-R architecture: activation decay, production compilation.
-- Bartlett, F.C. (1932). *Remembering*. Cambridge University Press. — Schema theory: related memories cluster into activatable schemas.
+- Anderson, J.R. (1995). *Cognitive Psychology and its Implications*. W.H. Freeman. -- ACT-R architecture: activation decay, production compilation.
+- Bartlett, F.C. (1932). *Remembering*. Cambridge University Press. -- Schema theory: related memories cluster into activatable schemas.
 - Clark, A. & Chalmers, D. (1998). The extended mind. *Analysis*, 58(1), 7-19.
-- Collins, A.M. & Loftus, E.F. (1975). A spreading-activation theory of semantic processing. *Psychological Review*, 82(6), 407-428. — Spreading activation: activating one node lowers threshold for related nodes. Basis for `selectAndSpread()`.
+- Collins, A.M. & Loftus, E.F. (1975). A spreading-activation theory of semantic processing. *Psychological Review*, 82(6), 407-428. -- Spreading activation: activating one node lowers threshold for related nodes. Basis for `selectAndSpread()`.
 - Gick, M.L. & Holyoak, K.J. (1983). Schema induction and analogical transfer. *Cognitive Psychology*, 15(1), 1-38.
-- Hebb, D.O. (1949). *The Organization of Behavior*. Wiley. — Hebbian learning: co-activated units form stronger connections. Basis for `co_accessed` associations.
+- Hebb, D.O. (1949). *The Organization of Behavior*. Wiley. -- Hebbian learning: co-activated units form stronger connections. Basis for `co_accessed` associations.
 - McClelland, J.L. et al. (1995). Why there are complementary learning systems. *Psychological Review*, 102(3), 419-457.
 - Nader, K. et al. (2000). Fear memories require protein synthesis in the amygdala for reconsolidation. *Nature*, 406, 722-726.
-- Paivio, A. (1971). *Imagery and Verbal Processes*. Holt, Rinehart & Winston. — Dual coding: concrete examples alongside abstract statements improve recall. Basis for `dual_coding` field.
-- Tulving, E. & Thomson, D.M. (1973). Encoding specificity and retrieval processes in episodic memory. *Psychological Review*, 80(5), 352-373. — Encoding specificity: recall improves when retrieval cues match encoding context. Basis for `knowledge_anchors`.
+- Paivio, A. (1971). *Imagery and Verbal Processes*. Holt, Rinehart & Winston. -- Dual coding: concrete examples alongside abstract statements improve recall. Basis for `dual_coding` field.
+- Tulving, E. & Thomson, D.M. (1973). Encoding specificity and retrieval processes in episodic memory. *Psychological Review*, 80(5), 352-373. -- Encoding specificity: recall improves when retrieval cues match encoding context. Basis for `knowledge_anchors`.
 
 ---
 
