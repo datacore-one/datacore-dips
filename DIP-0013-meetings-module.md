@@ -6,17 +6,18 @@
 | **Title** | Meetings Module |
 | **Author** | Gregor |
 | **Type** | Module |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2025-12-18 |
-| **Updated** | 2025-12-19 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `meetings`, `gtd`, `calendar`, `standup` |
 | **Affects** | `/today`, `journal`, `next_actions.org`, `calendar.org` |
-| **Depends On** | DIP-0006 (Open Questions), DIP-0010 (External Sync) |
+| **Depends On** | DIP-0010 (External Sync) |
+| **Absorbs** | DIP-0006 (Open Questions Management) |
 | **Agents** | `standup-generator`, `agenda-generator`, `transcription-processor`, `question-researcher` |
 
 ## Summary
 
-A comprehensive meetings module that automates the full meeting lifecycle: preparation, agenda generation, standup reports, transcription processing, and action item extraction. Integrates with calendar sync (DIP-0010) and open questions management (DIP-0006) to minimize manual work while maximizing meeting effectiveness.
+A comprehensive meetings module that automates the full meeting lifecycle: preparation, agenda generation, standup reports, transcription processing, and action item extraction. Integrates with calendar sync (DIP-0010) and includes open questions management (absorbed from DIP-0006) to minimize manual work while maximizing meeting effectiveness.
 
 ## Motivation
 
@@ -160,7 +161,7 @@ def generate_standup(date: date) -> StandupReport:
 
 ### Blockers
 - WAITING: Legal review for Dubai contract (since Dec 15)
-- NEED: Design input from @andrej for landing page
+- NEED: Design input from @dave for landing page
 ```
 
 #### 3.3 /today Integration
@@ -281,9 +282,19 @@ Planned for Phase 3:
 - Blocker aging alerts
 - Anomaly detection (unusual topic mix)
 
-### 4. Open Questions Pre-Processing
+### 4. Open Questions Management
 
-Extends DIP-0006 with AI-assisted preparation.
+> **Note:** This section absorbs DIP-0006 (Open Questions Management System), which is now superseded. All question tracking, collection, and preparation workflows are specified here.
+
+#### 4.0 Question Collection
+
+AI scans for questions across sources:
+- Document sections ending with "Open Questions", "Unresolved", "TBD"
+- Code comments with `TODO:`, `FIXME:`, `QUESTION:`
+- Meeting transcripts and conversation exports
+- Plan documents with decision points
+
+Quick capture via `/add-question [project] "question text"`.
 
 #### 4.1 Question Classification
 
@@ -314,7 +325,7 @@ For questions that can be researched:
 
 **Recommendation**: JWT aligns with architecture
 
-**Decision needed from**: @tadej (security), @gregor (architecture)
+**Decision needed from**: @carol (security), @alice (architecture)
 
 **Sources**: [links to relevant docs/articles]
 ```
@@ -407,9 +418,9 @@ Output:
 :PROPERTIES:
 :CREATED: [2025-12-18 Thu]
 :SOURCE: [[Weekly Exec 2025-12-18]]
-:ASSIGNEE: @tadej
+:ASSIGNEE: @carol
 :END:
-From weekly exec: Tadej will review the rate limiting proposal by Friday.
+From weekly exec: Carol will review the rate limiting proposal by Friday.
 ```
 
 ### 7. Commands
@@ -512,27 +523,27 @@ meetings:
     daily-standup:
       name: "Daily Standup"
       duration: 15
-      attendees: ["@gregor", "@crt", "@tadej"]
+      attendees: ["@alice", "@bob", "@carol"]
       calendar_match: "Daily"  # Match calendar.org entries
       generate_standup: true
 
     weekly-exec:
       name: "Weekly Exec"
       duration: 45
-      attendees: ["@gregor", "@crt", "@tadej"]
+      attendees: ["@alice", "@bob", "@carol"]
       calendar_match: "Weekly Exec"
       escalate_from_daily: true
 
     comms-weekly:
       name: "Comms Weekly"
       duration: 45
-      attendees: ["@gregor", "@crt", "@andrej"]
+      attendees: ["@alice", "@bob", "@dave"]
       calendar_match: "Comms Weekly"
 
     verity-product:
       name: "Verity Product Call"
       duration: 60
-      attendees: ["@gregor", "@crt", "@tadej"]
+      attendees: ["@alice", "@bob", "@carol"]
       calendar_match: "Verity"
       github_repo: "datacore-one/verity"
       pull_issues: true
@@ -603,34 +614,81 @@ Team context: With a small team, daily and weekly meetings can overlap. Explicit
 
 ## Implementation
 
-### Phase 1: Core Standup (MVP)
-- [ ] `/standup` command
-- [ ] Journal parser for yesterday's accomplishments
-- [ ] Integration with `/today`
-- [ ] Standup template
+### Phase 1: Core Standup — DONE
+- [x] `standup-generator` agent
+- [x] Journal parser for yesterday's accomplishments
+- [x] Integration with `/today`
 
-### Phase 2: Meeting Preparation
-- [ ] `/meeting-prep` command
-- [ ] Agenda generation from open questions
-- [ ] Calendar.org integration for meeting context
-- [ ] Question pre-research agent
+### Phase 2: Meeting Preparation — DONE
+- [x] `agenda-generator` agent
+- [x] `question-researcher` agent for pre-research
+- [x] Calendar.org integration for meeting context
 
-### Phase 3: Transcription Processing
-- [ ] Google Drive integration for transcripts
-- [ ] Granola .md import
-- [ ] Action item extraction
-- [ ] Decision capture to journal
+### Phase 3: Transcription Processing — DONE
+- [x] `transcription-processor` agent
+- [x] Action item extraction
+- [x] Decision capture to journal
 
-### Phase 4: Smart Routing
-- [ ] Daily/weekly routing rules
-- [ ] Escalation detection
-- [ ] Cross-meeting deduplication
+### Phase 4: Smart Routing — DONE
+- [x] `meeting-router` agent for request routing
+- [ ] Cross-meeting deduplication (deferred)
 
 ## Open Questions
 
 1. **Google Meet transcript format** - Need to investigate export format from Google Drive
 2. **Attendee matching** - How to match calendar attendees to @mentions in tasks?
 3. **Meeting detection** - Should we auto-detect meeting type from calendar.org title, or require explicit tagging?
+
+## Implementation Status
+_Last audited: 2026-03-04_
+
+### Implemented
+
+| Feature | Evidence |
+|---------|----------|
+| Module structure (v0.4.0, v2 manifest) | `modules/meetings/module.yaml` with `manifest_version: 2` |
+| `standup-generator` agent | `modules/meetings/agents/standup-generator.md` |
+| `agenda-generator` agent | `modules/meetings/agents/agenda-generator.md` |
+| `question-researcher` agent | `modules/meetings/agents/question-researcher.md` |
+| `transcription-processor` agent | `modules/meetings/agents/transcription-processor.md` |
+| `meeting-router` agent | `modules/meetings/agents/meeting-router.md` |
+| MCP tools: `standup`, `upcoming` | 2 tools registered in `module.yaml` |
+| Skills: `standup`, `my-questions` | 2 skills registered in `module.yaml` |
+| Commands: `/standup`, `/meeting-prep`, `/meeting-process` | All command files present |
+| Commands: `/meeting-agenda`, `/my-questions`, `/weekly` | `my-questions.md`, `weekly.md` present |
+| Hooks: today, weekly_review, gtd_weekly_review | All 3 hook files present |
+| Templates: standup, agenda-daily, agenda-weekly, agenda-product | All 4 spec templates present |
+| Templates: questions-prep, meeting-summary | Additional templates beyond spec |
+| Transcription parser (`lib/transcription_parser.py`) | Supports Google Meet, Granola, plain text formats |
+| Google Docs fetch utility (`lib/google_docs.py`) | OAuth fetch for meeting transcripts from Google Drive |
+| `/today` standup auto-generation | Triggered when Daily meeting detected in calendar |
+| Audience-aware filtering | Team vs personal vs investor modes in standup command |
+| Meeting type presets | daily/weekly/investor/product presets in settings |
+
+### Implemented (promoted from deferred)
+
+| Feature | Evidence |
+|---------|----------|
+| Within-meeting deduplication | `transcription-processor` handles duplicate detection during processing |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| `lib/journal_parser.py` | Logic lives inside agents; shared lib not yet needed |
+| `lib/action_extractor.py` | Extraction logic folded into `transcription_parser.py` |
+| `lib/meeting_types.py` | Meeting type config handled via `module.yaml` settings |
+| Cross-meeting deduplication | Escalation detection specified but not automated |
+| Full DIP-0010 calendar adapter | `google_docs.py` not a full sync adapter; deferred to DIP-0010 |
+| Historical comparison (week-over-week) | Pattern detection not yet implemented |
+
+### Resolved Questions
+
+| Question | Resolution |
+|----------|------------|
+| DIP-0006 absorption | Open Questions Management fully absorbed; `/my-questions` command implemented |
+| Library reorganization per spec §8 | Deferred — logic consolidated in agents and `transcription_parser.py` rather than separate lib modules |
 
 ## References
 

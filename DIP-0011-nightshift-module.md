@@ -2,13 +2,15 @@
 
 | Field | Value |
 |-------|-------|
-| DIP | 0011 |
-| Title | Autonomous AI Task Execution with Quality Gates |
-| Module | nightshift |
-| Status | Draft |
-| Created | 2025-12-10 |
-| Author | User, Claude |
-| Depends On | DIP-0002, DIP-0004, DIP-0009, DIP-0010 |
+| **DIP** | 0011 |
+| **Title** | Autonomous AI Task Execution with Quality Gates |
+| **Author** | User, Claude |
+| **Type** | Module |
+| **Status** | Implemented |
+| **Created** | 2025-12-10 |
+| **Updated** | 2026-03-04 |
+| **Module** | nightshift |
+| **Depends On** | DIP-0002, DIP-0009, DIP-0010, Datacortex module |
 
 ## Summary
 
@@ -125,6 +127,9 @@ Nightshift is an autonomous task execution module that processes `:AI:` tagged t
 **Note**: Tasks are moved from `next_actions.org` and `research_learning.org` to `nightshift.org` by the `/tomorrow` command before queue optimization runs.
 
 **Logic**:
+
+> **Note:** Priority scoring follows the canonical formula in DIP-0009 Part 13 (includes Intent Graph alignment). The composite below is a simplified queue-ordering heuristic for nightshift execution order.
+
 ```
 For each task:
   1. Parse task content and metadata
@@ -150,7 +155,7 @@ Sort by composite score, respecting dependency order.
 
 **Purpose**: Build comprehensive context package before task execution.
 
-**Search Strategy** (multi-modal, per DIP-0004 and patterns.md):
+**Search Strategy** (multi-modal, per Datacortex module and patterns.md):
 
 | Method | Tool | Best For |
 |--------|------|----------|
@@ -368,14 +373,19 @@ If needs_revision:
 
 ### Task States (extends DIP-0009)
 
+> **Note:** Task states follow the canonical state machine defined in DIP-0009 Part 2. Nightshift extends the base GTD states with execution-specific states.
+
 | State | Meaning | Set By |
 |-------|---------|--------|
 | `TODO` | Captured, not queued | Human |
 | `NEXT` | Queued for nightshift | Human/System |
-| `WORKING` | Currently executing | Nightshift |
+| `QUEUED` | In nightshift queue (alias: `NEXT` with `:NIGHTSHIFT_QUEUED:`) | System |
+| `EXECUTING` | Currently executing (org-mode: `WORKING`) | Nightshift |
 | `DONE` | Completed and approved | Nightshift |
-| `REVIEW` | Needs human review | Nightshift |
+| `REVIEW` | Needs human review (nightshift extension) | Nightshift |
 | `FAILED` | Execution failed | Nightshift |
+
+> **Implementation note:** Org-mode headers use `WORKING` for in-progress tasks (more natural for org-mode). The code accepts both `WORKING` and `EXECUTING` as valid states.
 
 ### Task Properties
 
@@ -383,7 +393,7 @@ If needs_revision:
 * TODO Research competitor X :AI:research:
   :PROPERTIES:
   :CREATED: [2025-12-10 Tue]
-  :SPACE: teamspace
+  :SPACE: 1-teamspace
   :PRIORITY: A
   :END:
 
@@ -406,7 +416,7 @@ If needs_revision:
   :PROPERTIES:
   :NIGHTSHIFT_COMPLETED: [2025-12-10 Tue 02:27]
   :NIGHTSHIFT_SCORE: 0.85
-  :NIGHTSHIFT_OUTPUT: 1-teamspace/0-inbox/nightshift-001-research.md
+  :NIGHTSHIFT_OUTPUT: [space]/0-inbox/nightshift-001-research.md
   :END:
 ```
 
@@ -1048,10 +1058,51 @@ status: approved|needs_review
 - Complete tasks via commit: `nightshift: complete <task-id>`
 - Server only modifies: `org/next_actions.org`, `[space]/0-inbox/*`, `[space]/journal/*`
 
+## Implementation Status
+_Last audited: 2026-03-04_
+
+### Implemented
+
+| Component | Location | Notes |
+|-----------|----------|-------|
+| Nightshift orchestrator agent | `modules/nightshift/agents/nightshift-orchestrator.md` | Core pipeline coordinator |
+| Queue optimizer agent | `modules/nightshift/agents/queue-optimizer.md` | Priority scoring and ordering |
+| Context enhancer agent | `modules/nightshift/agents/context-enhancer.md` | RAG + wiki-link context packaging |
+| Learning extractor agent | `modules/nightshift/agents/learning-extractor.md` | Pattern and correction extraction |
+| Core evaluator panel (6) | `modules/nightshift/agents/evaluator-{user,critic,ceo,cto,coo,archivist}.md` | Always-run evaluation |
+| Domain evaluator panel (14) | `modules/nightshift/agents/evaluator-*.md` | Bezos, Buffett, Dijkstra, Feynman, etc. |
+| Execution library | `modules/nightshift/lib/` | queue, execute, evaluate, claim, org_parser, output, journal, run, route_tasks, status, summary, metrics, execution_recorder |
+| Execution recording | `modules/nightshift/lib/execution_recorder.py` | Writes JSON records to `.datacore/state/nightshift/` for analytics |
+| 5-factor priority formula | `modules/nightshift/lib/queue.py` + `queue-optimizer.md` | Aligned with DIP-0009 Part 13 canonical formula (Impact/Urgency/Readiness/Effort/Intent) |
+| Dynamic journal path | `modules/nightshift/lib/journal.py` | Detects `notes/journals/` vs `journal/` per space |
+| Scheduler (cron + systemd) | `modules/nightshift/lib/scheduler/` | `cron_adapter.py`, `systemd_adapter.py` |
+| Server deployment | `modules/nightshift/server/` | Systemd service/timer files, setup script |
+| Nightshift status skill | `modules/nightshift/skills/nightshift-status/` | Queue and execution status |
+| Test suite | `modules/nightshift/tests/` | 4 test files: failure, intent, metrics, route_config |
+| `module.yaml` | `modules/nightshift/module.yaml` (v0.2.0) | Full manifest with tools, schedules, agents |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| `launchd_adapter.py` | macOS scheduling; cron covers local development needs |
+| Daemon mode (24/7) | Timer-based execution sufficient for overnight tasks |
+| Evaluator calibration | Correlation tracking with human judgement; needs evaluation data first |
+| Weekly insights report | Aggregate pattern analysis; user-analytics-generator covers basics |
+| Cost/budget enforcement | Token tracking exists in metrics; budget limits not yet wired |
+| Completion notifications | Email/push notification on task completion |
+
+### Resolved Questions
+
+1. **Server or local?** Both supported. Server uses systemd timers; local uses cron. Same pipeline code.
+2. **How many evaluators?** 6 core (always run) + configurable domain evaluators. Task can specify which domain evaluators to include.
+3. **State machine?** `TODO→QUEUED→EXECUTING→DONE|FAILED`. Canonical definition in DIP-0009 Part 2.
+
 ## References
 
 - DIP-0002: Layered Context Pattern
-- DIP-0004: Knowledge Database
+- DIP-0004: Knowledge Database (Superseded — see Datacortex module)
 - DIP-0009: GTD Specification
 - DIP-0010: External Sync Architecture
 - DIP-0017: Outbox & Archive Pattern (outbox processing schedules)

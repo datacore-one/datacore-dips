@@ -8,7 +8,7 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-01 |
-| **Updated** | 2025-12-01 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `context`, `privacy`, `CLAUDE.md`, `layers`, `contribution` |
 | **Affects** | `CLAUDE.md`, `.gitignore`, `agents/*.md`, `commands/*.md` |
 | **Specs** | `privacy-policy.md` |
@@ -276,30 +276,36 @@ Migration script provided in implementation.
 /\$[\d,]+\.\d{2}/  # Dollar amounts
 ```
 
-## Implementation
+## Implementation Status
+_Last audited: 2026-03-04_
 
-### Phase 1: Core Pattern (Complete)
-- [x] Create `context_merge.py` utility
-- [x] Update `.gitignore` templates
-- [x] Create pre-commit hooks
+### Implemented
 
-### Phase 2: Apply to Repos (Complete)
-- [x] Update `datacore` repo
-- [x] Update `datacore-org` template
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| `context_merge.py` utility | Done | `.datacore/lib/context_merge.py` (555 lines, rebuild/validate/trace) |
+| `.gitignore` templates | Done | `*.local.md`, `CLAUDE.md` ignored across all repos |
+| Pre-commit hook | Done | `.datacore/hooks/pre-commit` validates `.base.md` for PII |
+| Pre-push hook | Done | `.datacore/hooks/pre-push` safety net + Git LFS integration |
+| Hook symlinks | Done | `.git/hooks/pre-commit`, `.git/hooks/pre-push` |
+| `datacore` repo layered context | Done | `CLAUDE.base.md` + `CLAUDE.local.md` |
+| `datacore-org` template | Done | `CLAUDE.base.md` + `CLAUDE.space.md` |
+| Module `CLAUDE.base.md` files | Done | 21 modules with layered context |
+| `context_merge.py rebuild` | Done | CLI for rebuilding composed files |
+| `context_merge.py validate` | Done | CLI for validating PUBLIC layers |
+| `context_merge.py trace` | Done | CLI for finding which layer contains a section |
+| Registry injection | Done | `<!-- REGISTRY:xxx -->` markers → auto-generated tables |
+| Test suite | Done | 14 tests covering merge, validation, rebuild, discovery |
+| CLAUDE.md documentation | Done | Commands, layer table, contribution flow documented |
+| CONTRIBUTING.md | Done | Hook setup instructions for external contributors |
 
-### Phase 3: Tooling (In Progress)
-- [ ] Add `datacore context` CLI commands
-- [x] Create pre-commit hooks
-- [x] Add CI validation workflow
+### Future Work
+_No items — all four implementation phases are complete._
 
-### Phase 4: Documentation
-- [ ] Update INSTALL.md
-- [ ] Update CONTRIBUTING.md
+### Resolved Questions
 
-## Open Questions
-
-1. How to handle merge conflicts between layers?
-2. Should composed files include layer markers for debugging? (Currently: yes)
+1. **Merge conflicts between layers?** — Additive model: layers are concatenated, not merged. Conflicts don't arise because each layer is a separate file. If same-named sections exist, both appear (space-specific overrides are handled by AI context at runtime).
+2. **Layer markers for debugging?** — Yes. Composed files include `<!-- === Layer: BASE (PUBLIC) === -->` markers. Can be disabled with `--no-markers` flag.
 
 ## Agent Context
 
@@ -380,7 +386,7 @@ When modifying context files:
 
 - [DIP-0001: Contribution Model](./DIP-0001-contribution-model.md)
 - [DIP-0010: External Sync Architecture](./DIP-0010-external-sync-architecture.md)
-- [Privacy Policy](../.datacore/specs/privacy-policy.md)
+- [Privacy Policy](../specs/privacy-policy.md)
 - [Ethereum EIP Process](https://eips.ethereum.org/EIPS/eip-1)
 
 ## Applications

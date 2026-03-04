@@ -2,10 +2,12 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **DIP** | 0014 |
+| **Title** | Tag Taxonomy |
+| **Status** | Implemented |
 | **Author** | Gregor |
 | **Created** | 2025-12-19 |
-| **Updated** | 2025-12-19 |
+| **Updated** | 2026-03-04 |
 | **References** | DIP-0003 (Scaffolding), DIP-0009 (GTD), DIP-0012 (CRM) |
 
 ## Summary
@@ -166,7 +168,7 @@ While org-mode sees flat tags, Datacore agents **interpret adjacent tags as logi
 ```
 
 - Tag 1: `AI` - Signals this task should be delegated to AI
-- Tag 2: `research` - Specifies the agent type (gtd-research-processor)
+- Tag 2: `research` - Specifies the agent type (research-orchestrator)
 
 Both tags are independent. A task can have `:research:` without `:AI:` (human research task).
 
@@ -252,25 +254,25 @@ namespaces:
     discoverable: true  # Agents should read this
     tags:
       - id: content
-        routes-to: gtd-content-writer
         description: Blog posts, emails, social media, documentation
+        # Routing: see agents.yaml → gtd-content-writer
 
       - id: research
-        routes-to: gtd-research-processor
         description: URL analysis, literature notes, zettels
+        # Routing: see agents.yaml → research-orchestrator
 
       - id: data
-        routes-to: gtd-data-analyzer
         description: Metrics, reports, data analysis
+        # Routing: see agents.yaml → gtd-data-analyzer
 
       - id: pm
-        routes-to: gtd-project-manager
         description: Project status, blockers, coordination
+        # Routing: see agents.yaml → gtd-project-manager
 
       - id: technical
-        routes-to: cto-queue
-        autonomous: false
         description: Implementation tasks (human review required)
+        autonomous: false
+        # Routing: see agents.yaml → cto-queue (human review)
 
   status:
     description: Document lifecycle
@@ -530,7 +532,7 @@ Place at end of note content, after the main body.
 
 | Agent | Current Issue | Required Change |
 |-------|---------------|-----------------|
-| `gtd-research-processor` | Uses `tags: [array]` in template | Use inline `#tag` format |
+| `research-orchestrator` | Uses `tags: [array]` in template | Use inline `#tag` format |
 | `conversation-processor` | Uses `tags: [array]` in zettel template | Use inline `#tag` format |
 | `session-learning` | Uses `tags: [array]` in output | Use inline `#tag` format |
 | `gtd-inbox-processor` | No tag validation | Add registry validation |
@@ -549,7 +551,7 @@ Place at end of note content, after the main body.
 
 ### Agent Template Updates
 
-**Literature Note Template (gtd-research-processor):**
+**Literature Note Template (research-orchestrator):**
 ```markdown
 ---
 type: literature-note
@@ -593,7 +595,7 @@ maturity: seedling
 
 ### Phase 2: Agent Compliance
 
-1. Update `gtd-research-processor` template
+1. Update `research-orchestrator` template
 2. Update `conversation-processor` template
 3. Update `session-learning` output format
 4. Add tag validation to `gtd-inbox-processor`
@@ -617,6 +619,43 @@ maturity: seedling
 1. Define financial module tag requirements
 2. Integrate expense/income tagging
 3. Build cross-module reporting
+
+## Implementation Status
+_Last audited: 2026-03-04_
+
+### Implemented
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Primary tag registry | Done | `.datacore/tags.yaml` (566 lines, 11 namespaces, ~86 tags) |
+| Module tag registries | Done | `meetings/tags.yaml` as reference pattern |
+| Tag format conventions | Done | org-mode `:tag:`, PKM `#tag`, frontmatter single values |
+| Sync label mapping | Done | AI delegation + priority tags mapped to GitHub labels |
+| Validation rules | Done | Variant warnings and auto-normalization in registry |
+| `tag-suggester` agent | Done | AI-powered tag suggestion from registry |
+| CLAUDE.md tag documentation | Done | Format rules, registries, system conventions |
+| `routes-to` removal | Done | Tags define semantics only; routing in `agents.yaml` per DIP-0016 |
+
+### Implemented (promoted)
+
+| Component | Evidence |
+|-----------|----------|
+| `tag_validator.py` dynamic spaces | `_discover_space_dirs()` uses filesystem-based `[0-9]-*` pattern discovery |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| Migration script (array → inline) | Gradual migration; new notes use correct format |
+| Financial module tags | Awaits personal-finance module maturity |
+| Registry consolidation script | Single primary registry approach makes this less urgent |
+
+### Resolved Questions
+
+1. **Dual registries?** — `.datacore/config/tags.yaml` was stale (empty dir). Single primary registry at `.datacore/tags.yaml` is authoritative. Module-scoped registries (`modules/*/tags.yaml`) are federated but must not contain routing logic.
+2. **Tag routing vs. agent routing?** — Per DIP-0016 conflict resolution: tags define semantics only. `agents.yaml` is authoritative for routing. All `routes-to` fields removed from tag definitions.
+3. **CRM tag format?** — Inline `#tag` format per DIP-0014 standard. DIP-0012 contact schema updated to match.
 
 ---
 
@@ -668,20 +707,20 @@ All tags normalize to **kebab-case**:
 
 ### AI Task Routing
 
+> **Clarification (DIP-0016):** Agent routing is managed by `agents.yaml` (per DIP-0016 Agent Registry), not by the tag registry. Tags define semantics only; `agents.yaml` is the authoritative source for agent routing.
+
 ```yaml
 # System registry: .datacore/tags.yaml
-ai:
-  content:
-    routes-to: gtd-content-writer
-  research:
-    routes-to: gtd-research-processor
-  data:
-    routes-to: gtd-data-analyzer
-  pm:
-    routes-to: gtd-project-manager
-  technical:
-    routes-to: cto-queue
-    autonomous: false  # Human review required
+# Tags define WHAT, not WHERE. Routing is in agents.yaml.
+ai_delegation:
+  AI-content:
+    description: "Content generation (blog, email, docs, social)"
+    org: ":AI:content:"
+    # Routing: see agents.yaml → gtd-content-writer
+  AI-research:
+    description: "Research, analysis, literature notes"
+    org: ":AI:research:"
+    # Routing: see agents.yaml → research-orchestrator
 ```
 
 ### Template for Generated Notes
@@ -730,6 +769,6 @@ def load_tags():
 - DIP-0003: Scaffolding Pattern (content types, categories)
 - DIP-0009: GTD Specification (AI delegation tags, contexts)
 - DIP-0012: CRM Module (industry/technology tags)
-- `.datacore/config/tags.yaml` - Existing tag configuration
+- `.datacore/tags.yaml` - Primary tag registry
 - [Zettelkasten Method](https://zettelkasten.de/) - Maturity levels
 - [GTD Contexts](https://gettingthingsdone.com/) - Context concept

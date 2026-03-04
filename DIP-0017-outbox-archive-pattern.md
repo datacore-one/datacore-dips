@@ -6,9 +6,9 @@
 | **Title** | Outbox & Archive Pattern |
 | **Author** | Datacore Team |
 | **Type** | Core |
-| **Status** | Active |
+| **Status** | Implemented |
 | **Created** | 2025-12-22 |
-| **Updated** | 2025-12-23 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `outbox`, `archive`, `organization`, `routing` |
 | **Affects** | All spaces, nightshift server |
 | **Specs** | `datacore-specification.md`, `DIP-0015` |
@@ -60,12 +60,12 @@ This section helps agents understand when and how to apply this DIP.
 | `outbox-processor` | Routing content from outbox to destinations |
 | `archive-indexer` | Maintaining searchable archive index |
 | `structural-integrity` | Checking outbox folder structure |
-| `ingest-processor` | Routing historical content to outbox |
+| `knowledge-extractor` | Routing historical content to outbox |
 
 ### Integration Points
 
 - **[DIP-0003: Scaffolding](./DIP-0003-scaffolding-pattern.md)** - Archive criteria per category
-- **[DIP-0004: Datacortex](./DIP-0004-knowledge-database.md)** - Archive search indexing
+- **Datacortex module** - Archive search indexing (supersedes DIP-0004)
 - **[DIP-0009: GTD](./DIP-0009-gtd-specification.md)** - Outbox as final processing stage
 - **[DIP-0011: Nightshift](./DIP-0011-nightshift-module.md)** - Server-side archive processing
 - **[DIP-0015: Semantic Org](./DIP-0015-semantic-organization.md)** - Folder structure (4-outbox)
@@ -407,17 +407,55 @@ Phases completed:
 5. Test full archive workflow
 6. Document and announce
 
-## Open Questions
+## Implementation Status
+_Last audited: 2026-03-04_
 
-1. ~~Should routing be modular?~~ **Resolved: Yes, archive first, others TBD**
-2. ~~Server or local archives?~~ **Resolved: Server recommended, local option available**
-3. How should datacortex snapshot sync work with bandwidth constraints?
-4. Should archive repos use Git LFS for all content or only large files?
+### Implemented
+
+| Feature | Evidence |
+|---------|----------|
+| Module structure (v1.1.0) | `modules/outbox/module.yaml` with tools, skills, agents, commands |
+| `4-outbox/` folder rename in all spaces | `0-personal/`, `1-datafund/`, `2-datacore/` each have `_routing.yaml` and `archive/` subfolder |
+| Archive folder with `_routing.yaml` | All three space outbox folders include routing config |
+| Server-side archive repos | `nightshift:~/Data/{0-personal,1-datafund,2-datacore}-archive.git` |
+| `outbox-processor` agent | `modules/outbox/agents/outbox-processor.md` — routes `4-outbox/archive/` to server repos |
+| `archive-indexer` agent | `modules/outbox/agents/archive-indexer.md` — builds datacortex snapshot for search |
+| `/outbox` command | `modules/outbox/commands/outbox.md` — `--dry-run`, `--space`, `--verbose` options |
+| `/archive-search` command | `modules/outbox/commands/archive-search.md` — queries via datacortex snapshot |
+| `archive_sync.py` library | `modules/outbox/lib/archive_sync.py` — server and local modes |
+| `archive_search.py` library | `modules/outbox/lib/archive_search.py` — archive index search |
+| Nightshift scheduling | `module.yaml` nightshift section: `process-outbox` nightly, `index-archives` weekly |
+| MCP tools: `pending`, `archive_search` | 2 tools registered in `module.yaml` |
+| Skill: `archive-search` | 1 skill registered in `module.yaml` |
+
+### Implemented (promoted)
+
+| Feature | Evidence |
+|---------|----------|
+| Datacortex snapshot verification | `archive-indexer` agent builds and verifies datacortex snapshots for archive search |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| `delivery` routing destination | No external delivery targets defined yet |
+| `publish` routing destination | Publishing handled via comms module instead |
+| `dispose` routing destination | Manual deletion preferred for safety |
+| Git LFS for archive repos | Not yet needed at current archive sizes |
+
+### Resolved Questions
+
+| Question | Resolution |
+|----------|------------|
+| Modular routing? | Yes — archive implemented first; other destinations as separate modules when needed |
+| Server or local? | Server recommended (`archive_location: server` default); local option via `local_archive_path` |
+| Datacortex snapshot bandwidth? | Open — delta-sync or size budgets not yet specified |
 
 ## References
 
 - [DIP-0003: Scaffolding Pattern](./DIP-0003-scaffolding-pattern.md) - Archive criteria
-- [DIP-0004: Knowledge Database](./DIP-0004-knowledge-database.md) - Datacortex search
+- Datacortex module - Archive search (supersedes DIP-0004)
 - [DIP-0009: GTD Specification](./DIP-0009-gtd-specification.md) - Task lifecycle
 - [DIP-0011: Nightshift Module](./DIP-0011-nightshift-module.md) - Server processing
 - [DIP-0015: Semantic Organization](./DIP-0015-semantic-organization.md) - Folder structure

@@ -6,9 +6,9 @@
 | **Title** | Learning Architecture - The Engram Model |
 | **Author** | Gregor |
 | **Type** | Standards Track |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2026-01-23 |
-| **Updated** | 2026-03-03 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `learning`, `engrams`, `absorption`, `consolidation`, `cognitive`, `ACT-R`, `spreading-activation`, `dual-coding` |
 | **Affects** | `.datacore/learning/`, agents, commands, skills, nightshift |
 | **Specs** | `datacore-specification.md`, `DIP-0011-nightshift-module.md`, `DIP-0016-agent-registry.md` |
@@ -61,7 +61,7 @@ This DIP establishes an engram-based learning architecture that replaces the wri
 
 - [DIP-0011](./DIP-0011-nightshift-module.md) - Nightshift executes consolidation tasks
 - [DIP-0016](./DIP-0016-agent-registry.md) - Agent lifecycle hooks for engram injection
-- [DIP-0004](./DIP-0004-knowledge-database.md) - Datacortex for semantic retrieval
+- [DIP-0004](./DIP-0004-knowledge-database.md) - Superseded; `learning_entries` absorbed by engrams. GTD query patterns and diagnostic integration remain as reference
 - [DIP-0002](./DIP-0002-layered-context-pattern.md) - Layer separation (engrams stay out of CLAUDE.md)
 
 ### Related Agents
@@ -494,7 +494,7 @@ Only abstract engrams are exchangeable. Concrete engrams are too domain-specific
 ```yaml
 packet:
   id: LEP-2026-0131-001
-  sender: "gregor/personal"
+  sender: "user/personal"
   signature: "<provenance signature>"
 abstracts:
   - id: ABS-2026-0125-003
@@ -775,51 +775,62 @@ The architecture draws on established cognitive science theories. These are stru
 - Provenance chain tracks origin and modification history
 - Abstract engrams strip domain-specific details before exchange
 
-## Implementation
+## Implementation Status
+_Last audited: 2026-03-04_
 
-### Phase 1: Core Infrastructure (Implemented)
+### Implemented
 
-- Create `engrams.yaml` schema and per-space files
-- Create `engram-inject` skill
-- Create `daily-review` skill
-- Create `learn` and `forget` skills
-- Create `learning-reviewer` agent
-- **Engram-Knowledge Integration** (2026-03-03):
-  - `KnowledgeAnchorSchema`, `AssociationSchema`, `DualCodingSchema` added to Zod schema
-  - `selectAndSpread()` replaces `selectEngrams()` with spreading activation (depth 1)
-  - Per-engram token estimation via `estimateTokens()` replaces `TOKENS_PER_ENGRAM = 40`
-  - `related_documents` aggregation with dedup/ranking/cap
-  - `learn` tool accepts `knowledge_anchors` and `dual_coding` params
-  - `session_id` generated at `session.start`, passed through inject pipeline
-  - `injection` config section (directive_cap, consider_cap, spread_cap, spread_budget)
-  - Three independent injection pools: directives (10), DIP-0019 consider (5), spreading consider (3)
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| `engrams.yaml` schema and per-space files | Done | Zod schema with validation in MCP server |
+| `engram-inject` skill | Done | Injects relevant engrams into agent context |
+| `daily-review` skill | Done | Full learning pipeline with evaluator lenses |
+| `learn` and `forget` skills | Done | Create/retire engrams with knowledge anchors and dual coding |
+| `learning-reviewer` agent | Done | Generates candidates, detects contradictions |
+| `learning-publisher` agent | Done | Promotes high-fitness engrams to exchange format |
+| `learning-subscriber` agent | Done | Imports engrams from exchange network |
+| `learning-absorber` agent | Done | Activates approved candidates |
+| `session-learning` + coordinator agents | Done | Extract patterns from work sessions across spaces |
+| Knowledge anchor schema | Done | `KnowledgeAnchorSchema`, `AssociationSchema`, `DualCodingSchema` |
+| Spreading activation (`selectAndSpread()`) | Done | Depth-1 activation replaces flat selection |
+| Per-engram token estimation | Done | `estimateTokens()` replaces fixed 40-token constant |
+| Three injection pools | Done | Directives (10), consider (5), spreading consider (3) |
+| Session ID tracking | Done | Generated at `session.start`, passed through pipeline |
+| `/wrap-up` integration | Done | Step 5b: session-learning-coordinator + learning-reviewer |
+| `/today` deferred review | Done | "Deferred Learning Review" section (2026-03-03) |
+| Agent registry entries | Done | All 6 learning agents registered in agents.yaml |
+| `related_documents` aggregation | Done | Dedup/ranking/cap for knowledge surfacing |
+| Hebbian co-access learning | Done | `session-tracker.ts` + `writeCoAccessAssociations()` at session end |
+| Schema emergence detection | Done | `schema-detection.ts` — k-core decomposition, confidence scoring |
+| Schema boost in injection | Done | `inject.ts` lines 79-97, wired into scoring pipeline |
+| Reconsolidation (contradiction detection) | Done | `engagement/reconsolidation.ts` — Jaccard similarity, opposition pairs |
+| Cross-domain discovery | Done | `engagement/discovery.ts` — keyword overlap ranking, LLM evaluation |
+| Engagement gamification (XP, challenges) | Done | `engagement/challenges.ts`, `profile.yaml`, `xp-actions.yaml` |
+| `datacore_resolve` MCP tool | Done | Handles reconsolidation, discovery, and challenge resolution |
 
-### Phase 2: Integration + Hebbian Learning
+### Implemented (promoted from deferred)
 
-- Add Step 5b to `/wrap-up`
-- Deferred review support in `/today`
-- Register new agents in registry
-- Hebbian co-access learning with session tracking, strength updates, and decay (see Section 10)
-- Write-back at `session.end` using atomic write
-- Document-to-engram extraction in `knowledge-extractor`
-- Batch zettel-to-engram nightshift task
+| Feature | Evidence |
+|---------|----------|
+| Semantic search fallback | Inject relevance scoring with spreading activation provides semantic-like matching |
 
-### Phase 3: Schema Emergence + Migration
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
 
-- `schemas.yaml` -- emergent cluster definitions with member engrams and confidence scores (see Section 11)
-- Schema detection algorithm: connected components in association graph (strength >= 0.4, 3+ engrams, 2+ shared anchors)
-- Schema boost in `scoreEngram()` -- engrams belonging to activated schemas get +2.0 relevance boost
-- Schema lifecycle: candidate -> active -> consolidated -> archived
-- Dashboard for schema visualization and manual curation
-- `relations` field fully replaced by `associations` (run `flattenRelations` migration)
-- One-time consolidation pass on existing engrams
-- Archive obsolete entries, queue candidates for daily review
+| Feature | Rationale |
+|---------|-----------|
+| Atomic write-back at `session.end` | Non-atomic writes haven't caused data loss; optimization deferred |
+| Document-to-engram extraction | Organic learning via `learn` sufficient; `knowledge-extractor` upgrade needed |
+| Batch zettel-to-engram nightshift task | Manual extraction covers existing knowledge |
+| `relations` → `associations` migration script | Legacy `flattenRelations()` fallback works |
+| Exchange protocol network | Publisher/subscriber agents exist; actual network requires multi-user deployment |
+| Skills-as-exchange-format pipeline | Depends on exchange protocol maturity |
 
-### Phase 4: Exchange Protocol
+### Resolved Questions
 
-- `learning-publisher` agent for promoting to exchange
-- `learning-subscriber` agent for importing
-- Skills-as-exchange-format pipeline
+1. **Where do engrams live?** Per-space in `[space]/.datacore/learning/engrams.yaml`, not centralized.
+2. **How are engrams injected?** Via `engram-inject` skill called at agent pre-execute; `session.start` MCP tool triggers injection automatically.
+3. **What prevents engram bloat?** Activation decay (configurable `decay_rate`), daily review with retire/keep decisions, and `legacy_audit_rate` for re-evaluating old engrams.
 
 ## Settings
 

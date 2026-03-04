@@ -22,9 +22,11 @@ A DIP is a design document providing information to the Datacore community about
 | **Draft** | Initial proposal, open for feedback |
 | **Review** | Under formal review by maintainers |
 | **Accepted** | Approved for implementation |
+| **Partial** | Specification accepted, implementation in progress |
 | **Implemented** | Merged and released |
 | **Rejected** | Not accepted (with rationale) |
 | **Withdrawn** | Withdrawn by author |
+| **Superseded** | Replaced by a newer DIP or implementation |
 | **Deferred** | Postponed for future consideration |
 
 ## DIP Workflow
@@ -76,6 +78,7 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 |-----|-------|--------|
 | [0001](DIP-0001-contribution-model.md) | Contribution Model | Implemented |
 | [0002](DIP-0002-layered-context-pattern.md) | Layered Context Pattern | Implemented |
+| [0005](DIP-0005-installation-upgrade.md) | Installation & Upgrade | Implemented |
 | [0014](DIP-0014-tag-taxonomy.md) | Tag Taxonomy | Implemented |
 | [0016](DIP-0016-agent-registry.md) | Agent Registry & Discoverability | Implemented |
 
@@ -84,10 +87,9 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 | DIP | Title | Status |
 |-----|-------|--------|
 | [0003](DIP-0003-scaffolding-pattern.md) | Scaffolding Pattern | Implemented |
-| [0004](DIP-0004-knowledge-database.md) | Knowledge Database | Implemented |
 | [0015](DIP-0015-semantic-organization.md) | Semantic Organization | Implemented |
-| [0017](DIP-0017-outbox-archive-pattern.md) | Outbox & Archive Pattern | Active |
-| [0019](DIP-0019-learning-architecture.md) | Learning Architecture | Draft |
+| [0017](DIP-0017-outbox-archive-pattern.md) | Outbox & Archive Pattern | Implemented |
+| [0019](DIP-0019-learning-architecture.md) | Learning Architecture | Implemented |
 
 ### GTD & Task Management
 
@@ -115,21 +117,22 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 | DIP | Title | Status |
 |-----|-------|--------|
 | [0021](DIP-0021-search-research-architecture.md) | Search & Research Architecture | Implemented |
+| [0022](DIP-0022-module-specification.md) | Module Specification | Partial |
 
 ### Infrastructure & Security
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0018](DIP-0018-credential-management-DRAFT.md) | Credential Management | Draft |
-| [0020](DIP-0020-whatsapp-module.md) | WhatsApp Module | Draft |
+| [0018](DIP-0018-credential-management-DRAFT.md) | Credential Management | Partial |
+| [0020](DIP-0020-whatsapp-module.md) | WhatsApp Module | Partial |
 
 ### Historical / Superseded
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0005](DIP-0005-github-onboarding.md) | GitHub-Based Onboarding | Draft (unfinished) |
-| [0006](DIP-0006-open-questions-management.md) | Open Questions Management | Draft (superseded by DIP-0013) |
-| [0007](DIP-0007-inbox-done-option.md) | Inbox DONE Option | Draft (unfinished) |
+| [0004](DIP-0004-knowledge-database.md) | Knowledge Database | Superseded (learning→DIP-0019, search→Datacortex) |
+| [0006](DIP-0006-open-questions-management.md) | Open Questions Management | Superseded (by DIP-0013) |
+| [0007](DIP-0007-inbox-done-option.md) | Inbox DONE Option | Superseded (by DIP-0009 Part 2) |
 
 ---
 
@@ -139,12 +142,10 @@ The following DIPs are planned to complete full specification coverage:
 
 | DIP | Title | Purpose | Priority |
 |-----|-------|---------|----------|
-| **0026** | Journal Format | Personal and team journal structure | Low |
-| **0027** | Module Specification | module.yaml schema, installation, hooks, lifecycle | High |
-| **0022** | Installation & Upgrade | Bootstrap, upgrades, migrations | Medium |
 | **0023** | Sync Architecture | ./sync script, multi-repo handling | Medium |
-| **0024** | External Services | n8n, Gamma, and service integration patterns | Low |
-| **0025** | Chat Interface Architecture | Telegram, Slack, Discord, Email integrations | Medium |
+| **0025** | External Services | n8n, Gamma, and service integration patterns | Low |
+| **0026** | Chat Interface Architecture | Telegram, Slack, Discord, Email integrations | Medium |
+| **0027** | Journal Format | Personal and team journal structure | Low |
 
 ### Relationship to `datacore-specification.md`
 
@@ -159,17 +160,17 @@ With DIP-0017 through DIP-0021 complete, the monolithic `datacore-specification.
 |--------------|------------|
 | Overview & Philosophy | Remains in spec (unique) |
 | Core Concepts (Spaces) | Remains in spec (unique) |
-| Core Concepts (Modules) | → DIP-0021 |
+| Core Concepts (Modules) | → DIP-0022 |
 | Architecture | → DIP-0003, DIP-0015 |
-| Knowledge Layer | → DIP-0003, DIP-0004, DIP-0015 |
-| Task Management (GTD) | → DIP-0007, DIP-0009 |
+| Knowledge Layer | → DIP-0003, DIP-0015, DIP-0019 |
+| Task Management (GTD) | → DIP-0009 |
 | Agents & Commands | → DIP-0016 |
 | Configuration | → DIP-0021 |
 | Git & Contribution | → DIP-0001, DIP-0002 |
 | External Sync | → DIP-0010 |
 | Operations | → DIP-0017, DIP-0018 |
-| Integrations | → DIP-0010, DIP-0024 |
-| Chat Interfaces | → DIP-0025 |
+| Integrations | → DIP-0010 |
+| Chat Interfaces | → (future DIP) |
 
 ## Contributing
 

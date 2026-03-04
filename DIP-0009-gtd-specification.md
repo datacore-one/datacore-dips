@@ -8,7 +8,7 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-04 |
-| **Updated** | 2026-02-22 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `gtd`, `task-management`, `org-mode`, `agents` |
 | **Affects** | `org/`, `.datacore/commands/`, `.datacore/agents/`, `.datacore/modules/gtd/` |
 | **Specs** | `org-mode-conventions.md` |
@@ -166,7 +166,8 @@ Regular reviews ensure system integrity.
 | State | Meaning | Terminal | Required Properties |
 |-------|---------|----------|---------------------|
 | `QUEUED` | Waiting in AI queue | No | - |
-| `EXECUTING` | Currently being processed by AI | No | `:NIGHTSHIFT_EXECUTOR:`, `:NIGHTSHIFT_STARTED:` |
+| `EXECUTING` | Currently being processed by AI (org-mode: `WORKING`) | No | `:NIGHTSHIFT_EXECUTOR:`, `:NIGHTSHIFT_STARTED:` |
+| `REVIEW` | Output needs human review before approval | No | `:NIGHTSHIFT_SCORE:` |
 | `DONE` | Completed successfully with quality gates | Yes | `CLOSED:` timestamp, `:NIGHTSHIFT_SCORE:` |
 | `FAILED` | Needs human review (evaluation failed) | No | `:NIGHTSHIFT_REASON:` |
 
@@ -755,31 +756,38 @@ prompt = build_task_prompt(task, data_dir, engram_text=engram_text)
 
 ## Part 6: Module Architecture
 
+> **Note:** Module architecture has evolved significantly beyond this part's original scope.
+> See DIP-0022 (Module Specification) for the authoritative module system spec.
+> This part is retained for historical context.
+
 ### Core (Always Present)
 
 | Component | Purpose |
 |-----------|---------|
-| GTD commands | Daily/weekly/monthly workflows |
-| AI task executor | Autonomous task routing |
-| Inbox processor | Entry classification and routing |
-| Session learning | Extract patterns from work |
+| GTD commands (`/today`, `/tomorrow`, `/wrap-up`) | Daily/weekly/monthly workflows |
+| AI task executor (`ai-task-executor`) | Autonomous task routing via `:AI:` tags |
+| Inbox processor (`gtd-inbox-coordinator`) | Entry classification and routing |
+| Session learning (`session-learning-coordinator`) | Extract patterns from work |
 
 ### Optional Modules
 
+See `install.yaml` for the full module list. Key modules:
+
 | Module | Purpose | DIP |
 |--------|---------|-----|
-| `task-sync` | GitHub, Asana, Calendar sync | DIP-0010 |
-| `trading` | Trading-specific workflows | - |
+| `nightshift` | Overnight autonomous task execution | DIP-0011 |
+| `research` | Multi-source research pipeline | DIP-0021 |
 | `meetings` | Meeting lifecycle, questions | DIP-0013 |
+| `crm` | Contact relationship management | DIP-0012 |
+| `trading` | Trading-specific workflows | - |
 
 ### Module Interface
 
-Modules extend Datacore by providing:
-- Agents in `.datacore/modules/[name]/agents/`
-- Commands in `.datacore/modules/[name]/commands/`
-- Config in `.datacore/modules/[name]/config.yaml`
-
-Registration via `module-registrar` agent.
+Per DIP-0022, modules extend Datacore via `module.yaml` manifests providing:
+- Agents, commands, skills, MCP tools
+- Context injection hooks (`always`, `on_match`, `on_demand`)
+- Settings with `auto_*` defaults for conversational UX
+- Registration via `module-registrar` agent or `create-module` agent
 
 ---
 
@@ -1476,13 +1484,15 @@ When a task reaches FAILED status, the `failure-analyzer` agent classifies the f
 
 ## Part 13: Strategic Prioritization
 
-The current priority formula (`Impact * 0.4 + Urgency * 0.3 + Readiness * 0.2 + Effort * 0.1`) does not account for strategic alignment. This part adds an Intent dimension that connects task prioritization to the Intent Graph.
+Task prioritization incorporates strategic alignment via the Intent Graph. The formula balances immediate execution needs (impact, urgency, readiness) with strategic direction (intent alignment).
 
-### 13.1 Enhanced Priority Formula
+### 13.1 Priority Formula
 
 ```
-Score = (Impact*0.3 + Urgency*0.2 + Readiness*0.15 + Effort*0.1 + Intent*0.25) * tag_multiplier
+Score = (Impact*0.35 + Urgency*0.25 + Readiness*0.20 + Effort*0.10 + Intent*0.10) * tag_multiplier
 ```
+
+**Implementation:** `nightshift/lib/queue.py` `calculate_priority()`. Intent weight is deliberately lower (0.10) because most tasks already inherit strategic alignment from their focus area; the intent score acts as a tiebreaker and high-leverage signal, not a dominant factor.
 
 The new `Intent` factor (0-10 scale):
 
@@ -1519,11 +1529,12 @@ The `strategic-prioritizer` agent scores intent alignment by:
 
 **Output:** Priority scores written to `:INTENT_SCORE:` property. Queue builder incorporates into final ordering.
 
-### 13.4 Code Changes
+### 13.4 Implementation Status
 
-- `nightshift/lib/queue.py`: Update `calculate_priority()` to include `intent_multiplier`
-- New: `nightshift/agents/strategic-prioritizer.md` agent specification
-- `/tomorrow` command: Invoke strategic-prioritizer after initial queue build, before final ordering
+- `nightshift/lib/queue.py`: `calculate_priority()` reads `:INTENT_SCORE:` property (implemented)
+- `strategic-prioritizer` agent: Registered, uses deterministic keyword matching from `gtd/skills/intent-routing.md` (implemented)
+- `queue-optimizer` and `gtd-inbox-processor`: Invoke strategic-prioritizer during queue build (implemented)
+- `/tomorrow` command: Invokes queue optimization which includes intent scoring (implemented)
 
 ---
 
@@ -2349,88 +2360,46 @@ All capabilities required for this DIP to be fully active:
 
 ---
 
-## Implementation
+## Implementation Status
+_Last audited: 2026-03-04_
 
-### Phase 1: Documentation (Current)
-- Finalize this DIP (Parts 1-21)
-- Archive gtd-spec.md (superseded)
-- Update CLAUDE.md references
+### Implemented
 
-### Phase 2: Agent Compliance
-- Audit existing agents against spec
-- Add missing state validations
-- Standardize logging format
+| Part | Title | Status | Notes |
+|------|-------|--------|-------|
+| 1 | GTD Workflow | Implemented | Five stages, capture/clarify/organize/review/do |
+| 2 | Task States | Implemented | TODO/NEXT/WAITING/DONE + AI states (QUEUED/EXECUTING/FAILED) |
+| 3 | File Structure | Implemented | inbox.org, next_actions.org, Rich Task Standard |
+| 4 | AI Agent Architecture | Implemented | ai-task-executor, gtd-inbox-coordinator, routing |
+| 5 | Review Cycles | Implemented | /today, /wrap-up, weekly review, monthly review |
 
-### Phase 3: Module System
-- Implement module registration
-- Extract optional components to modules
-- Document module creation guide
+### Implemented (promoted from deferred)
 
-### Phase 4: External Sync (DIP-0010)
-- Implement GitHub adapter
-- Add Calendar read support
-- Build sync engine
+| Part | Title | Evidence |
+|------|-------|----------|
+| 6 | Module Architecture | Superseded and implemented by DIP-0022 |
+| 7 | External Integration | Implemented by DIP-0010 sync engine (GitHub + Google Calendar adapters) |
+| 8 | Org-Mode Full Utilization | `org_parser.py` handles CLOCK/DEADLINE; archiving via `archiver` agent |
+| 9 | Intent Graph | `Intent-Graph.md` + `strategic-prioritizer` agent + `intent_score` nightshift tool |
+| 12 | Failure Recovery | `failure-analyzer` agent in nightshift module classifies and routes failures |
+| 13 | Strategic Prioritization | `queue.py` 5-factor formula + `queue-optimizer` agent (matches spec exactly) |
+| 15 | Sync Architecture | Implemented by DIP-0010 (GitHub + Calendar + conflict resolution) |
+| 17 | AI Task Performance | `user-analytics-generator` agent + `execution_logger.py` captures metrics |
+| 19 | Personal Task Lifecycle | `/today`, `/tomorrow`, `/wrap-up`, `/continue` commands operational |
+| 20 | Inbox Processing Pipeline | `gtd-inbox-coordinator` + `gtd-inbox-processor` working pipeline |
+| 21 | User Analytics | `user-analytics-generator` agent produces periodic reports |
 
-### Phase 5: Org-Mode Extensions (Part 8)
-- Add `write_clock_entry()` to `org_parser.py`
-- Add `archive_task()` to `org_parser.py`
-- Implement DEADLINE warning in `/today` briefing
-- Implement auto-archiving in weekly review
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
 
-### Phase 6: Strategy Layer (Parts 9-10)
-- Formalize Intent Graph review protocol in weekly/monthly commands
-- Implement Project Canvas stub generation in `gtd-project-manager`
-- Add horizon coverage check to weekly review
-
-### Phase 7: GTD Completeness (Part 11)
-- Create `.datacore/specs/trigger-lists.yaml`
-- Enhance `gtd-inbox-processor` with two-minute rule
-- Add Natural Planning to `gtd-project-manager`
-- Implement Someday/Maybe AI-assisted curation
-- Build annual review command
-
-### Phase 8: Autonomous Execution (Parts 12-13)
-- Create `failure-analyzer` agent
-- Implement failure classification and recovery protocols
-- Create `strategic-prioritizer` agent
-- Update `calculate_priority()` with intent multiplier
-
-### Phase 9: Collaboration + Integrity (Parts 14-15)
-- Implement cross-space task aggregation in `/today`
-- Extend `structural-integrity` for task-level checks
-- Add duplicate detection to inbox processor
-- Build integrity dashboard for weekly review
-
-### Phase 10: Performance Tracking (Part 17)
-- Add cost/token recording to nightshift pipeline
-- Create `nightshift/lib/metrics.py`
-- Implement performance dashboard generation
-- Add budget tracking and alerts
-
-### Phase 11: GTD MCP Tools (Parts 8, 20, 21)
-- Implement `gtd.agenda_view` tool with filter API
-- Implement `gtd.duplicate_check`, `gtd.deadline_warnings`
-- Implement `gtd.write_clock_entry`, `gtd.archive_tasks`
-- Implement `nightshift.intent_score`, `nightshift.task_metrics`
-
-### Phase 12: Skills and Inbox Pipeline (Parts 19-20)
-- Create `gtd-triage` skill (inbox classification methodology)
-- Create `intent-routing` skill (Intent Graph → focus area mapping)
-- Create `project-canvas` skill (template + OKR methodology)
-- Build inbox processing pipeline workflow
-- Enhance `gtd-inbox-processor` with triage + intent-routing skills
-- Update `/wrap-up` step 5c to route via intent graph
-
-### Phase 13: Analytics and Lifecycle (Part 21)
-- Create `user-analytics-generator` agent
-- Add analytics generation to weekly/monthly review
-- Update `/today` with DEADLINE warnings and vitals-adjusted priorities
-- Update `/tomorrow` with intent-scored queue display
-- Create `.datacore/specs/trigger-lists.yaml`
-
-### Phase 14: Future Work (Parts 16, 18)
-- Event-driven reactions: deferred to future DIP
-- Metacognitive planning: wire engram injection, implement skill gap detection
+| Part | Title | Rationale |
+|------|-------|-----------|
+| 10 | Horizons of Focus | Intent Graph covers strategic levels; middle layers (Project Canvas, OKRs) deferred |
+| 11 | GTD Completeness | Two-minute rule, Natural Planning, trigger lists — methodology edge features |
+| 14 | Task-Level Integrity | `structural-integrity` agent covers basics; full constraint checking deferred |
+| 16 | Event-Driven Reactions | Architecture stub only; requires persistent daemon |
+| 18 | Metacognitive Planning | Architecture stub; depends on DIP-0019 engram maturity |
+| - | `:INTENT_SCORE:` auto-population | Intent Graph scoring not auto-written to org tasks; review protocol not formalized |
 
 ---
 

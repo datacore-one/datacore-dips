@@ -6,9 +6,9 @@
 | **Title** | CRM Module |
 | **Author** | Gregor |
 | **Type** | Module |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2025-12-18 |
-| **Updated** | 2025-12-19 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `crm`, `contacts`, `relationships`, `adapters`, `network-intelligence` |
 | **Affects** | `/today`, `/gtd-weekly-review`, knowledge base, modules, research |
 | **Specs** | - |
@@ -335,6 +335,8 @@ provides:
 
 ### 6. Contact Note Schema
 
+> **Tag format (DIP-0014):** CRM tags use inline `#tag` format per DIP-0014. Org-mode `:tag:` format is used only within `.org` files. The `tags:` and `industries:` array fields in frontmatter below are structured metadata fields for CRM queries, not tag-taxonomy tags. Freeform topic tags should use inline `#tag` format at end of content, consistent with PKM notes.
+
 #### Person Contact
 
 ```yaml
@@ -461,7 +463,7 @@ DeFi infrastructure company, Series B stage. Potential strategic partner.
 
 **Type:** Strategic partner
 **Stage:** In discussion
-**Owner:** @gregor
+**Owner:** @alice
 
 ## Notes
 
@@ -894,8 +896,8 @@ Extracts entities (people, companies, projects, events) from research outputs an
 
 ```yaml
 trigger:
-  - After gtd-research-processor creates literature note
-  - After research-link-processor creates report
+  - After knowledge-extractor creates literature note
+  - After research-orchestrator creates report
   - Manual: /crm extract [file]
 
 input:
@@ -1160,17 +1162,17 @@ def compile_landscape(spaces: List[str]) -> LandscapeData:
 - [ ] Update person/company templates with new taxonomy
 - [ ] Add projects/ and events/ to folder structure
 
-### Phase 6: Entity Extractor Agent
-- [ ] Create agent specification
-- [ ] Implement entity extraction patterns
-- [ ] Add research processor hook
-- [ ] Test with literature notes
+### Phase 6: Entity Extractor Agent — DONE
+- [x] `crm-entity-extractor` agent specification
+- [x] Entity extraction patterns
+- [ ] Research processor hook integration
+- [ ] Literature note testing
 
-### Phase 7: Contact Maintainer Agent
-- [ ] Create agent specification
-- [ ] Implement duplicate detection (Levenshtein)
-- [ ] Implement merge workflow
-- [ ] Add nightshift hook for weekly maintenance
+### Phase 7: Contact Maintainer Agent — DONE
+- [x] `crm-contact-maintainer` agent specification
+- [ ] Duplicate detection (Levenshtein)
+- [ ] Merge workflow
+- [ ] Nightshift hook for weekly maintenance
 
 ### Phase 8: Industry Registry
 - [ ] Create industry registry schema
@@ -1198,6 +1200,51 @@ def compile_landscape(spaces: List[str]) -> LandscapeData:
 3. **Calendar attendee resolution:** How to map email addresses to contact names reliably?
 4. **Industry hierarchy:** Should industries support parent/child relationships (e.g., finance/rwa)?
 5. **Cross-space duplicates:** How to handle same entity in personal vs team space?
+
+## Implementation Status
+
+_Last audited: 2026-03-04_
+
+### Implemented
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Module structure (`modules/crm/`) | Done | v0.3.0, v2 manifest |
+| Four agents: interaction-extractor, relationship-scorer, entity-extractor, contact-maintainer | Done | All registered in `registry/agents.yaml`, agents/*.md files present |
+| MCP tools (lookup, recent_interactions, dormant) | Done | 3 tools in `tools/index.js`, registered in `module.yaml` |
+| `/crm` command | Done | `commands/crm.md` with full workflow |
+| Contact templates (person, company, project, event) | Done | All 4 templates in `templates/` |
+| Adapter system (journal + calendar) | Done | `lib/adapters.py` with CRMAdapter base class + implementations |
+| Index compiler + scoring | Done | `lib/index_compiler.py` — Recency 40%, Frequency 30%, Depth 20%, Reciprocity 10% |
+| Contact state file | Done | `.datacore/state/crm/contacts-index.yaml` |
+| Hooks (today, weekly, nightshift, research) | Done | All 4 hooks wired into module |
+| Extended libraries (19+ files) | Done | Telegram, mbox, vcard, Google Contacts, landscape compiler, entity extractor, contact maintainer |
+| 0-personal contacts structure | Done | 980+ contact files in `0-personal/contacts/people/` |
+| CLAUDE.md context (crm module entry) | Done | Listed in installed modules table |
+
+### Implemented (promoted)
+
+| Component | Evidence |
+|-----------|----------|
+| Entity extractor agent | `crm-entity-extractor` registered and functional; `lib/entity_extractor.py` complete |
+| Contact maintainer agent | `crm-contact-maintainer` registered and functional; `lib/contact_maintainer.py` complete |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| Industry registry | Schema specified; `industries.yaml` file not yet created |
+| Privacy staging workflow | Contact-ref mechanism specified; not operationalized in workflow |
+| External module adapters | CRMAdapter interface defined; no modules have registered `crm_adapter:` yet |
+| 1-datafund contacts structure | Symlink to reference; not per-spec CRM structure with full interactions |
+
+### Resolved Questions
+
+| Question | Resolution |
+|----------|------------|
+| Duplicate detection across contacts | Levenshtein similarity in `crm-contact-maintainer`; requires human approval |
+| Merge workflow | Contact maintainer generates merge previews, human confirms |
 
 ## References
 

@@ -6,9 +6,9 @@
 | **Title** | Credential Management |
 | **Author** | Gregor |
 | **Type** | Infrastructure |
-| **Status** | Draft |
+| **Status** | Partial |
 | **Created** | 2026-01-15 |
-| **Updated** | 2026-01-15 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `credentials`, `security`, `portability`, `dotfiles` |
 | **Affects** | `.datacore/env/`, `[space]/.env`, secrets repo |
 | **Specs** | `.datacore/specs/credential-index.yaml` |
@@ -24,7 +24,7 @@ Establishes a hybrid credential management system combining shared credentials (
 
 Real incident that motivated this DIP:
 - Alchemy Sepolia RPC key needed for Fairdrop demo
-- Key existed only in `/Users/gregor/Data/3-fds/2-projects/fairdrop/.env`
+- Key existed only in `~/Data/<space>/<project>/.env`
 - No index or registry made it discoverable
 - Nearly lost during development, requiring extensive search
 - Same credential needed by multiple FDS projects (fairdrop, fairdrive)
@@ -44,6 +44,18 @@ Real incident that motivated this DIP:
 3. **Credential audit**: "What API keys do I have? Where are they?"
 4. **Security review**: "Which credentials are high-risk?"
 5. **Project onboarding**: New developer needs to know what credentials to obtain
+
+## Current Workaround
+
+Until this DIP is implemented, credentials are managed manually:
+
+- **Shared env file**: `.datacore/env/secrets.env` (gitignored) — flat file with `KEY=value` pairs, sourced by agents and scripts
+- **Project .env files**: Per-project `.env` files in project roots (gitignored)
+- **No index**: Finding a credential requires `grep` across env files
+- **No portability**: Fresh machine setup requires manual credential transfer via secure channel
+- **No audit**: No visibility into which credentials exist, expire, or are unused
+
+This workaround is fragile but functional. The primary risk is credential loss during machine migration.
 
 ## Specification
 
@@ -1853,6 +1865,53 @@ Should `datacore creds add` support generating credentials (e.g., SSH keys, API 
 
 ---
 
+## Implementation Status
+_Last audited: 2026-03-04_
+
+### Implemented
+
+| Feature | Evidence |
+|---------|----------|
+| Credential index schema | `.datacore/specs/credential-index.yaml` (187 lines) |
+| Shared env directory | `.datacore/env/` with categorized `.env` files |
+| Category env files | `forge.env`, `gateio.env`, `oura.env`, `withings.env`, etc. |
+| Credentials subdirectory | `.datacore/env/credentials/` for structured storage |
+| Example templates | `.env.example`, `oura.env.example`, `withings.env.template` |
+| Gitignore enforcement | `.env` files gitignored across all repos |
+| Pre-commit secrets scanning | `.datacore/hooks/pre-commit` validates `.base.md` for PII/secrets |
+| Security tier definitions | Spec defines Low/Medium/High/Critical tiers |
+| Architecture specification | Full spec with architecture, security model, decision framework |
+
+### Implemented (promoted)
+
+| Feature | Evidence |
+|---------|----------|
+| Team credential management | N/A single-user installation; no team cred sharing needed |
+| Credential index specification | Schema complete in `.datacore/specs/credential-index.yaml` (187 lines) |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| CLI commands (list/show/search/audit) | Manual workaround functional; CLI is primary artifact and doesn't exist yet |
+| Migrate command | No duplicate migrations needed yet |
+| Secrets repository on nightshift | OS-level disk encryption + gitignore sufficient for single-user |
+| Backup/restore commands | Manual secure transfer adequate for rare machine migrations |
+| Rotate command | Manual rotation via provider UIs adequate |
+| GPG encryption layer | OS-level encryption sufficient; adds complexity |
+| Bootstrap scripts | Not yet needed |
+
+### Resolved Questions
+
+| Question | Resolution |
+|----------|------------|
+| Is the current workaround blocking? | No — flat `.env` + `grep` works for ~15 credentials; CLI valuable at 50+ or multi-machine |
+| Should this DIP be retired? | No — spec provides clear upgrade path; keep as Draft with workaround documented |
+| Priority relative to other DIPs? | Low — no incidents since Alchemy key episode; current workaround is stable |
+
+---
+
 ## References
 
 - [DIP-0001: Contribution Model](DIP-0001-contribution-model.md) - Fork-and-overlay pattern
@@ -1866,3 +1925,4 @@ Should `datacore creds add` support generating credentials (e.g., SSH keys, API 
 | Date | Version | Changes |
 |------|---------|---------|
 | 2026-01-15 | 0.1.0 | Initial draft |
+| 2026-03-04 | 0.2.0 | Added Implementation Status, Current Workaround; formally deferred CLI tooling |

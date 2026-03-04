@@ -6,9 +6,9 @@
 | **Title** | Semantic Organization |
 | **Author** | Datacore Team |
 | **Type** | Core |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2025-12-21 |
-| **Updated** | 2025-12-30 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `organization`, `files`, `structure`, `git-lfs`, `companion`, `media-index` |
 | **Affects** | `.gitattributes`, all spaces |
 | **Specs** | `datacore-specification.md` |
@@ -697,27 +697,39 @@ git lfs migrate import --include="*.mp4,*.key,*.psd"
 - Companion files should not contain sensitive content from source files
 - `.gitattributes` should be committed (not gitignored)
 
-## Implementation
+## Implementation Status
+_Last audited: 2026-03-04_
 
-### Reference Implementation
+### Implemented
 
-This branch: `dip-0015-semantic-organization`
+| Phase | Component | Status | Notes |
+|-------|-----------|--------|-------|
+| 1 | `.gitattributes` with LFS patterns | Done | 27 file type rules (video, audio, presentations, design, archives, office) |
+| 2 | Git LFS on nightshift server | Done | Server has Git LFS installed and configured |
+| 4 | Ingest agents | Done | `ingest-orchestrator` + `knowledge-extractor` + 5 sub-agents |
+| 4 | `/ingest` command | Done | Processes inbox folders with 6-phase methodology |
+| 5 | `structural-integrity` agent | Done | Audits folder structure, detects misplaced files, orphaned refs |
+| 5 | Dynamic space discovery | Done | Uses `DATACORE_ROOT` env var, no hardcoded paths |
+| 6 | CLAUDE.md documentation | Done | Structure, conventions, agents documented |
+| - | Folder structure spec | Done | Personal and team space layouts defined |
+| - | File tier system | Done | 3 tiers by AI readability |
+| - | Companion markdown pattern | Done | Schema defined, agents create companions |
+| - | Media index pattern | Done | `_media-index.md` for bulk media folders |
 
-### Rollout Plan
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
 
-1. **Phase 1**: Create `.gitattributes` with LFS patterns ✓
-2. **Phase 2**: Install Git LFS on nightshift server
-3. **Phase 3**: Migrate existing large files (if any)
-4. **Phase 4**: Create ingest agents and command
-5. **Phase 5**: Create structural-integrity agent and command
-6. **Phase 6**: Document patterns in CLAUDE.md
-7. **Phase 7**: Run pilot migration (~/Documents/Datafund)
+| Feature | Rationale |
+|---------|-----------|
+| Migrate existing large files | Operational task — no large files currently need migration |
+| Pilot migration with external contributors | Deferred to post-publication when contributors exist |
+| Companion enforcement in CI | Requires DIP-0001 GitHub Actions pipeline; manual creation sufficient |
 
-## Open Questions
+### Resolved Questions
 
-1. Should `.gitattributes` be per-space or at root level?
-2. What size threshold (if any) should trigger LFS for PDFs?
-3. Should companion files use `.companion.md` suffix instead of same name?
+1. **`.gitattributes` per-space or root?** — Root level. Single `.gitattributes` at `~/Data/` covers all spaces.
+2. **Size threshold for PDFs?** — No threshold. PDFs are AI-readable, stored in git directly regardless of size. Only non-text formats use LFS.
+3. **Companion suffix?** — Same name (e.g., `deck.key` → `deck.md`). Keeps companion co-located with source file.
 
 ## References
 
@@ -725,7 +737,7 @@ This branch: `dip-0015-semantic-organization`
 - [DIP-0002: Layered Context Pattern](./DIP-0002-layered-context-pattern.md) - Privacy layers for context files
 - [DIP-0003: Scaffolding Pattern](./DIP-0003-scaffolding-pattern.md) - Index files and navigation
 - [DIP-0009: GTD Specification](./DIP-0009-gtd-specification.md) - GTD workflow and agents
-- [DIP-0011: Module System](./DIP-0011-module-system.md) - Module architecture
+- [DIP-0011: Nightshift Module](./DIP-0011-nightshift-module.md) - Module architecture
 - [DIP-0017: Outbox & Archive Pattern](./DIP-0017-outbox-archive-pattern.md) - 4-outbox folder, archive repos
 - `datacore-specification.md` - Current structure documentation
 

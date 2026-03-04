@@ -8,11 +8,11 @@
 | **Type** | Standard |
 | **Status** | Implemented |
 | **Created** | 2025-12-01 |
-| **Updated** | 2025-12-01 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `scaffolding`, `knowledge`, `projects`, `modules` |
 | **Affects** | `datacore-org/`, `spaces/`, `projects/` |
-| **Specs** | SCAFFOLDING.md |
-| **Agents** | `space-initializer`, `scaffolding-auditor` |
+| **Specs** | SCAFFOLDING.base.md (template in `datacore-org/`) |
+| **Agents** | `create-space`, `scaffolding-auditor` |
 
 ## Summary
 
@@ -125,7 +125,7 @@ When project docs need to appear in space folders (e.g., roadmap in product trac
 ln -s ../../../2-projects/verity/ROADMAP.md verity-roadmap.md
 ```
 
-The `space-initializer` agent generates these symlinks based on scaffolding configuration.
+The `create-space` agent generates these symlinks based on scaffolding configuration.
 
 ### Contribution Workflow
 
@@ -196,7 +196,7 @@ Every project module must include:
 ...
 ```
 
-#### space-initializer Agent
+#### create-space Agent
 
 Triggers on new space creation. Actions:
 1. Copy SCAFFOLDING.base.md from datacore-org
@@ -222,7 +222,7 @@ New files in datacore-org:
 - `templates/` folder with document stubs
 
 New agents:
-- `space-initializer` - Creates space from template
+- `create-space` - Creates space from template
 - `scaffolding-auditor` - Validates completeness
 
 ## Rationale
@@ -268,7 +268,7 @@ New agents:
 3. Update DIP-0002 to reference scaffolding
 
 ### Phase 2: Agent Implementation
-1. Implement space-initializer agent
+1. Implement create-space agent
 2. Implement scaffolding-auditor agent
 3. Test with 2-datacore space
 
@@ -394,11 +394,41 @@ Start: [[Datafund-Core-Purpose]]
       → Discover: Values and principles content
 ```
 
-## Open Questions
+## Implementation Status
+_Last audited: 2026-03-04_
 
-1. Should scaffolding coverage be a space health metric?
-2. How to handle documents that span multiple categories?
-3. Should there be a "minimum viable scaffolding" for quick starts?
+### Implemented
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Document categories | Done | 10 categories defined (Identity through Metrics) |
+| `create-space` agent | Done | Scaffolds spaces with folder structure and templates |
+| `scaffolding-auditor` agent | Done | Audits scaffolding completeness, generates drafts |
+| `_index.md` pattern | Done | Index files in key folders for navigation |
+| Numbered folder convention | Done | 0-inbox through 4-outbox in all spaces |
+| Link-following discovery | Done | Agents traverse wiki-links for topic clusters |
+| DIP-0002 layered scaffolding | Done | Pattern defined; SCAFFOLDING files not yet deployed |
+| Project module structure | Done | Defined but not enforced by auditor |
+
+### Implemented (promoted from deferred)
+
+| Component | Evidence |
+|-----------|----------|
+| Space health metrics | `scaffolding-auditor` agent reports completeness scores per space |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| SCAFFOLDING.base.md deployment to datacore-org | Pattern specified; repo not yet public |
+| Multi-source synthesis enforcement | Agent guidance only; automated checking not yet needed |
+
+### Resolved Questions
+
+1. **Scaffolding coverage as health metric?** — Yes, planned for v2.0 via structural-integrity agent expansion.
+2. **Documents spanning categories?** — Primary location by dominant purpose; wiki-links for cross-references.
+3. **Minimum viable scaffolding?** — Yes: `_index.md` + `CLAUDE.base.md` + `org/inbox.org` + `org/next_actions.org`. The `create-space` agent scaffolds this minimum.
 
 ## References
 

@@ -6,9 +6,9 @@
 | **Title** | Agent Registry & Discoverability |
 | **Author** | Gregor |
 | **Type** | Standards Track |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2025-12-21 |
-| **Updated** | 2025-12-31 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `agents`, `registry`, `discovery`, `hooks`, `lifecycle`, `erc-8004` |
 | **Affects** | `.datacore/agents/`, `.datacore/commands/`, `.datacore/registry/`, `tags.yaml` |
 | **Specs** | `datacore-specification.md` |
@@ -69,7 +69,7 @@ This section helps agents understand when and how to apply this DIP.
 
 - **[DIP-0009: GTD](./DIP-0009-gtd-specification.md)** - Task routing and :AI: tag processing
 - **[DIP-0014: Tags](./DIP-0014-tag-taxonomy.md)** - Tag-based agent triggers
-- **[DIP-0004: Knowledge Database](./DIP-0004-knowledge-database.md)** - Datacortex semantic queries
+- **Datacortex module** - Semantic queries (supersedes DIP-0004)
 - **[DIP-0011: Nightshift](./DIP-0011-nightshift-module.md)** - Server-side performance aggregation
 
 ## Motivation
@@ -88,7 +88,7 @@ This section helps agents understand when and how to apply this DIP.
 
 ### Use Cases Enabled
 
-1. **Semantic Agent Discovery**: Query "find an agent that can analyze URLs" returns `gtd-research-processor`.
+1. **Semantic Agent Discovery**: Query "find an agent that can analyze URLs" returns `knowledge-extractor`.
 
 2. **Automatic Context Gathering**: Agents pre-fetch relevant knowledge via datacortex before executing.
 
@@ -103,6 +103,10 @@ This section helps agents understand when and how to apply this DIP.
 ### 1. Agent Registry Format
 
 Create `.datacore/registry/agents.yaml` as the single source of truth for agent metadata:
+
+> **Note:** The examples below use `gtd-research-processor` as a reference agent.
+> This agent has been superseded by `knowledge-extractor` per DIP-0021.
+> The examples are retained for pattern illustration; use current agent names in practice.
 
 ```yaml
 # Agent Registry v1.0.0
@@ -2039,31 +2043,55 @@ All improvements identified in the analysis are addressed:
 | Agent Evaluation | Virtuals ACP | §11.2 |
 | Version Hash Tracking | Olas Protocol | §10.2 |
 
+## Implementation Status
+_Last audited: 2026-03-04_
+
+### Implemented
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| `agents.yaml` registry | Done | 3,500+ lines, 130+ agents across core and modules |
+| `commands.yaml` registry | Done | 1,230 lines, 67 commands across 21 modules |
+| `knowledge_locations` matrix | Done | GTD, tags, privacy, agents, outbox, archives |
+| `agent-registry-auditor` agent | Done | Scans agents, validates compliance, generates entries |
+| `/audit-agents` command | Done | Triggers agent/command audits |
+| Agent Context sections | Partial | Pattern defined; not all agents upgraded |
+| Spawn relationships | Done | `spawns` and `can_be_called_by` tracked |
+| Module agent registration | Done | All 21 modules have agents registered |
+| Validation rules | Done | Required fields, source existence, circular spawn detection |
+| Source path verification | Done | All agent/command sources resolve to existing files |
+
+### Implemented (promoted)
+
+| Component | Evidence |
+|-----------|----------|
+| Registry specification completeness | 130+ agents, 67 commands, all source files verified, spawn relationships tracked |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| Hook execution engine (HookExecutor) | Design complete in §16; implementation deferred to post-launch |
+| Agent-to-agent contracts | Formal contract system between agents; direct invocation sufficient |
+| Performance metrics tracking | Needs execution logging integration |
+| Execution logging integration | Needs nightshift pipeline connection |
+| External compatibility (ERC-8004) | Future on-chain agent registry integration |
+| External compatibility (Google A2A) | Future agent interoperability protocol |
+| Multi-agent consensus protocol | Requires HookExecutor foundation |
+| Agent skill embedding | Awaits Datacortex maturity for semantic discovery |
+
+### Resolved Questions
+
+1. **All agents registered?** — Yes. 127 agents across core and modules. All source files verified.
+2. **Commands vs skills?** — Some commands are implemented as skills (e.g., trading check-position-health). Registry tracks actual source path regardless of form factor.
+3. **Hook execution model?** — Design in DIP Phases 8-9. Implementation deferred. Current agents use direct invocation.
+
 ## Open Questions
 
-1. **Embedding agent skills**: Should skills be embedded in datacortex for semantic discovery?
-
-2. **Session memory search**: Should execution outputs be embedded for future retrieval? (e.g., "What did gtd-research-processor find about tokenization?")
-
-3. **Multi-agent coordination**: How do `spawns` relationships affect knowledge sharing between parent/child agents?
-
-4. **Privacy levels**: Should registry entries have privacy classifications per DIP-0002?
-
-5. **Versioning**: How to handle breaking changes in agent capabilities?
-
-6. **Component reuse**: When should we extract common patterns into Olas-style components?
-
-7. **Hook execution timeout**: Should hooks have timeouts? What's a reasonable default?
-
-8. **Hook dependencies**: Can hooks depend on other hooks' output within the same phase?
-
-9. **Async post-hooks**: Should post-hooks run synchronously or can they be queued for background execution?
-
-10. **Hook versioning**: How to handle hook config changes when agent versions change?
-
-11. **Hook metrics**: Should hook execution time be tracked separately from agent metrics?
-
-12. **Hook failures**: If a post-hook fails, should the agent execution still be marked successful?
+1. **Hook execution timeout**: Should hooks have timeouts? What's a reasonable default?
+2. **Hook dependencies**: Can hooks depend on other hooks' output within the same phase?
+3. **Async post-hooks**: Should post-hooks run synchronously or can they be queued for background execution?
 
 ## References
 
@@ -2094,7 +2122,7 @@ All improvements identified in the analysis are addressed:
 - [DIP-0009: GTD Specification](DIP-0009-gtd-specification.md) - Agent routing and execution
 - [DIP-0014: Tag Taxonomy](DIP-0014-tag-taxonomy.md) - Tag-based agent triggers
 - [DIP-0002: Layered Context](DIP-0002-layered-context-pattern.md) - Privacy levels for registry
-- [DIP-0004: Knowledge Database](DIP-0004-knowledge-database.md) - Datacortex integration
+- Datacortex module - Semantic search integration (supersedes DIP-0004)
 - [DIP-0011: Nightshift Module](DIP-0011-nightshift-module.md) - Server-side execution and sync
 
 ### Research

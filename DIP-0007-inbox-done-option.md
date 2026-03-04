@@ -1,9 +1,17 @@
 # DIP-0007: Add DONE Option to Inbox Processing
 
-**Status:** Draft
-**Author:** AI System
-**Created:** 2025-12-04
-**Type:** Process Enhancement
+| Field | Value |
+|-------|-------|
+| **DIP** | 0007 |
+| **Title** | Add DONE Option to Inbox Processing |
+| **Author** | AI System |
+| **Type** | Process |
+| **Status** | Superseded |
+| **Created** | 2025-12-04 |
+| **Updated** | 2026-03-03 |
+| **Superseded By** | DIP-0009 Part 2 (Task Lifecycle & Terminal States) |
+
+> **Note:** This DIP has been superseded by **DIP-0009 GTD System Specification, Part 2**, which defines the complete task lifecycle including terminal states (DONE, CANCELLED). The DONE processing option is now part of the canonical GTD state machine.
 
 ## Abstract
 

@@ -6,9 +6,9 @@
 | **Title** | Search & Research Architecture |
 | **Author** | Gregor, Claude (AI-assisted) |
 | **Type** | Core |
-| **Status** | Implementation |
+| **Status** | Implemented |
 | **Created** | 2026-02-18 |
-| **Updated** | 2026-02-18 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `search`, `research`, `agents`, `ingest`, `mcp`, `architecture` |
 | **Affects** | `/search`, `/research`, `/ingest`, all research agents, datacortex module, research module |
 | **Specs** | DIP-0004, DIP-0015, DIP-0016 |
@@ -939,45 +939,49 @@ Each MCP server should implement rate limiting to prevent accidental cost spikes
 
 ### Reference Implementation
 
-TBD — branch `dip-0021-search-research`
+Implemented on `main`. Key files:
+- `.datacore/registry/sources.yaml` — source registry (6 sources)
+- `.datacore/agents/knowledge-extractor.md` — coordinator agent
+- `.datacore/agents/research-orchestrator.md` — research pipeline
+- `.datacore/commands/research.md` — `/research` command
 
 ### Rollout Plan
 
-**Phase 1: Foundation (Week 1)**
-- Set up MCP servers (Perplexity first, then Exa, Jina)
-- Store API keys in `.datacore/env/`
-- Create `sources.yaml` registry
-- Verify tools are accessible from Claude Code
+**Phase 1: Foundation — DONE**
+- [x] Set up MCP servers (Perplexity, Exa, Jina, Google Scholar, Gemini)
+- [x] Store API keys in `.datacore/env/`
+- [x] Create `sources.yaml` registry (6 sources registered)
+- [x] Verify tools are accessible from Claude Code
 
-**Phase 2: Search Upgrade (Week 2)**
-- Upgrade `/search` command to fan out to Datacortex + Perplexity
-- Implement latency-based source selection
-- Test graceful degradation when Perplexity unavailable
+**Phase 2: Search Upgrade — DONE**
+- [x] Upgrade `/search` command to fan out to Datacortex + Perplexity
+- [x] Implement latency-based source selection
+- [x] Test graceful degradation when source unavailable
 
-**Phase 3: Knowledge Extractor (Week 3)**
-- Create `knowledge-extractor` coordinator agent
-- Create sub-agents: `url-fetcher`, `pdf-extractor`, `conversation-parser`, `file-reader`
-- Test with URLs, files, PDFs, conversations
-- Verify output parity with existing agents
+**Phase 3: Knowledge Extractor — DONE**
+- [x] Create `knowledge-extractor` coordinator agent
+- [x] Create sub-agents: `url-fetcher`, `pdf-extractor`, `conversation-parser`, `file-reader`, `youtube-transcriber`, `docx-reader`
+- [x] Test with URLs, files, PDFs, conversations
+- [x] Verify output parity with deprecated agents
 
-**Phase 4: Research Command (Week 4)**
-- Create `/research` command and `research-orchestrator`
-- Wire discovery phase (Exa, Scholar, Perplexity)
-- Implement deduplication and convergence tracking
-- Test interactive and nightshift modes
-- Define research output format
+**Phase 4: Research Command — DONE**
+- [x] Create `/research` command and `research-orchestrator`
+- [x] Wire discovery phase (Exa, Scholar, Perplexity)
+- [x] Implement deduplication and convergence tracking
+- [x] Test interactive and nightshift modes
+- [x] Define research output format
 
-**Phase 5: Synthesis & Consolidation (Week 5)**
-- Create `research-synthesizer`, rename `podcast-creator`, `ingest-orchestrator`
-- Add Gemini integration (opt-in)
-- Wire overnight pipeline to new agents (daily news + topical workflows)
-- Add aliases for deprecated agent names
+**Phase 5: Synthesis & Consolidation — DONE**
+- [x] Create `research-synthesizer`, `podcast-creator`, `ingest-orchestrator`
+- [x] Add Gemini integration (opt-in)
+- [x] Wire overnight pipeline to new agents (daily news + topical workflows)
+- [x] Add `[DEPRECATED]` markers on old agent definitions
 
-**Phase 6: Cleanup (Week 6)**
-- Update registry entries (agents.yaml, commands.yaml, sources.yaml)
-- Update CLAUDE.md documentation
-- Remove deprecated agent files (keep aliases)
-- Update DIP-0004, DIP-0009, DIP-0011, DIP-0015, DIP-0016 cross-references
+**Phase 6: Cleanup — PARTIAL**
+- [x] Update registry entries (agents.yaml, commands.yaml, sources.yaml)
+- [x] Update CLAUDE.md documentation
+- [ ] Remove deprecated agent files (keep aliases) — deprecated agents still referenced in some contexts
+- [x] Update cross-references in related DIPs
 
 ## Open Questions
 
@@ -1067,6 +1071,54 @@ The trading module manages morning routines, trade validation, evening reviews, 
 ### A.3 Key Insight
 
 Both workflows reveal the same pattern: existing Datacore modules already implicitly operate across all three layers but without the formal architecture to connect them. The three-layer model turns ad-hoc information flow into a systematic knowledge pipeline where every interaction — email, trade, research — contributes to the same growing knowledge base.
+
+## Implementation Status
+_Last audited: 2026-03-04_
+
+### Implemented
+
+| Component | Location | Notes |
+|-----------|----------|-------|
+| Source registry | `.datacore/registry/sources.yaml` | 6 sources: datacortex, perplexity, exa, google-scholar, jina-reader, gemini |
+| `knowledge-extractor` coordinator | `.datacore/agents/knowledge-extractor.md` | Routes to sub-agents by content type |
+| `url-fetcher` sub-agent | `.datacore/agents/url-fetcher.md` | Jina/WebFetch/archive.org fallback chain |
+| `pdf-extractor` sub-agent | `.datacore/agents/pdf-extractor.md` | PDF text and structure extraction |
+| `conversation-parser` sub-agent | `.datacore/agents/conversation-parser.md` | Speaker attribution, topic clustering |
+| `file-reader` sub-agent | `.datacore/agents/file-reader.md` | MIME detection, companion files |
+| `youtube-transcriber` sub-agent | `.datacore/agents/youtube-transcriber.md` | YouTube transcript extraction |
+| `docx-reader` sub-agent | `.datacore/agents/docx-reader.md` | DOCX to markdown conversion |
+| `research-orchestrator` | `.datacore/agents/research-orchestrator.md` | Discovery-gather-process-synthesize pipeline |
+| `research-synthesizer` | `.datacore/agents/research-synthesizer.md` | Multi-source synthesis with convergence analysis |
+| `podcast-creator` | `.datacore/agents/podcast-creator.md` | NotebookLM audio overview generation |
+| `ingest-orchestrator` | `.datacore/agents/ingest-orchestrator.md` | File/folder ingestion coordinator |
+| `/research` command | `.datacore/commands/research.md` | Interactive and nightshift modes |
+| Research module | `modules/research/module.yaml` (v0.2.0) | Tools, skills, agents configured |
+| Deprecated agent markers | `.datacore/registry/agents.yaml` | 8 deprecated entries with `superseded_by` |
+| Sources MCP tool | `modules/research/tools/index.js` | Fixed YAML parser for mapping format |
+| Learning integration | `research-orchestrator.md` | Pre-research inject + post-research learn hooks |
+
+### Implemented (promoted)
+
+| Component | Evidence |
+|-----------|----------|
+| Unified search via `/research` | `/research` provides unified local+external search; demoted `/search` is covered |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| Deterministic dedup utility | Prompt-driven dedup works; `lib/dedup.py` for reliability deferred |
+| Google Scholar source activation | `enabled: false` in sources.yaml; requires `serpapi` pip package |
+| Deprecated agent file removal | Files still present; aliases work as forward references |
+| Domain-specific source routing | `good_for` field advisory only; all sources queried |
+| Cost monitoring / rate limits | Per-source budget caps not yet in schema |
+
+### Resolved Questions
+
+1. **Coordinator vs monolith?** Coordinator pattern — each content type needs specialized tools; sub-agents use haiku, coordinator uses sonnet.
+2. **Why separate research and ingest?** Research has discovery + multi-source synthesis; ingest processes individual items.
+3. **Gemini opt-in?** Yes — sends full content to Google; `opt_in: true` in sources.yaml; disabled by default.
 
 ## References
 

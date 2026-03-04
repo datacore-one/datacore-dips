@@ -4,11 +4,12 @@
 |-------|-------|
 | **DIP** | 0010 |
 | **Title** | External Sync Architecture |
-| **Status** | Accepted |
+| **Status** | Implemented |
 | **Created** | 2025-12-04 |
+| **Updated** | 2026-03-04 |
 | **Author** | Gregor |
 | **Affects** | All GTD agents, /today, /wrap-up, org files, GitHub Issues, Google Calendar |
-| **Related DIPs** | DIP-0004 (Knowledge Database), DIP-0005 (Onboarding), DIP-0009 (GTD Specification) |
+| **Related DIPs** | DIP-0009 (GTD Specification), DIP-0001 (Contribution — PR sync), DIP-0011 (Nightshift — PR review routing) |
 
 ## Abstract
 
@@ -57,6 +58,8 @@ Org-mode is the **best format for AI agents** to read and manipulate tasks. Exte
 4. **Bidirectional sync** - Changes flow both ways automatically
 5. **Single source of truth** - Org-mode is authoritative, external tools are mirrors
 6. **Graceful degradation** - System works if external tool is unavailable
+
+> **Cross-reference (DIP-0009):** Org-mode files are the source of truth for agent-managed task state. GitHub Issues are the source of truth for human discussion and collaboration. On conflict: org-mode wins for task state transitions, GitHub wins for discussion context.
 
 ## Specification
 
@@ -884,6 +887,42 @@ The following questions were resolved during review:
 | Polling interval | 10 minutes | Balance between responsiveness and API rate limits. Webhooks provide real-time for critical events. |
 | Bulk operations | User-initiated only | Safety first. Bulk close/update should require explicit user action. Can automate later with safeguards. |
 | Multiple external tools | Supported in architecture, only GitHub implemented now | Design for flexibility, implement what's needed. `:EXTERNAL_ID:` format (`github:owner/repo#42`) supports multiple tools. |
+
+## Implementation Status
+
+_Last audited: 2026-03-04_
+
+### Implemented
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| Sync engine core | `.datacore/lib/sync/engine.py` | Done — Orchestration, pull/push flow, conflict detection |
+| GitHub adapter | `.datacore/lib/sync/adapters/github.py` | Done — Full CRUD via `gh` CLI, task linking, duplicate detection |
+| Google Calendar adapter | `.datacore/lib/sync/adapters/google_calendar.py` | Done — OAuth, full sync, timestamp support |
+| Task routing | `.datacore/lib/sync/router.py` | Done — Rule-based routing to org files, conflict handling |
+| Sync history | `.datacore/lib/sync/history.py` | Done — SQLite audit log |
+| Conflict resolution | `.datacore/lib/sync/conflict.py` | Done — Four strategies: `org_wins`, `external_wins`, `merge`, `ask` |
+| Base adapter interface | `.datacore/lib/sync/adapters/base.py` | Done |
+| `calendar.org` integration | `0-personal/org/calendar.org` | Done — Synced entries with external IDs |
+| Tag validator integration | `.datacore/lib/tag_validator.py` | Done — Registry validation and auto-fix |
+| Test suite | `.datacore/lib/sync/tests/` | Done — 5 test files (engine, github, calendar, router, conflict, history) |
+| Settings config | `.datacore/settings.yaml` | Done — `sync` section configured |
+
+### Implemented (promoted from deferred)
+
+| Component | Evidence |
+|-----------|----------|
+| `/today` and `/wrap-up` sync wiring | `/today` reads `calendar.org`; `/wrap-up` triggers sync push |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| Webhook receiver | Polling via cron sufficient for current needs |
+| Asana adapter | No current usage; architecture supports adding adapters |
+| Linear adapter | No current usage; architecture supports adding adapters |
+| Mobile app integration | Out of v1.0 scope |
 
 ## References
 

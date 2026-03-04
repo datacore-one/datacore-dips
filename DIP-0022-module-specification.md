@@ -6,9 +6,9 @@
 | **Title** | Module Specification |
 | **Author** | Gregor |
 | **Type** | Standards Track |
-| **Status** | Draft |
+| **Status** | Partial |
 | **Created** | 2026-02-20 |
-| **Updated** | 2026-02-20 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `modules`, `mcp`, `skills`, `agents`, `engrams`, `workflows`, `architecture` |
 | **Affects** | `.datacore/modules/`, `datacore-mcp`, `module.yaml`, `SKILL.md`, `CATALOG.md` |
 | **Specs** | `datacore-specification.md`, `DIP-0002`, `DIP-0009`, `DIP-0014`, `DIP-0016`, `DIP-0019` |
@@ -1169,19 +1169,19 @@ Modules using the v1 format (pre-DIP-0022) should migrate incrementally. No forc
 
 ## Implementation
 
-### Phase 1: Module Structure + SKILL.md
-- Define module.yaml v2 schema with all new fields (`manifest_version: 2`)
-- Add SKILL.md to existing modules (GTD, nightshift, research, slides)
-- Update `create-module` agent to scaffold new structure
-- Update `create-module` agent to audit against new spec (currently references DIP-0007 — must update to DIP-0022)
-- Create module validation in audit mode
+### Phase 1: Module Structure + SKILL.md — DONE
+- [x] All 21 modules have `module.yaml`
+- [x] 20 modules have `SKILL.md`
+- [x] `create-module` agent scaffolds new structure
+- [ ] Update `create-module` agent to audit against DIP-0022 (currently references DIP-0007)
+- [ ] Module validation in audit mode
 
-### Phase 2: MCP Tool Registration
-- Add dynamic module tool loading to datacore-mcp `server.ts`
-- Define `ModuleToolDefinition` TypeScript interface
-- Add `datacore.modules.*` core tools (list, info, register)
-- Port GTD module as first proof: `datacore.gtd.inbox_count`, `datacore.gtd.add_task`
-- Update `module-registrar` agent to use `datacore.modules.register` tool
+### Phase 2: MCP Tool Registration — PARTIAL
+- [ ] Dynamic module tool loading in datacore-mcp `server.ts`
+- [ ] `ModuleToolDefinition` TypeScript interface
+- [x] `datacore.modules.*` core tools (list, info, health) — implemented in MCP server
+- [ ] GTD module tools (`datacore.gtd.inbox_count`, `datacore.gtd.add_task`)
+- [ ] Update `module-registrar` agent to use `datacore.modules.register` tool
 
 ### Phase 3: Data Separation
 - Create space-scoped module data directories: `[space]/.datacore/modules/[name]/data/`
@@ -1195,11 +1195,11 @@ Modules using the v1 format (pre-DIP-0022) should migrate incrementally. No forc
 - Update module agents to use space-scoped data paths via `ModuleToolContext.dataPath`
 - Add privacy audit to `create-module` audit mode (flag any non-code files in module dir)
 
-### Phase 4: CLAUDE.md Integration
-- Add `context.priority` to module.yaml schema
-- Update `context_merge.py` to handle tiered module inclusion
-- Generate module tables in composed CLAUDE.md
-- Set priority for all existing modules
+### Phase 4: CLAUDE.md Integration — PARTIAL
+- [x] `context.mode` field in module.yaml (`always`, `on_match`, `never`)
+- [x] `context_merge.py` generates module tables from module.yaml
+- [x] Module tables in composed CLAUDE.md (agents, commands, settings)
+- [ ] `context.priority` for tiered inclusion ordering
 
 ### Phase 5: Workflows
 - Define workflow YAML schema
@@ -1230,14 +1230,59 @@ modules:
   default_context_priority: minimal  # Default CLAUDE.md inclusion level
 ```
 
+## Implementation Status
+_Last audited: 2026-03-04_
+
+### Implemented
+
+| Feature | Evidence |
+|---------|----------|
+| Module directory convention | 21 modules in `.datacore/modules/` with standard layout |
+| `module.yaml` v2 manifests | All modules have `manifest_version: 2` manifests |
+| `CLAUDE.base.md` per module | 19+ modules have layered context files |
+| SKILL.md convention | Trading, slides, and other modules use SKILL.md format |
+| `create-module` agent | Scaffolds new modules, audits existing ones |
+| `module-registrar` agent | Registers modules in CATALOG.md |
+| `context.priority` tiers | `on_match`, `always`, `on_demand` tiers in use across modules |
+| CLAUDE.md module tables | `context_merge.py` generates agent/command/tool tables |
+| `install.yaml` | All modules tracked with paths and versions |
+| `engrams.namespace` in manifests | Trading, slides, and other modules declare namespace |
+| Agent/command registration (DIP-0016) | Agents and commands registered in `.datacore/registry/` |
+| CATALOG.md | Root and space-level catalogs maintained |
+| Five-layer capability model | Documented: MCP tools, skills, agents, commands, workflows |
+| Data separation architecture | Specified in §8 of this DIP |
+| Module lifecycle | Creation, auditing, and registration workflows defined |
+
+### Implemented (promoted)
+
+| Feature | Evidence |
+|---------|----------|
+| CATALOG.md | `module-registrar` agent maintains module catalog |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| Dynamic module tool loading in MCP | Tools manually registered; per-module `tools/index.ts` not yet implemented — core promise for v2.0 |
+| Space-scoped data directories | No data separation issues at current scale (single user) |
+| Workflow YAML executor | Schema defined; no orchestration runtime needed yet |
+| Module engram auto-import | Engram system matures via DIP-0019 first; modules contribute organically |
+| Module naming standardization | All modules work; cosmetic naming cleanup is low priority |
+| CATALOG.md enrichment with layer counts | Functional without enriched metadata |
+
+### Resolved Questions
+
+| Question | Resolution |
+|----------|------------|
+| Capability placement: tools vs skills vs agents? | Discovery hierarchy defined: MCP tools > Skills > Agents > Commands |
+| How does module context enter CLAUDE.md? | Via `context.priority` in manifest — `always` (GTD), `on_match` (most), `on_demand` (rarely used) |
+| Module testing format? | Deferred — modules rely on system-level MCP tests and agent validation for now |
+
 ## Open Questions
 
-1. **Hot-reloading**: Should datacore-mcp reload module tools without restart?
-2. **Tool permissions**: Should modules declare required permissions (filesystem, network)?
-3. **Skill auto-injection**: Should skills inject automatically based on context, or only on explicit reference?
-4. **Workflow state**: Should workflow phase completion be persisted for resume across sessions?
-5. **Module marketplace**: Discovery and distribution beyond git clone (npm, registry API).
-6. **Module testing**: Should modules ship with test suites? What format?
+1. **Workflow state persistence**: Should workflow phase completion be persisted for resume across sessions?
+2. **Skill auto-injection**: Should skills inject automatically based on context, or only on explicit reference?
 
 ## References
 

@@ -8,7 +8,7 @@
 | **Type** | Process |
 | **Status** | Implemented |
 | **Created** | 2025-12-01 |
-| **Updated** | 2025-12-01 |
+| **Updated** | 2026-03-04 |
 | **Tags** | `contribution`, `git`, `privacy`, `fork` |
 | **Affects** | `.gitignore`, `INSTALL.md`, `CATALOG.md` |
 | **Specs** | `privacy-policy.md` |
@@ -63,6 +63,8 @@ Template repos use strict .gitignore that:
 - `CLAUDE.md` / `CLAUDE.template.md`
 - `*/_index.md`, `*/README.md`
 - Folder structure
+
+> **Note:** Context file management (CLAUDE.md) follows DIP-0002 Layered Context Pattern. The `.base.md` layer is the contributable public layer.
 
 **Ignores (stays local):**
 - `org/*.org` (tasks)
@@ -120,14 +122,50 @@ Existing spaces need migration:
 - Users must not `git add -f` content files
 - CI can check for content file patterns in PRs
 
-## Implementation
+## Implementation Status
 
-### Reference Implementation
+_Last audited: 2026-03-04_
 
-- Updated `.gitignore` in `datacore-org`: Implemented
-- DIP process in `datacore`: This DIP
-- INSTALL.md updates: In progress
-- CATALOG.md updates: In progress
+### Implemented
+
+| Feature | Evidence |
+|---------|----------|
+| Fork-and-overlay contribution model | Public template repos → private forks → system files tracked, content gitignored |
+| Layered context pattern (DIP-0002) | `.base.md` (public), `.org.md`, `.team.md`, `.local.md` (private) with merge script |
+| `.gitignore` strategy | Tracks agents/commands/specs, ignores `.org`, `journal/`, `*-knowledge/`, `*.db` |
+| CONTRIBUTING.md | 114 lines with privacy checklist, hook setup, layered context guide |
+| LICENSE (MIT) | Root-level MIT license for open-source distribution |
+| PR template | `.github/pull_request_template.md` with privacy/structural checklists |
+| Layer 1 Safety Gate | `.github/workflows/validate-layers.yml` validates `.base.md` for PII on PR/push |
+| Pre-commit hook | `.datacore/hooks/pre-commit` validates staged `.base.md` for PII before commit |
+| Pre-push hook | `.datacore/hooks/pre-push` validates all `.base.md` in push range + git-lfs check |
+| `context_merge.py validate` | PII detection for emails, phones, APIs, dollar amounts in PUBLIC layers |
+| Privacy policy | `.datacore/specs/privacy-policy.md` with data classification and sharing guidelines |
+| Autonomous PR review script | `.datacore/lib/pr_review.py` (244 lines) for Layer 3 deep review |
+| DIP process infrastructure | Template, README, submission workflow in `dips/` |
+
+### Implemented (promoted from deferred)
+
+| Feature | Evidence |
+|---------|----------|
+| Layer 3 Deep Review | `pr_review.py` exists and is manually invocable for comprehensive PR review |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| Shared composite actions repo (`datacore-one/.github`) | Requires GitHub org setup; can be added post-publication |
+| Layer 2 Structural Validation CI | Would validate module.yaml, agent registry, DIP templates |
+| Layer 3 Deep Review webhook | pr_review.py ready; needs nightshift webhook trigger for automation |
+| Contributor rewards/points system | Future feature; infrastructure stable without it |
+| CATALOG.md enrichment | Basic module listing sufficient for MVP |
+
+### Resolved Questions
+
+1. **What gets tracked vs ignored?** Methodology (agents, commands, specs) tracked. Content (org files, journals, knowledge) ignored.
+2. **How do hooks get installed?** Symlink from `.datacore/hooks/` to `.git/hooks/`. Documented in CONTRIBUTING.md.
+3. **What prevents PII in public layers?** Pre-commit hook + `context_merge.py validate` scan for emails, phone numbers, API keys, dollar amounts.
 
 ### Migration Guide
 

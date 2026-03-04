@@ -1,9 +1,17 @@
 # DIP-0006: Open Questions Management System
 
-**Status:** Draft
-**Author:** AI System
-**Created:** 2025-12-03
-**Type:** Process Enhancement
+| Field | Value |
+|-------|-------|
+| **DIP** | 0006 |
+| **Title** | Open Questions Management System |
+| **Author** | AI System |
+| **Type** | Process |
+| **Status** | Superseded |
+| **Created** | 2025-12-03 |
+| **Updated** | 2026-03-03 |
+| **Superseded By** | DIP-0013 (Meetings Module) |
+
+> **Note:** This DIP has been superseded and merged into **DIP-0013 Meetings Module, Section 4** (Open Questions Management). Question collection patterns, `/my-questions`, `/add-question`, and preparation workflows are now specified in DIP-0013. The question-researcher agent handles pre-research.
 
 ## Abstract
 
@@ -97,7 +105,7 @@ A structured system would provide:
 ```bash
 # Examples
 /meeting-agenda verity
-/meeting-agenda datacore --attendees @crt,@gregor
+/meeting-agenda datacore --attendees @bob,@alice
 /meeting-agenda --all
 ```
 
@@ -139,7 +147,7 @@ A structured system would provide:
 | Command | Purpose | Example |
 |---------|---------|---------|
 | `/my-questions [project]` | Personal preparation view | `/my-questions verity` |
-| `/meeting-agenda [project]` | Generate meeting agenda | `/meeting-agenda verity --attendees @crt,@gregor` |
+| `/meeting-agenda [project]` | Generate meeting agenda | `/meeting-agenda verity --attendees @bob,@alice` |
 | `/close-questions [issue]` | Process meeting outcomes | `/close-questions 123` |
 | `/add-question [project]` | Quick question capture | `/add-question verity "Budget for Q1?"` |
 
@@ -148,7 +156,7 @@ A structured system would provide:
 **Monday - Questions Arise**:
 ```markdown
 ## Open Questions
-- Should we implement rate limiting on the API? (@gregor @crt)
+- Should we implement rate limiting on the API? (@alice @bob)
 ```
 
 **Wednesday - Individual Prep**:
@@ -159,7 +167,7 @@ A structured system would provide:
 
 **Thursday - Agenda Creation**:
 ```bash
-/meeting-agenda verity --attendees @crt,@gregor,@tadej
+/meeting-agenda verity --attendees @bob,@alice,@carol
 # Creates structured GitHub issue with preparation status
 ```
 

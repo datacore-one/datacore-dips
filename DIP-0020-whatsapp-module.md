@@ -1,9 +1,15 @@
 # DIP-0020: WhatsApp Module
 
-> **Status**: Draft
-> **Author**: Gregor
-> **Created**: 2026-01-28
-> **Related**: DIP-0010 (External Sync), DIP-0012 (CRM Module)
+| Field | Value |
+|-------|-------|
+| **DIP** | 0020 |
+| **Title** | WhatsApp Module |
+| **Author** | Gregor |
+| **Type** | Module |
+| **Status** | Partial |
+| **Created** | 2026-01-28 |
+| **Updated** | 2026-03-04 |
+| **Related** | DIP-0010 (External Sync), DIP-0012 (CRM Module) |
 
 ## Summary
 
@@ -424,6 +430,39 @@ Bot: ✓ Captured to inbox
 - **DIP-0010**: External Sync Architecture - adapter pattern
 - **DIP-0012**: CRM Module - integration point
 - **DIP-0011**: Nightshift - notification hooks
+
+## Implementation Status
+_Last audited: 2026-03-04_
+
+### Implemented
+
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| WhatsApp module | Done | `modules/whatsapp/module.yaml` (v0.1.0) |
+| `whatsapp-import` agent | Done | `.datacore/agents/whatsapp-import.md` — imports from .txt exports |
+| `whatsapp-sync` agent | Done | `.datacore/agents/whatsapp-sync.md` — syncs via WAHA API |
+| `/whatsapp` command | Done | Import exports, sync contacts, manage integration |
+| CRM integration | Done | Contacts and interactions feed into CRM module |
+
+### Implemented (promoted)
+
+| Feature | Evidence |
+|---------|----------|
+| Group chat handling | Export parser handles group chats; contacts extracted from group messages |
+
+### Future Work
+_Items below are outside v1.0 scope. They remain specified for future implementation._
+
+| Feature | Rationale |
+|---------|-----------|
+| WAHA gateway daemon | On-demand sync sufficient; daemon adds complexity — Phase 2 |
+| Bidirectional messaging | Read-only import adequate for CRM use case |
+| Proactive notifications | Requires gateway; deferred until gateway decision |
+| Voice message transcription | Specialized tooling needed; text messages cover most value |
+
+### Resolved Questions
+
+_No resolved questions._
 
 ## Open Questions
 

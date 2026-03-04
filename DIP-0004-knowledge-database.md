@@ -4,10 +4,29 @@
 |-------|-------|
 | **DIP** | 0004 |
 | **Title** | Knowledge Database |
-| **Status** | Implemented |
+| **Status** | Superseded |
 | **Created** | 2025-12-02 |
+| **Superseded** | 2026-03-03 |
 | **Author** | Claude (AI-assisted) |
 | **Affects** | All agents, /today, /wrap-up, /tomorrow, /diagnostic |
+| **Superseded By** | Datacortex module (indexing/search), DIP-0019 (learning), DIP-0009 (GTD queries) |
+
+> **Note:** This DIP has been superseded. The monolithic SQLite knowledge database was replaced by targeted systems:
+>
+> **Fully absorbed:**
+> - `learning_entries` table → DIP-0019 `engrams.yaml` (engram-based learning)
+> - `files`, `files_fts`, `links`, `tags`, `terms` tables → Datacortex module (`zettel_db.py` with SQLite + FTS5)
+> - Core principle ("files remain source of truth, database is derived index") → Datacortex and DIP-0019 both follow this
+> - Rebuild guarantee (Section 9) → `zettel_db.py rebuild` implements this
+>
+> **Partially absorbed (reference for future implementation):**
+> - Section 5.1 Agent Query Patterns → Pattern is sound but agents still use file parsing. Future: expand GTD MCP tools or Datacortex
+> - Section 5.3 Query Library → 4 GTD MCP tools exist (`inbox_count`, `add_task`, `list_next_actions`, `complete_task`) but lack: category filtering, project status queries, temporal analytics, similar-notes-by-terms
+> - Section 3.2 GTD tables (`tasks`, `projects`, `inbox_entries`, `habits`) → Schema exists in `zettel_db.py` but no MCP query surface for structured GTD queries
+> - Section 7 Diagnostic Integration → Health checks and coverage metrics not yet implemented. Candidate for `structural-integrity` agent or `/diagnostic` command
+> - Section 4 Bidirectional Sync Protocol → Write-back engine not implemented. Agents still modify org files directly
+>
+> Sections 5.1, 5.3, and 7 remain as reference specifications for future GTD tooling expansion.
 
 ## Abstract
 
