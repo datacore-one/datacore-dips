@@ -7,7 +7,7 @@
 | **Status** | Implemented |
 | **Created** | 2025-12-04 |
 | **Updated** | 2026-03-04 |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Affects** | All GTD agents, /today, /wrap-up, org files, GitHub Issues, Google Calendar |
 | **Related DIPs** | DIP-0009 (GTD Specification), DIP-0001 (Contribution — PR sync), DIP-0011 (Nightshift — PR review routing) |
 
@@ -362,7 +362,7 @@ EXTERNAL CHANGE DETECTED
 3. APPLY
    ├── Update org-mode task properties
    ├── Update :SYNC_UPDATED: timestamp
-   ├── Write to file (via DIP-0004 write-back engine)
+   ├── Write to file (via Datacortex write-back)
    └── Log change to sync_history table
 
 4. NOTIFY (optional)
@@ -926,8 +926,8 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 
 ## References
 
-- DIP-0004: Knowledge Database (provides write-back infrastructure)
-- DIP-0005: GitHub-Based Onboarding (first use case)
+- DIP-0004: Knowledge Database (superseded — write-back infrastructure now in Datacortex module)
+- DIP-0005: Installation & Upgrade (first use case)
 - DIP-0009: GTD Specification (uses tag registry from this DIP)
 - `.datacore/specs/datacore-specification.md` - Task Management section
 - `.datacore/datacore-docs/org-mode-conventions.md`

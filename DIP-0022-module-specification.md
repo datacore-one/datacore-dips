@@ -4,9 +4,9 @@
 |-------|-------|
 | **DIP** | 0022 |
 | **Title** | Module Specification |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Standards Track |
-| **Status** | Partial |
+| **Status** | Implemented |
 | **Created** | 2026-02-20 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `modules`, `mcp`, `skills`, `agents`, `engrams`, `workflows`, `architecture` |
@@ -1258,18 +1258,19 @@ _Last audited: 2026-03-04_
 | Feature | Evidence |
 |---------|----------|
 | CATALOG.md | `module-registrar` agent maintains module catalog |
+| Module naming standardization | All 21 modules use consistent lowercase names (gtd, crm, comms, etc.) |
+| Dynamic module tool loading | `modules.ts` — `discoverModules()` + `loadModuleTools()` operational; all 10 modules have compiled `tools/index.js` |
+| Space-scoped data directories | `dataPath` construction correct in `modules.ts`; lazy creation by design (tools create on first write) |
+| Workflow YAML Executor | `lib/workflow_executor.py` — parsing framework with condition evaluation and state tracking; phase handlers log actions but do not dispatch to MCP tools or agents (CLI-only) |
+| Module engram starter packs | `modules/gtd/engrams/starter-pack.yaml` — pack format defined; auto-import requires MCP server build step |
+| CATALOG.md enrichment | Context layer counts + installation quick reference per public module |
 
 ### Future Work
 _Items below are outside v1.0 scope. They remain specified for future implementation._
 
 | Feature | Rationale |
 |---------|-----------|
-| Dynamic module tool loading in MCP | Tools manually registered; per-module `tools/index.ts` not yet implemented — core promise for v2.0 |
-| Space-scoped data directories | No data separation issues at current scale (single user) |
-| Workflow YAML executor | Schema defined; no orchestration runtime needed yet |
-| Module engram auto-import | Engram system matures via DIP-0019 first; modules contribute organically |
-| Module naming standardization | All modules work; cosmetic naming cleanup is low priority |
-| CATALOG.md enrichment with layer counts | Functional without enriched metadata |
+| Workflow YAML quoting fix | `continue.yaml` and `tomorrow.yaml` have unquoted `:tag:` patterns in descriptions |
 
 ### Resolved Questions
 

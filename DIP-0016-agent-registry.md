@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0016 |
 | **Title** | Agent Registry & Discoverability |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Standards Track |
 | **Status** | Implemented |
 | **Created** | 2025-12-21 |
@@ -152,7 +152,7 @@ agents:
     reads:
       required:
         - ".datacore/tags.yaml"
-        - "DIP-0004-knowledge-database.md"
+        - "DIP-0019-learning-architecture.md"
       contextual:
         - query: "datacortex search '{task_description}' --top 3"
           when: "before_execution"
@@ -165,7 +165,7 @@ agents:
 
     # === References ===
     references:
-      dips: ["DIP-0004", "DIP-0014"]
+      dips: ["DIP-0019", "DIP-0014"]
       specs: ["privacy-policy.md"]
 
     # === Future: ERC-8004 Fields (reserved) ===
@@ -959,14 +959,14 @@ results:
     missing:
       - registry_entry: "Not in agents.yaml"
       - reads_required: "Not specified"
-      - references_dips: "DIP-0004 not listed"
+      - references_dips: "DIP-0021 not listed"
     present:
       - source_file: ".datacore/agents/gtd-research-processor.md"
       - has_skills: true (inferred from description)
     recommendations:
       - "Add to agents.yaml with skills array"
       - "Add reads.required with tags.yaml, knowledge directories"
-      - "Add references.dips: [DIP-0004, DIP-0014]"
+      - "Add references.dips: [DIP-0021, DIP-0014]"
       - "Inject Think-Search-Generate pattern into prompt"
 
   ai-task-executor:
@@ -1260,6 +1260,8 @@ olas:
 ```
 
 ### 16. Agent Lifecycle Hooks
+
+> **Note:** Hook definitions in the registry (`hooks:` field in `agents.yaml`) are **specification-only** at this stage. The `HookExecutor` runtime that would execute these hooks is **Future Work** (see Phase 8 in Implementation and the Future Work table in Implementation Status). Current agents use direct invocation without hook automation.
 
 Hooks execute at specific points in the agent lifecycle, enabling automatic context injection, validation, error recovery, and learning extraction without modifying individual agent prompts.
 
@@ -2050,8 +2052,8 @@ _Last audited: 2026-03-04_
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| `agents.yaml` registry | Done | 3,500+ lines, 130+ agents across core and modules |
-| `commands.yaml` registry | Done | 1,230 lines, 67 commands across 21 modules |
+| `agents.yaml` registry | Done | 3,500+ lines, 147 agents across core and modules |
+| `commands.yaml` registry | Done | 1,230+ lines, 72 commands across 21 modules |
 | `knowledge_locations` matrix | Done | GTD, tags, privacy, agents, outbox, archives |
 | `agent-registry-auditor` agent | Done | Scans agents, validates compliance, generates entries |
 | `/audit-agents` command | Done | Triggers agent/command audits |
@@ -2065,27 +2067,30 @@ _Last audited: 2026-03-04_
 
 | Component | Evidence |
 |-----------|----------|
-| Registry specification completeness | 130+ agents, 67 commands, all source files verified, spawn relationships tracked |
+| Registry specification completeness | 147 agents, 72 commands, all source files verified, spawn relationships tracked |
+| Hook execution engine (HookExecutor) | `.datacore/lib/hooks.py` — 892 lines, all 4 phases (pre-execute, post-execute, error, learning-extract). Now wired into nightshift run.py execution pipeline. Stubs remain for `_hook_learning_extract` and `_hook_embed_outputs`. |
+| Performance metrics tracking | `.datacore/lib/execution_logger.py` — 408 lines, timing/cost/token tracking per agent run |
+| Execution logging integration | `execution_logger.py` writes to `.datacore/state/execution_log.yaml`; nightshift reads for analytics |
+| Agent skill indexer | `lib/agent_skill_indexer.py` — CLI tool that builds skill-to-agent mapping from registry; no production callers (standalone CLI) |
+| `_hook_learning_extract` implementation | `hooks.py` — heuristic pattern/correction extraction from agent output, writes to `learning_candidates.yaml` |
+| `_hook_embed_outputs` implementation | `hooks.py` — Datacortex embeddings integration with graceful fallback |
 
 ### Future Work
 _Items below are outside v1.0 scope. They remain specified for future implementation._
 
 | Feature | Rationale |
 |---------|-----------|
-| Hook execution engine (HookExecutor) | Design complete in §16; implementation deferred to post-launch |
-| Agent-to-agent contracts | Formal contract system between agents; direct invocation sufficient |
-| Performance metrics tracking | Needs execution logging integration |
-| Execution logging integration | Needs nightshift pipeline connection |
-| External compatibility (ERC-8004) | Future on-chain agent registry integration |
+| Agent-to-agent contracts | Formal contract system between agents; `spawns`/`can_be_called_by` registry fields sufficient |
+| External compatibility (ERC-8004) | Future on-chain agent registry; needs chain RPC infrastructure decisions |
 | External compatibility (Google A2A) | Future agent interoperability protocol |
-| Multi-agent consensus protocol | Requires HookExecutor foundation |
-| Agent skill embedding | Awaits Datacortex maturity for semantic discovery |
+| Multi-agent consensus protocol | Nightshift evaluator panel provides adequate consensus mechanism |
+| Agent skill semantic embedding | Keyword index exists; full vector embedding via Datacortex deferred |
 
 ### Resolved Questions
 
-1. **All agents registered?** — Yes. 127 agents across core and modules. All source files verified.
+1. **All agents registered?** — Yes. 147 agents across core and modules. All source files verified.
 2. **Commands vs skills?** — Some commands are implemented as skills (e.g., trading check-position-health). Registry tracks actual source path regardless of form factor.
-3. **Hook execution model?** — Design in DIP Phases 8-9. Implementation deferred. Current agents use direct invocation.
+3. **Hook execution model?** — Implemented in `hooks.py` (892 lines). HookExecutor supports all 4 phases (pre-execute, post-execute, error, learning-extract). Agents use direct invocation with optional hook integration.
 
 ## Open Questions
 

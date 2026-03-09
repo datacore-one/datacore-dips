@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0013 |
 | **Title** | Meetings Module |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Module |
 | **Status** | Implemented |
 | **Created** | 2025-12-18 |
@@ -671,6 +671,13 @@ _Last audited: 2026-03-04_
 |---------|----------|
 | Within-meeting deduplication | `transcription-processor` handles duplicate detection during processing |
 
+### Implemented (promoted)
+
+| Feature | Evidence |
+|---------|----------|
+| Cross-meeting deduplication | `transcription-processor.md` Phase 4b — uses `dedup.py` for content hash + Jaccard similarity matching |
+| Historical meeting comparison | `agenda-generator.md` Phase 4b — 90-day lookback, attendee/topic matching, "Previously Discussed" section |
+
 ### Future Work
 _Items below are outside v1.0 scope. They remain specified for future implementation._
 
@@ -679,9 +686,7 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 | `lib/journal_parser.py` | Logic lives inside agents; shared lib not yet needed |
 | `lib/action_extractor.py` | Extraction logic folded into `transcription_parser.py` |
 | `lib/meeting_types.py` | Meeting type config handled via `module.yaml` settings |
-| Cross-meeting deduplication | Escalation detection specified but not automated |
 | Full DIP-0010 calendar adapter | `google_docs.py` not a full sync adapter; deferred to DIP-0010 |
-| Historical comparison (week-over-week) | Pattern detection not yet implemented |
 
 ### Resolved Questions
 

@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0020 |
 | **Title** | WhatsApp Module |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Module |
 | **Status** | Partial |
 | **Created** | 2026-01-28 |
@@ -196,7 +196,7 @@ class WhatsAppGateway:
         Examples:
         - "today" → /today
         - "inbox: call John" → capture to inbox
-        - "who is Ahmed" → CRM lookup
+        - "who is Jane" → CRM lookup
         - "search ZK proofs" → Datacortex search
         """
 
@@ -343,7 +343,7 @@ hooks:
 /whatsapp gateway start
 
 # Send message
-/whatsapp send "Ahmed Bin Sulayem" "Following up on our Davos conversation..."
+/whatsapp send "Jane Smith" "Following up on our last call..."
 ```
 
 **Via WhatsApp (to yourself):**
@@ -351,10 +351,10 @@ hooks:
 You: today
 Bot: 📅 Today's Briefing...
 
-You: who is Ahmed Bin Sulayem
-Bot: Ahmed Bin Sulayem | DMCC
+You: who is Jane Smith
+Bot: Jane Smith | Acme Corp
      Executive Chairman & CEO
-     Last contact: Davos 2025
+     Last contact: Tech Summit 2025
 
 You: remind me to follow up with Brett Krause
 Bot: ✓ Captured to inbox

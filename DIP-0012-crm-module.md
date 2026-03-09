@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0012 |
 | **Title** | CRM Module |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Module |
 | **Status** | Implemented |
 | **Created** | 2025-12-18 |
@@ -197,7 +197,7 @@ industries:
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. Adapter Interface
+### 3. Adapter Interface
 
 The CRM module defines an abstract interface that other modules implement to feed interactions.
 
@@ -499,11 +499,11 @@ relevance: 3                      # 1-5 (minimal to critical)
 industries: [storage, web3, data_infrastructure]
 project_type: protocol            # protocol | platform | product | initiative
 stage: mainnet                    # concept | development | testnet | mainnet | mature
-parent_company: "[[Protocol Labs]]"
-website: "https://filecoin.io"
-github: "https://github.com/filecoin-project"
-docs: "https://docs.filecoin.io"
-tags: [decentralized_storage, ipfs]
+parent_company: "[[Acme Labs]]"
+website: "https://example-project.io"
+github: "https://github.com/example-project"
+docs: "https://docs.example-project.io"
+tags: [distributed_storage, p2p]
 discovered_in: "[[Research - Storage Protocols]]"
 created: 2025-12-19
 updated: 2025-12-19
@@ -536,7 +536,7 @@ Decentralized storage network built on IPFS. Major player in Web3 storage infras
 
 | Name | Role | Our Status |
 |------|------|------------|
-| [[Juan Benet]] | Founder | Dormant |
+| [[Alex Rivera]] | Founder | Dormant |
 
 ## Related Projects
 
@@ -549,7 +549,7 @@ Decentralized storage network built on IPFS. Major player in Web3 storage infras
 
 ## Related
 
-- [[Protocol Labs]]
+- [[Acme Labs]]
 - [[Storage Landscape]]
 ```
 
@@ -595,7 +595,7 @@ Major Ethereum conference and hackathon. Key networking opportunity for Web3 pro
 | Contact | Company | Meeting Status |
 |---------|---------|----------------|
 | [[John Smith]] | [[Acme Corp]] | Scheduled |
-| [[Jane Doe]] | [[Protocol Labs]] | Requested |
+| [[Jane Doe]] | [[Acme Labs]] | Requested |
 
 ## Target Introductions
 
@@ -932,19 +932,19 @@ process:
 
 output:
   entities:
-    - name: "Protocol Labs"
+    - name: "Acme Labs"
       type: company
       confidence: 0.95
-      context: "Protocol Labs, founded by Juan Benet, created IPFS and Filecoin"
+      context: "Acme Labs, founded by Alex Rivera, created distributed storage and compute"
       suggested_industries: [storage, web3]
       existing_match: null  # or path to existing contact
 
-    - name: "Juan Benet"
+    - name: "Alex Rivera"
       type: person
       confidence: 0.85
-      context: "Juan Benet, founder of Protocol Labs"
-      suggested_organization: "[[Protocol Labs]]"
-      existing_match: "1-datafund/contacts/people/Juan Benet.md"
+      context: "Alex Rivera, founder of Acme Labs"
+      suggested_organization: "[[Acme Labs]]"
+      existing_match: "1-teamspace/contacts/people/Alex Rivera.md"
 
   summary:
     total_extracted: 15
@@ -1224,17 +1224,19 @@ _Last audited: 2026-03-04_
 
 ### Implemented (promoted)
 
-| Component | Evidence |
-|-----------|----------|
+| Feature | Evidence |
+|---------|----------|
 | Entity extractor agent | `crm-entity-extractor` registered and functional; `lib/entity_extractor.py` complete |
 | Contact maintainer agent | `crm-contact-maintainer` registered and functional; `lib/contact_maintainer.py` complete |
+| Industry registry | `.datacore/state/crm/industries.yaml` — 14 categories with keywords, sub-industries, aliases; seed data in `modules/crm/data/industries.yaml` |
+| Relationship decay | `crm-relationship-scorer.md` — -0.05 per 30-day period, floor at 0.10, reset on interaction |
+| Interaction analytics | `crm.md` command — top contacts, type breakdown, declining frequency detection |
 
 ### Future Work
 _Items below are outside v1.0 scope. They remain specified for future implementation._
 
 | Feature | Rationale |
 |---------|-----------|
-| Industry registry | Schema specified; `industries.yaml` file not yet created |
 | Privacy staging workflow | Contact-ref mechanism specified; not operationalized in workflow |
 | External module adapters | CRMAdapter interface defined; no modules have registered `crm_adapter:` yet |
 | 1-datafund contacts structure | Symlink to reference; not per-spec CRM structure with full interactions |

@@ -4,14 +4,14 @@
 |-------|-------|
 | **DIP** | 0021 |
 | **Title** | Search & Research Architecture |
-| **Author** | Gregor, Claude (AI-assisted) |
+| **Author** | @datacore-one, Claude (AI-assisted) |
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2026-02-18 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `search`, `research`, `agents`, `ingest`, `mcp`, `architecture` |
 | **Affects** | `/search`, `/research`, `/ingest`, all research agents, datacortex module, research module |
-| **Specs** | DIP-0004, DIP-0015, DIP-0016 |
+| **Specs** | DIP-0015, DIP-0016 |
 | **Agents** | `knowledge-extractor`, `research-orchestrator`, `ingest-orchestrator`, `research-synthesizer`, `podcast-creator` |
 
 ## Summary
@@ -1096,23 +1096,25 @@ _Last audited: 2026-03-04_
 | Deprecated agent markers | `.datacore/registry/agents.yaml` | 8 deprecated entries with `superseded_by` |
 | Sources MCP tool | `modules/research/tools/index.js` | Fixed YAML parser for mapping format |
 | Learning integration | `research-orchestrator.md` | Pre-research inject + post-research learn hooks |
+| Deprecated agent file archival | `.datacore/agents/_deprecated/` | 6 deprecated stubs moved to archive directory |
+| Deterministic dedup utility | `.datacore/lib/dedup.py` | Content hash + title similarity deduplication |
 
 ### Implemented (promoted)
 
-| Component | Evidence |
-|-----------|----------|
+| Feature | Evidence |
+|---------|----------|
 | Unified search via `/research` | `/research` provides unified local+external search; demoted `/search` is covered |
+| Google Scholar source activation | `enabled: true` in sources.yaml; SERPAPI_API_KEY configured |
+| Domain-specific source routing | `research-orchestrator.md` — intent classification, `good_for` tag matching, source skipping |
+| Source cost monitoring | `state/source_costs.yaml` schema defined, `sources.yaml` has `cost_per_call` fields; tracking depends on research-orchestrator agent following prompt instructions |
+| Source health monitoring | `state/source_health.yaml` schema defined, `sources.yaml` has `max_latency_ms` fields; tracking depends on research-orchestrator agent following prompt instructions |
 
 ### Future Work
 _Items below are outside v1.0 scope. They remain specified for future implementation._
 
 | Feature | Rationale |
 |---------|-----------|
-| Deterministic dedup utility | Prompt-driven dedup works; `lib/dedup.py` for reliability deferred |
-| Google Scholar source activation | `enabled: false` in sources.yaml; requires `serpapi` pip package |
-| Deprecated agent file removal | Files still present; aliases work as forward references |
-| Domain-specific source routing | `good_for` field advisory only; all sources queried |
-| Cost monitoring / rate limits | Per-source budget caps not yet in schema |
+| Per-source budget caps | Cost tracking exists; automatic budget-based disabling deferred |
 
 ### Resolved Questions
 

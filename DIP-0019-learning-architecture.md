@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0019 |
 | **Title** | Learning Architecture - The Engram Model |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Standards Track |
 | **Status** | Implemented |
 | **Created** | 2026-01-23 |
@@ -813,6 +813,15 @@ _Last audited: 2026-03-04_
 | Feature | Evidence |
 |---------|----------|
 | Semantic search fallback | Inject relevance scoring with spreading activation provides semantic-like matching |
+| `relations` → `associations` migration | `datacore.schemas migrate` action + `flattenRelations()` fallback in `inject.ts:103` |
+
+### Implemented (promoted)
+
+| Feature | Evidence |
+|---------|----------|
+| Document-to-engram extraction | `session-learning.md` Phase 0 — 5 heuristics (headings, bold, conclusions, decisions, contrasts) with source-type confidence |
+| Batch zettel-to-engram nightshift task | Weekly `:AI:research:` task in `next_actions.org` under Learning Architecture project |
+| Skills-as-exchange pipeline (manual) | `.datacore/docs/skills-exchange-pipeline.md` — 4-step manual path documented |
 
 ### Future Work
 _Items below are outside v1.0 scope. They remain specified for future implementation._
@@ -820,11 +829,8 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 | Feature | Rationale |
 |---------|-----------|
 | Atomic write-back at `session.end` | Non-atomic writes haven't caused data loss; optimization deferred |
-| Document-to-engram extraction | Organic learning via `learn` sufficient; `knowledge-extractor` upgrade needed |
-| Batch zettel-to-engram nightshift task | Manual extraction covers existing knowledge |
-| `relations` → `associations` migration script | Legacy `flattenRelations()` fallback works |
-| Exchange protocol network | Publisher/subscriber agents exist; actual network requires multi-user deployment |
-| Skills-as-exchange-format pipeline | Depends on exchange protocol maturity |
+| Exchange protocol network | Publisher/subscriber agents exist; actual network requires HTTP registry server |
+| Skills-as-exchange automation | Manual pipeline documented; automated orchestrator deferred pending coordinator agent design |
 
 ### Resolved Questions
 
@@ -855,7 +861,7 @@ learning:
 ## References
 
 ### Datacore
-- [Session-learning agent](../.datacore/agents/session-learning.md)
+- [Session-learning agent](../agents/session-learning.md)
 - [DIP-0011: Nightshift Module](./DIP-0011-nightshift-module.md)
 - [DIP-0016: Agent Registry](./DIP-0016-agent-registry.md)
 - Design doc: `docs/plans/2026-03-02-engram-knowledge-integration-design.md`

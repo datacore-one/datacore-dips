@@ -5,7 +5,7 @@
 | **DIP** | 0014 |
 | **Title** | Tag Taxonomy |
 | **Status** | Implemented |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Created** | 2025-12-19 |
 | **Updated** | 2026-03-04 |
 | **References** | DIP-0003 (Scaffolding), DIP-0009 (GTD), DIP-0012 (CRM) |
@@ -627,7 +627,7 @@ _Last audited: 2026-03-04_
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Primary tag registry | Done | `.datacore/tags.yaml` (566 lines, 11 namespaces, ~86 tags) |
+| Primary tag registry | Done | `.datacore/tags.yaml` (11 namespaces, ~197 org tags including 36 AI delegation tags) |
 | Module tag registries | Done | `meetings/tags.yaml` as reference pattern |
 | Tag format conventions | Done | org-mode `:tag:`, PKM `#tag`, frontmatter single values |
 | Sync label mapping | Done | AI delegation + priority tags mapped to GitHub labels |
@@ -641,6 +641,9 @@ _Last audited: 2026-03-04_
 | Component | Evidence |
 |-----------|----------|
 | `tag_validator.py` dynamic spaces | `_discover_space_dirs()` uses filesystem-based `[0-9]-*` pattern discovery |
+| Module AI delegation tags | 29 compound `:AI:module:` tags registered in `module_ai_delegation` section |
+| Compound tag validation | `tag_validator.py` validates individual segments of compound tags against registry |
+| Property drawer filtering | `tag_validator.py` skips `:PROPERTIES:` / `:LOGBOOK:` blocks (false positives from 2300+ to ~130) |
 
 ### Future Work
 _Items below are outside v1.0 scope. They remain specified for future implementation._

@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0018 |
 | **Title** | Credential Management |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Infrastructure |
 | **Status** | Partial |
 | **Created** | 2026-01-15 |

@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0009 |
 | **Title** | GTD System Specification |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-04 |
@@ -2389,17 +2389,25 @@ _Last audited: 2026-03-04_
 | 20 | Inbox Processing Pipeline | `gtd-inbox-coordinator` + `gtd-inbox-processor` working pipeline |
 | 21 | User Analytics | `user-analytics-generator` agent produces periodic reports |
 
+### Implemented (promoted)
+
+| Part | Title | Evidence |
+|------|-------|----------|
+| 11 | Trigger Lists | `modules/gtd/specs/trigger-lists.yaml` — 6 categories, 85+ prompts for weekly review |
+| - | `:INTENT_SCORE:` auto-population | `strategic-prioritizer.md` now writes `:INTENT_SCORE:`, `:INTENT_MATCH:`, `:MULTI_INTENT:` to task property drawers |
+| - | GTD Health Metrics | `/today` briefing includes inbox size, completions, oldest task, total open |
+| - | Skill gap logging | `state/skill_gaps.yaml` schema defined; logging depends on session-learning agent following prompt instructions |
+| - | NL Task Capture | `gtd-inbox-processor.md` enhanced with 7 NL parsing patterns (action+person, deadline, checklist, etc.) |
+
 ### Future Work
 _Items below are outside v1.0 scope. They remain specified for future implementation._
 
 | Part | Title | Rationale |
 |------|-------|-----------|
 | 10 | Horizons of Focus | Intent Graph covers strategic levels; middle layers (Project Canvas, OKRs) deferred |
-| 11 | GTD Completeness | Two-minute rule, Natural Planning, trigger lists — methodology edge features |
 | 14 | Task-Level Integrity | `structural-integrity` agent covers basics; full constraint checking deferred |
-| 16 | Event-Driven Reactions | Architecture stub only; requires persistent daemon |
-| 18 | Metacognitive Planning | Architecture stub; depends on DIP-0019 engram maturity |
-| - | `:INTENT_SCORE:` auto-population | Intent Graph scoring not auto-written to org tasks; review protocol not formalized |
+| 16 | Event-Driven Reactions | Requires persistent daemon; timer-based execution adequate |
+| 18 | Metacognitive Planning (full) | Skill gap logging covers detection; exchange protocol integration deferred |
 
 ---
 

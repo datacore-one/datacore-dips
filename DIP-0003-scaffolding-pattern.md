@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0003 |
 | **Title** | Scaffolding Pattern |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Standard |
 | **Status** | Implemented |
 | **Created** | 2025-12-01 |
@@ -407,7 +407,7 @@ _Last audited: 2026-03-04_
 | `_index.md` pattern | Done | Index files in key folders for navigation |
 | Numbered folder convention | Done | 0-inbox through 4-outbox in all spaces |
 | Link-following discovery | Done | Agents traverse wiki-links for topic clusters |
-| DIP-0002 layered scaffolding | Done | Pattern defined; SCAFFOLDING files not yet deployed |
+| DIP-0002 layered scaffolding | Done | `SCAFFOLDING.base.md` template deployed to all 5 spaces with `3-knowledge/` |
 | Project module structure | Done | Defined but not enforced by auditor |
 
 ### Implemented (promoted from deferred)
@@ -416,12 +416,19 @@ _Last audited: 2026-03-04_
 |-----------|----------|
 | Space health metrics | `scaffolding-auditor` agent reports completeness scores per space |
 
+### Implemented (promoted)
+
+| Feature | Evidence |
+|---------|----------|
+| SCAFFOLDING.base.md template deployment | Deployed to `0-personal`, `1-datafund`, `2-datacore`, `3-fds`, `4-forge` from `.datacore/templates/space/` |
+| Scaffolding agent template reference | `scaffolding-auditor.md` references canonical template path |
+
 ### Future Work
 _Items below are outside v1.0 scope. They remain specified for future implementation._
 
 | Feature | Rationale |
 |---------|-----------|
-| SCAFFOLDING.base.md deployment to datacore-org | Pattern specified; repo not yet public |
+| SCAFFOLDING.base.md deployment to datacore-org | Template ready; repo needs PII scrub before going public |
 | Multi-source synthesis enforcement | Agent guidance only; automated checking not yet needed |
 
 ### Resolved Questions

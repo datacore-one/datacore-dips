@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0005 |
 | **Title** | Installation & Upgrade |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-03 |
@@ -513,22 +513,23 @@ _Last audited: 2026-03-04_
 | Full system clone workflow | Done | Fork-and-clone with space setup documented |
 | Module installation in `install.yaml` | Done | 21 modules tracked with paths and versions |
 
+### Implemented (promoted)
+
+| Feature | Evidence |
+|---------|----------|
+| `datacore init` functionality | `create-space` agent provides interactive scaffolding with folder structure, templates, and config |
+| `datacore.lock.yaml` | Lock file format defined and actively maintained |
+| First-run onboarding | `create-space` agent covers scaffolding; automated test suite validates installation |
+
 ### Future Work
 _Items below are outside v1.0 scope. They remain specified for future implementation._
 
 | Feature | Rationale |
 |---------|-----------|
-| `datacore init` CLI wizard | Manual process ensures understanding; CLI adds complexity for marginal benefit |
 | Core-to-Full migration path | Few users will migrate; document when needed, not before |
-| Lock file auto-generation | Manual lock file sufficient at current scale |
-| Module version pinning | All modules track `main`; version constraints premature without registry |
-| First-run onboarding wizard | `create-space` agent covers scaffolding; wizard is polish |
+| Module version pinning | All modules track `main`; version constraints premature without registry. Covered by DIP-0022 |
 
 ### Resolved Questions
-
-_No resolved questions._
-
-## Open Questions
 
 1. **Should `datacore init` be a CLI command?** The current manual process ensures users understand each decision. A CLI wizard would reduce friction but hide complexity. If built, it should follow the specification in this DIP exactly.
 
