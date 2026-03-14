@@ -631,13 +631,18 @@ Before executing your primary task:
 2. **Relevant DIPs**: These governance documents apply:
    {dip_summaries}
 
-3. **Semantic Context**: Based on your task, these knowledge items are relevant:
+3. **Engrams** (DIP-0019): Load learned behavioral patterns via 3-layer injection:
+   a. Call `datacore.inject` MCP tool with `scope=agent:{name}` (preferred)
+   b. Read `.datacore/state/agent-engrams/{name}.md` for compiled fallback
+   c. Hook-based injection (automatic in nightshift via hooks.py)
+
+4. **Semantic Context**: Based on your task, these knowledge items are relevant:
    {datacortex_results}
 
-4. **Session Memory**: Previous insights on this topic:
+5. **Session Memory**: Previous insights on this topic:
    {session_memory_results}
 
-5. **Task-Specific**: {inferred_paths}
+6. **Task-Specific**: {inferred_paths}
 ```
 
 ### 10. Performance Tracking
@@ -941,6 +946,7 @@ The auditor validates each agent against:
 |-------|-------------|--------------|
 | Think-Search-Generate | §5 pattern in prompt | Partial |
 | Agent Context section | §Agent Context in prompt | Yes (template) |
+| Engram injection preamble | §9 DIP-0019 3-layer injection instruction | Yes (`add_engram_preamble.py`) |
 | Multi-hop guidance | When to use graph traversal | Yes (template) |
 
 #### 13.3 Audit Output
@@ -1003,7 +1009,9 @@ results:
 4. UPGRADE (with confirmation)
    ├── Add registry entries to agents.yaml
    ├── Inject Agent Context section into prompts
+   ├── Add engram injection preamble (DIP-0019 §3-layer)
    ├── Add Think-Search-Generate pattern
+   ├── Compile engrams for new agent (`compile_engrams.py --agent X`)
    └── Update CLAUDE.md agent tables
 ```
 

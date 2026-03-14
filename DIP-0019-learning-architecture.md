@@ -115,9 +115,38 @@ Session Work --> session-learning --> patterns.md (raw capture, unchanged)
                                           |
                                   engrams.yaml (active memory store)
                                           |
-                         engram-inject skill --> agent context at runtime
+                         3-Layer Injection --> agent context at runtime
                          (NOT baked into CLAUDE.md)
 ```
+
+#### 3-Layer Injection System
+
+Engrams reach agents through three injection layers with graceful fallback:
+
+| Layer | Mechanism | When | Priority |
+|-------|-----------|------|----------|
+| **Prompt-based** | Agent calls `datacore.inject` MCP tool | Claude Code subagents with MCP access | 1 (preferred) |
+| **Hook-based** | `hooks.py` injects via `engram_selector.py` | Nightshift automated execution | 2 |
+| **Compile-time** | Pre-baked files in `.datacore/state/agent-engrams/` | MCP unavailable, hooks not running | 3 (fallback) |
+
+**Prompt-based (Layer 1):** Each agent .md file includes an engram injection preamble
+instructing the agent to call `datacore.inject` with `scope=agent:{name}`. New agents
+MUST include this preamble (see DIP-0016 §9 compliance checklist). Tool:
+`python .datacore/lib/add_engram_preamble.py --apply`
+
+**Hook-based (Layer 2):** The `_hook_context_inject` method in `hooks.py` calls
+`engram_selector.py` with `scope=agent:{id}` during pre-execution hooks. Falls back
+to compiled files. Checks compiled file staleness and logs warnings.
+
+**Compile-time (Layer 3):** `compile_engrams.py` generates per-agent engram files
+in `.datacore/state/agent-engrams/{name}.md`. Each file includes a `source-hash`
+for staleness detection. Agent-scoped engrams are prioritized over global ones.
+Recompile: `python .datacore/lib/compile_engrams.py`
+
+**Staleness detection:** Compiled files include `<!-- source-hash: XXXX -->`. When
+Layer 1 or 2 runs, it compares the compiled hash against the current `engrams.yaml`
+hash. Stale compilations are logged as warnings. Check all agents:
+`python .datacore/lib/compile_engrams.py --check`
 
 **Why NOT CLAUDE.md for engrams:**
 - Reversion = set `status: retired` in YAML. No layer editing, no rebuild.
