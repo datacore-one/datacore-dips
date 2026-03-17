@@ -8,7 +8,7 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-01 |
-| **Updated** | 2026-03-04 |
+| **Updated** | 2026-03-17 |
 | **Tags** | `context`, `privacy`, `CLAUDE.md`, `layers`, `contribution` |
 | **Affects** | `CLAUDE.md`, `.gitignore`, `agents/*.md`, `commands/*.md` |
 | **Specs** | `privacy-policy.md` |
@@ -290,17 +290,79 @@ _Last audited: 2026-03-04_
 | Hook symlinks | Done | `.git/hooks/pre-commit`, `.git/hooks/pre-push` |
 | `datacore` repo layered context | Done | `CLAUDE.base.md` + `CLAUDE.local.md` |
 | `datacore-org` template | Done | `CLAUDE.base.md` + `CLAUDE.space.md` |
-| Module `CLAUDE.base.md` files | Done | 21 modules with layered context |
+| Module `CLAUDE.base.md` files | Done | 24 modules with layered context (standardized 2026-03-17) |
 | `context_merge.py rebuild` | Done | CLI for rebuilding composed files |
 | `context_merge.py validate` | Done | CLI for validating PUBLIC layers |
 | `context_merge.py trace` | Done | CLI for finding which layer contains a section |
-| Registry injection | Done | `<!-- REGISTRY:xxx -->` markers → auto-generated tables |
+| Registry injection | Done | `<!-- REGISTRY:xxx -->` markers → auto-generated tables (frontmatter extraction added 2026-03-17) |
 | Test suite | Done | 14 tests covering merge, validation, rebuild, discovery |
 | CLAUDE.md documentation | Done | Commands, layer table, contribution flow documented |
 | CONTRIBUTING.md | Done | Hook setup instructions for external contributors |
 
-### Future Work
-_No items — all four implementation phases are complete._
+### Amendment: Frontmatter & Templates (2026-03-17)
+
+Driven by DIP-0025 (datacore-bench) findings that CLAUDE.md was competing with engram memory rather than complementing it. Key changes:
+
+#### YAML Frontmatter Standard
+
+Module and space CLAUDE.base.md files now include YAML frontmatter:
+
+```yaml
+---
+summary: "One-line description for root CLAUDE.md"
+triggers: ["trigger phrase 1", "trigger phrase 2"]
+context: on_match
+---
+```
+
+`context_merge.py` extracts frontmatter during registry injection:
+- `summary` enriches the modules table Description column
+- `triggers` populate a new Triggers column (shows activation phrases)
+- `context` overrides module.yaml context priority when present
+
+#### Content Hierarchy Principle
+
+**Root CLAUDE.md** = system guide (how to use Datacore, not what it knows)
+- Memory system instructions, session lifecycle
+- Spaces overview with projects
+- Methodology framing (GTD, Zettelkasten, Engram memory)
+- Discovery patterns (registries, recall, datacortex)
+- Auto-injected: modules table with triggers, sources, infrastructure
+
+**Space CLAUDE.base.md** = space orientation (~50 lines)
+- What this space is for, pointer to root for system concepts
+- Compact structure, key paths, space-specific conventions
+
+**Module CLAUDE.base.md** = module usage guide (40-150 lines)
+- Purpose, Quick Start, How It Works, Agents & Commands, Key Paths, Boundaries
+- Engram footer: "stable config here, learned behavior in engrams"
+
+**CLAUDE.local.md** = minimal private overrides
+- Only space journal paths and routing references
+- All preferences, infrastructure facts, behavioral rules live as engrams
+
+#### Template Specs
+
+| Template | Location | Target Size |
+|----------|----------|-------------|
+| Module | `.datacore/specs/module-claude-template.md` | 40-150 lines |
+| Space | `.datacore/specs/space-claude-template.md` | 40-60 lines |
+
+#### Content Boundary: CLAUDE.md vs Engrams
+
+| Goes in CLAUDE.md | Goes in engrams |
+|-------------------|-----------------|
+| System structure, folder layout | Server IPs, SSH configs |
+| How to use commands/agents | Past decisions, design rationale |
+| Methodology overview | API quirks, bug workarounds |
+| Convention syntax reference | User preferences (formatting, tone) |
+| Module capability summary | Corrections and learned patterns |
+
+**Principle**: CLAUDE.md describes HOW the system works. Engrams contain WHAT has been learned. CLAUDE.md should teach Claude to use `datacore.recall` for factual questions.
+
+#### create-module Agent
+
+Updated with Step 8c: CLAUDE.base.md Template Audit — checks frontmatter, required sections, size, no root duplication. References `specs/module-claude-template.md`.
 
 ### Resolved Questions
 
