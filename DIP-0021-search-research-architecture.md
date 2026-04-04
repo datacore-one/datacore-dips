@@ -1057,6 +1057,14 @@ The trading module manages morning routines, trade validation, evening reviews, 
 - External analyst reports (PDFs, articles) saved during the day → overnight ingest into literature notes
 - Weekly performance data → structured analysis that feeds back into trading strategy zettels
 
+**Journal-to-knowledge promotion** (general, all spaces):
+- `/promote` command scans journal entries for high-value sections using `journal_scanner.py` (heuristic scoring — pattern matching, not LLM)
+- High-scoring sections routed through `knowledge-extractor` to create permanent zettels
+- `knowledge-promoter` agent orchestrates: scan → present candidates → user confirms → extract → link back to source journal
+- Nightshift mode: threshold 0.6 (higher bar), auto-approve, weekly Sunday schedule
+- Interactive mode: threshold 0.4, user confirms each candidate
+- Closes the gap where valuable analysis accumulates in journals but never gets promoted to permanent knowledge
+
 **Hook integration:**
 
 | Hook | Trading use case |
@@ -1071,6 +1079,17 @@ The trading module manages morning routines, trade validation, evening reviews, 
 ### A.3 Key Insight
 
 Both workflows reveal the same pattern: existing Datacore modules already implicitly operate across all three layers but without the formal architecture to connect them. The three-layer model turns ad-hoc information flow into a systematic knowledge pipeline where every interaction — email, trade, research — contributes to the same growing knowledge base.
+
+### A.4 Knowledge Health (Semantic Linting)
+
+The `/knowledge-lint` command and `knowledge-linter` agent perform semantic health checks on knowledge bases, complementing the structural checks in DIP-0015:
+
+- **Orphan detection**: zettels with no inbound wiki-links (via `knowledge_lint.py`)
+- **Completeness checks**: literature notes missing required sections (Summary, Key Insights)
+- **Staleness scanning**: seedling zettels unchanged for 180+ days
+- **Contradiction detection** (LLM-powered, `--deep` mode): cross-zettel contradictions, superseded claims, definitional drift
+
+Runs as part of the weekly review (Step 15) and on-demand. Deterministic checks use `knowledge_lint.py`; contradiction detection handled by the `knowledge-linter` agent.
 
 ## Implementation Status
 _Last audited: 2026-03-04_

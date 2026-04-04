@@ -769,8 +769,16 @@ Health Checks:
   FTS index.............. OK (last rebuild: 2025-12-01)
   Link resolution........ 94% (143 unresolved)
   Orphan notes........... 7
+  Incomplete lit notes... 3
+  Stale seedlings........ 2 (>180 days)
   Pending write-backs.... 0
   Failed write-backs..... 0
+
+Note: Orphan detection, literature completeness, and staleness checks
+are also available via `knowledge_lint.py` (filesystem-based, no DB
+required) and the `/knowledge-lint` command. The DB-based checks above
+and the filesystem-based linter are complementary — the DB has richer
+link data, the linter works without DB setup.
 
 Space Coverage:
   ┌─────────────────────────────────────────────┐
@@ -793,6 +801,8 @@ Alerts:
 | DB age | ≤4 hours | 4-24 hours | >24 hours |
 | Unresolved links | <50 | 50-100 | >100 |
 | Orphan notes | <10 | 10-25 | >25 |
+| Incomplete literature notes | <5 | 5-15 | >15 |
+| Stale seedlings (>180d) | <5 | 5-10 | >10 |
 | Pending writes | 0 | 1-5 | >5 |
 | Failed writes | 0 | 1 | >1 |
 | Stale specs | 0 | 1-3 | >3 |
@@ -813,6 +823,9 @@ python zettel_db.py stats [--space SPACE] [--json]
 python zettel_db.py unresolved [--space SPACE]
 python zettel_db.py orphans [--space SPACE]
 python zettel_db.py stale [--days DAYS] [--type TYPE]
+
+# Semantic linting (filesystem-based, complements DB queries)
+python .datacore/lib/knowledge_lint.py [KNOWLEDGE_DIR]
 
 # Validation
 python zettel_db.py validate [--fix]
