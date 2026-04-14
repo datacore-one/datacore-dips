@@ -143,7 +143,7 @@ The following DIPs are planned to complete full specification coverage:
 | DIP | Title | Purpose | Priority |
 |-----|-------|---------|----------|
 | **0023** | Sync Architecture | ./sync script, multi-repo handling | Medium |
-| **0025** | External Services | n8n, Gamma, and service integration patterns | Low |
+| **0025** | Evaluation & Benchmarking | datacore-bench: A/B testing, instrumentation, session replay | High |
 | **0026** | Chat Interface Architecture | Telegram, Slack, Discord, Email integrations | Medium |
 | **0027** | Journal Format | Personal and team journal structure | Low |
 
