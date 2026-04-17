@@ -312,8 +312,8 @@ The nightshift queue file mirrors the structure of next_actions.org to preserve 
 
 ```org
 *** TODO [#A] Verb-driven task heading           :AI:content:
-SCHEDULED: <2025-12-02 Mon>
-DEADLINE: <2025-12-06 Fri>
+SCHEDULED: <2025-12-02 Tue>
+DEADLINE: <2025-12-06 Sat>
 :PROPERTIES:
 :CREATED: [2025-11-28 Fri]
 :SOURCE: Where this came from
@@ -341,7 +341,7 @@ Nightshift tasks execute poorly when they lack context. A heading like `* TODO C
 SCHEDULED: <2026-02-22 Sun>
 :PROPERTIES:
 :ID:       550e8400-e29b-41d4-a716-446655440000
-:CREATED:  [2026-02-21 Fri 14:30]
+:CREATED:  [2026-02-21 Sat 14:30]
 :SOURCE:   inbox
 :EFFORT:   Moderate
 :CONTEXT: |
@@ -474,7 +474,7 @@ Existing bare tasks (heading + TODO state only) remain valid. The Rich Task Stan
 *** TODO [#B] Daily research digest                   :AI:research:recurring:
 SCHEDULED: <2026-02-22 Sun .+1d>
 :PROPERTIES:
-:CREATED:  [2026-02-01 Sat]
+:CREATED:  [2026-02-01 Sun]
 :SOURCE:   system
 :EFFORT:   Moderate
 :CONTEXT: |
@@ -1274,8 +1274,8 @@ Weekly review step already reviews someday items. This section adds AI-assisted 
 ** Technology
 *** TODO Build Obsidian plugin for Datacore
 :PROPERTIES:
-:CREATED: [2026-01-15 Wed]
-:LAST_REVIEWED: [2026-02-21 Fri]
+:CREATED: [2026-01-15 Thu]
+:LAST_REVIEWED: [2026-02-21 Sat]
 :INTENT_ALIGNMENT: Intent 4 > Community extensions
 :END:
 ```
@@ -1964,6 +1964,24 @@ Morning                    Day                     Evening
 - Engram candidate generation via learning pipeline (DIP-0019)
 - Insight Verification Checklist ensures nothing is lost across 4 capture layers
 
+### Team Journal Schema (Focus Mode)
+
+Team space journals (`[space]/journal/YYYY-MM-DD.md`) use a standardized three-section format:
+
+| Section | Purpose | Written by |
+|---------|---------|------------|
+| `## Standup` | Checkbox items linked to org tasks | `/standup` command |
+| `## @contributor` | Narrative entries with decisions and continuation | `/wrap-up` command |
+| `## Session Metadata` | YAML: artifacts, tokens, git refs | `/wrap-up` command |
+
+Frontmatter: `type: team-journal`, `date`, `space` (without number prefix), `contributors` array.
+
+Standup items use `- [x] Item text <!-- :ID: org-task-id -->` format for bidirectional sync with `:standup:` tagged org tasks.
+
+**Focus mode** activates automatically when CWD is inside `[space]/2-projects/`. The SessionStart hook injects a lightweight shim with space context, making `/wrap-up`, `/continue`, `/standup`, and `/today` available from project folders. See `focus_mode.py` for detection logic.
+
+Schema reference: `.datacore/templates/journal-schema.md`
+
 **`/tomorrow`** — End-of-day delegation (command spec: `.datacore/commands/tomorrow.md`)
 - Processes inbox status, runs diagnostics, creates recurring task instances (Part 3.6)
 - Builds nightshift queue: moves `:AI:` tasks from `next_actions.org` → `nightshift.org`
@@ -2126,7 +2144,7 @@ Gmail API → mail-classifier (agent) → Classification
 ```org
 ** TODO Reply to [Sender] re: [Subject] :email:
 :PROPERTIES:
-:CREATED: [2026-02-22 Sat 10:00]
+:CREATED: [2026-02-22 Sun 10:00]
 :SOURCE: email
 :EXTERNAL_ID: gmail:19b09952c4d344a1
 :EXTERNAL_URL: https://mail.google.com/mail/u/0/#inbox/19b09952c4d344a1

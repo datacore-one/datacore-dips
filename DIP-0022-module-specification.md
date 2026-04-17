@@ -847,6 +847,17 @@ Triggers: presentation, slides, deck, pitch, keynote.
 - Settings: flat keys in `[space]/.datacore/modules/slides/settings.local.yaml`
 ```
 
+### Focus Mode Command Availability
+
+When Datacore detects focus mode (CWD inside `[space]/2-projects/`), only a subset of commands are available to keep context lean:
+
+- Core: `/wrap-up`, `/continue`, `/today`
+- Module commands with `focus_mode: true` in their definition (e.g., `/standup`)
+
+Global modules can opt commands into focus mode. This avoids loading full root/space CLAUDE.md (~33KB) into project sessions.
+
+Detection: `.datacore/lib/focus_mode.py` (called by `session_bootstrap.py` SessionStart hook)
+
 #### context_merge.py Changes
 
 The context merge tool is extended:

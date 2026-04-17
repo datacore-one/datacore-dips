@@ -695,6 +695,18 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 | DIP-0006 absorption | Open Questions Management fully absorbed; `/my-questions` command implemented |
 | Library reorganization per spec §8 | Deferred — logic consolidated in agents and `transcription_parser.py` rather than separate lib modules |
 
+### Standup v2 — Team Journal Integration
+
+The `/standup` command and `standup-generator` agent have been upgraded to work with team journals instead of personal journals:
+
+- **Source**: Team journal `## @contributor` sections (not personal `notes/journals/`)
+- **Output**: `## Standup` section in team journal with checkbox items linked to org tasks
+- **Org sync**: New items create `:standup:` tagged tasks; completed items mark tasks DONE
+- **Carryover**: Unchecked items from yesterday carry forward automatically
+- **Integration**: `/today` step 11-bis generates standup drafts per space for user review
+
+Sync utility: `.datacore/lib/standup_sync.py` (carryover, check-off, create commands)
+
 ## References
 
 - DIP-0006: Open Questions Management System
