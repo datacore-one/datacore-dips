@@ -49,7 +49,7 @@ Tags are currently fragmented across systems:
 | Namespace | Purpose | Values | Format |
 |-----------|---------|--------|--------|
 | `ai` | AI task delegation | content, research, data, pm, technical | `:AI:type:` |
-| `status` | Document lifecycle | stub, draft, published, archived | frontmatter field |
+| `status` | Document lifecycle | draft, published, archived | frontmatter field |
 | `maturity` | Knowledge maturity | seedling, budding, evergreen | frontmatter field |
 | `type` | Document type | See Content Types below | frontmatter field |
 | `context` | GTD contexts | computer, phone, call, home, errands, waiting, anywhere | `@context` |
@@ -277,8 +277,7 @@ namespaces:
   status:
     description: Document lifecycle
     tags:
-      - id: stub
-        synonyms: [placeholder, empty]
+      # stub removed 2026-04-18 — stubs deprecated, unresolved links tracked in DB
       - id: draft
         synonyms: [wip, in-progress]
       - id: published
@@ -379,9 +378,9 @@ The system registry MUST be discoverable by agents. Add to:
 
 ```org
 *** TODO Review partnership contract with Zama    :verity:ops:legal:contract:AI:pm:
-SCHEDULED: <2025-12-20 Fri>
+SCHEDULED: <2025-12-20 Sat>
 :PROPERTIES:
-:CREATED: [2025-12-19 Thu]
+:CREATED: [2025-12-19 Fri]
 :EFFORT: 2h
 :END:
 
@@ -450,7 +449,7 @@ CRM contacts use same inline tag format as PKM notes.
 
 ```org
 *** EXPENSE Office supplies                       :datafund:ops:admin:
-SCHEDULED: <2025-12-19 Thu>
+SCHEDULED: <2025-12-19 Fri>
 :PROPERTIES:
 :AMOUNT: 150.00
 :CURRENCY: EUR

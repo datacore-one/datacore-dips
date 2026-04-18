@@ -27,6 +27,14 @@
 > - Section 4 Bidirectional Sync Protocol → Write-back engine not implemented. Agents still modify org files directly
 >
 > Sections 5.1, 5.3, and 7 remain as reference specifications for future GTD tooling expansion.
+>
+> **Amendment 2026-04-18 — Stubs deprecated:**
+> - Stub .md files (auto-generated for unresolved wikilinks) removed from the system. 14,389 stub files deleted.
+> - Unresolved links tracked via `resolved=0` in the `links` table — no filesystem representation needed.
+> - `is_stub` column kept in schema for compatibility but no longer populated.
+> - `--create-stubs` CLI flag disabled by default. `stub_expander.py` and `stub_triage.py` archived.
+> - UNIQUE constraints added to `links(source_id, target_title, syntax)`, `tags(file_id, tag)`, `terms(file_id, term)` to prevent row duplication on re-index.
+> - DB reduced from 25 GB to ~1 GB after removing 187M duplicate term rows, 5.3M duplicate link rows, and 14k stub file entries.
 
 ## Abstract
 
@@ -117,7 +125,7 @@ CREATE TABLE files (
     summary TEXT,                        -- AI-generated or first paragraph
     word_count INTEGER,
     maturity TEXT,                       -- seedling, budding, evergreen
-    is_stub BOOLEAN DEFAULT FALSE,
+    is_stub BOOLEAN DEFAULT FALSE,       -- DEPRECATED: stubs removed 2026-04-18, kept for schema compat
     author TEXT,                         -- human, ai, ai-assisted, unknown
     source_file TEXT,                    -- For DB→file sync tracking
     checksum TEXT,                       -- For change detection
@@ -847,9 +855,14 @@ python zettel_processor.py --session [--date DATE]
 python zettel_processor.py --org-sync [--file FILE]
 python zettel_processor.py --learning-extract [--session-id ID]
 
-# Stubs and backlinks
-python zettel_processor.py --create-stubs [--min-refs N]
+# Backlinks
 python zettel_processor.py --inject-backlinks
+
+# Stubs (DEPRECATED 2026-04-18)
+# Stub .md files are no longer created. Unresolved links are tracked
+# via resolved=0 in the links table. The --create-stubs flag exists
+# for backward compatibility but is disabled by default.
+# python zettel_processor.py --create-stubs [--min-refs N]  # deprecated
 ```
 
 ### 9. Rebuild Guarantee
