@@ -6,7 +6,7 @@
 | **Title** | Credential Management |
 | **Author** | @datacore-one |
 | **Type** | Infrastructure |
-| **Status** | Partial |
+| **Status** | Active |
 | **Created** | 2026-01-15 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `credentials`, `security`, `portability`, `dotfiles` |
@@ -1866,49 +1866,50 @@ Should `datacore creds add` support generating credentials (e.g., SSH keys, API 
 ---
 
 ## Implementation Status
-_Last audited: 2026-03-04_
+_Last audited: 2026-04-23_
 
 ### Implemented
 
 | Feature | Evidence |
 |---------|----------|
-| Credential index schema | `.datacore/specs/credential-index.yaml` (187 lines) |
-| Shared env directory | `.datacore/env/` with categorized `.env` files |
-| Category env files | `forge.env`, `gateio.env`, `oura.env`, `withings.env`, etc. |
-| Credentials subdirectory | `.datacore/env/credentials/` for structured storage |
-| Example templates | `.env.example`, `oura.env.example`, `withings.env.template` |
-| Gitignore enforcement | `.env` files gitignored across all repos |
-| Pre-commit secrets scanning | `.datacore/hooks/pre-commit` validates `.base.md` for PII/secrets |
-| Security tier definitions | Spec defines Low/Medium/High/Critical tiers |
-| Architecture specification | Full spec with architecture, security model, decision framework |
-
-### Implemented (promoted)
-
-| Feature | Evidence |
-|---------|----------|
-| Team credential management | N/A single-user installation; no team cred sharing needed |
-| Credential index specification | Schema complete in `.datacore/specs/credential-index.yaml` (187 lines) |
+| Central secrets repository | Bare git repo on BlackPi (`gregor@blackpi.local:~/secrets.git`) |
+| Credential split (global/space/project) | `global.env` + `spaces/N-name.env` + `projects/` in secrets repo |
+| Instance manifests | `instances/{local,nightshift,tris,data-on-claw}.yaml` |
+| Sync script | `scripts/sync.sh` — pull + assemble `.env` per manifest |
+| Bootstrap script | `scripts/install.sh` — one-command new instance setup |
+| Instance-local credentials | `local.env` per instance, never synced |
+| Credential index v2.0 | 36 entries with scope field (global/space/project/instance-local) |
+| CLI sync command | `python creds.py sync [--instance name]` |
+| CLI list/show/search/audit | Existing commands in `.datacore/lib/creds.py` |
+| Rotation tracking | `creds.py rotate` with bootstrap from .env |
+| Nightshift deployment | 68 credentials assembled via rsync + install.sh |
+| Gitignore enforcement | `.env` files and `secrets/` gitignored |
+| Pre-commit secrets scanning | `.datacore/hooks/pre-commit` validates for PII/secrets |
+| Security tier definitions | Low/Medium/High/Critical in credential-index.yaml |
+| Three-tier architecture | Global + space-scoped + instance-local credentials |
+| Multi-instance support | 4 instances: local, nightshift, tris-on-hermes, data-on-claw |
 
 ### Future Work
-_Items below are outside v1.0 scope. They remain specified for future implementation._
 
 | Feature | Rationale |
 |---------|-----------|
-| CLI commands (list/show/search/audit) | Manual workaround functional; CLI is primary artifact and doesn't exist yet |
-| Migrate command | No duplicate migrations needed yet |
-| Secrets repository on nightshift | OS-level disk encryption + gitignore sufficient for single-user |
-| Backup/restore commands | Manual secure transfer adequate for rare machine migrations |
-| Rotate command | Manual rotation via provider UIs adequate |
-| GPG encryption layer | OS-level encryption sufficient; adds complexity |
-| Bootstrap scripts | Not yet needed |
+| Bootstrap tris-on-hermes | Blocked on SSH key setup and BlackPi reachability |
+| Bootstrap data-on-claw | Blocked on SSH key setup and BlackPi reachability |
+| Nightshift service migration | 24 systemd units still reference `~/config/nightshift.env` |
+| `creds add` command | Interactive credential addition with scope routing |
+| GPG encryption layer | Optional; OS-level encryption sufficient for now |
+| Automated rotation | Phase 2; manual rotation via provider UIs adequate |
+| Nightshift git-based sync | Currently rsync; needs BlackPi reachability from nightshift |
 
 ### Resolved Questions
 
 | Question | Resolution |
 |----------|------------|
-| Is the current workaround blocking? | No — flat `.env` + `grep` works for ~15 credentials; CLI valuable at 50+ or multi-machine |
-| Should this DIP be retired? | No — spec provides clear upgrade path; keep as Draft with workaround documented |
-| Priority relative to other DIPs? | Low — no incidents since Alchemy key episode; current workaround is stable |
+| Where should the secrets repo live? | BlackPi (Raspberry Pi) — central private git server |
+| How should credentials be scoped? | Three tiers: global, space-scoped, instance-local |
+| How should instances sync? | git pull from BlackPi (or rsync if no connectivity) |
+| Who pushes to the secrets repo? | Only root user (local); all others pull |
+| Should instances share all credentials? | No — per-instance manifests declare space access |
 
 ---
 
@@ -1926,3 +1927,4 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 |------|---------|---------|
 | 2026-01-15 | 0.1.0 | Initial draft |
 | 2026-03-04 | 0.2.0 | Added Implementation Status, Current Workaround; formally deferred CLI tooling |
+| 2026-04-23 | 1.0.0 | Multi-instance activation: BlackPi secrets repo, space-scoped split, sync/install scripts, 4 instances |
