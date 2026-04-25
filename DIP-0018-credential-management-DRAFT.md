@@ -1866,40 +1866,40 @@ Should `datacore creds add` support generating credentials (e.g., SSH keys, API 
 ---
 
 ## Implementation Status
-_Last audited: 2026-04-23_
+_Last audited: 2026-04-25_
 
 ### Implemented
 
 | Feature | Evidence |
 |---------|----------|
-| Central secrets repository | Bare git repo on BlackPi (`gregor@blackpi.local:~/secrets.git`) |
-| Credential split (global/space/project) | `global.env` + `spaces/N-name.env` + `projects/` in secrets repo |
+| Central secrets repository | Bare git repo on BlackPi (`gregor@100.115.67.71:~/secrets.git`) |
+| Credential split (global/space/project) | 10 scoped files: `global.env` + 8 `spaces/` + 1 `projects/` |
 | Instance manifests | `instances/{local,nightshift,tris,data-on-claw}.yaml` |
-| Sync script | `scripts/sync.sh` — pull + assemble `.env` per manifest |
+| Sync script | `scripts/sync.sh` — git pull + assemble `.env` per manifest (5s timeout) |
 | Bootstrap script | `scripts/install.sh` — one-command new instance setup |
-| Instance-local credentials | `local.env` per instance, never synced |
-| Credential index v2.0 | 36 entries with scope field (global/space/project/instance-local) |
+| Instance-local credentials | `local.env` on all 4 instances with INSTANCE_NAME set |
+| Credential index v2.0 | 35 entries with scope field (global/space/project/instance-local) |
 | CLI sync command | `python creds.py sync [--instance name]` |
 | CLI list/show/search/audit | Existing commands in `.datacore/lib/creds.py` |
 | Rotation tracking | `creds.py rotate` with bootstrap from .env |
-| Nightshift deployment | 68 credentials assembled via rsync + install.sh |
 | Gitignore enforcement | `.env` files and `secrets/` gitignored |
 | Pre-commit secrets scanning | `.datacore/hooks/pre-commit` validates for PII/secrets |
 | Security tier definitions | Low/Medium/High/Critical in credential-index.yaml |
 | Three-tier architecture | Global + space-scoped + instance-local credentials |
-| Multi-instance support | 4 instances: local, nightshift, tris-on-hermes, data-on-claw |
+| Tailscale mesh (5 nodes) | mac, blackpi, nightshift, hermes, plur-claw — all interconnected |
+| All 4 instances deployed | local (86 creds), nightshift (84), tris (35), data-on-claw (35) |
+| All instances git-based sync | All pull from BlackPi via Tailscale IP (100.115.67.71) |
+| FDS X credential aliases | Dual names: X_CONSUMER_KEY (canonical) + FDS_X_API_KEY (nightshift) |
 
 ### Future Work
 
 | Feature | Rationale |
 |---------|-----------|
-| Bootstrap tris-on-hermes | Blocked on SSH key setup and BlackPi reachability |
-| Bootstrap data-on-claw | Blocked on SSH key setup and BlackPi reachability |
 | Nightshift service migration | 24 systemd units still reference `~/config/nightshift.env` |
 | `creds add` command | Interactive credential addition with scope routing |
 | GPG encryption layer | Optional; OS-level encryption sufficient for now |
 | Automated rotation | Phase 2; manual rotation via provider UIs adequate |
-| Nightshift git-based sync | Currently rsync; needs BlackPi reachability from nightshift |
+| Periodic sync cron on agents | Tris and Mr Data don't have cron jobs for sync yet |
 
 ### Resolved Questions
 
@@ -1928,3 +1928,4 @@ _Last audited: 2026-04-23_
 | 2026-01-15 | 0.1.0 | Initial draft |
 | 2026-03-04 | 0.2.0 | Added Implementation Status, Current Workaround; formally deferred CLI tooling |
 | 2026-04-23 | 1.0.0 | Multi-instance activation: BlackPi secrets repo, space-scoped split, sync/install scripts, 4 instances |
+| 2026-04-25 | 1.1.0 | Full deployment: Tailscale mesh (5 nodes), all 4 instances bootstrapped and git-syncing, PLUR Hub + Datafund DO + FDS_X aliases added |
