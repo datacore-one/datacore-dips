@@ -1866,7 +1866,7 @@ Should `datacore creds add` support generating credentials (e.g., SSH keys, API 
 ---
 
 ## Implementation Status
-_Last audited: 2026-04-25_
+_Last audited: 2026-04-25 (final verification pass)_
 
 ### Implemented
 
@@ -1890,16 +1890,18 @@ _Last audited: 2026-04-25_
 | All 4 instances deployed | local (86 creds), nightshift (84), tris (35), data-on-claw (35) |
 | All instances git-based sync | All pull from BlackPi via Tailscale IP (100.115.67.71) |
 | FDS X credential aliases | Dual names: X_CONSUMER_KEY (canonical) + FDS_X_API_KEY (nightshift) |
+| Nightshift systemd migration | All 24 services + 5 scripts updated from `~/config/nightshift.env` |
+| `creds add` CLI command | Interactive + non-interactive mode, routes to scope, updates index, commits |
+| Hourly sync cron | All 4 instances (nightshift, tris, Mr Data) sync every hour |
+| `creds audit` v2 compatible | Accepts both v1 `locations` and v2 `var_name`/`vars` schema |
+| `creds list --tier` v2 compatible | Reads both `security_tier` and `tier` fields |
 
 ### Future Work
 
 | Feature | Rationale |
 |---------|-----------|
-| Nightshift service migration | 24 systemd units still reference `~/config/nightshift.env` |
-| `creds add` command | Interactive credential addition with scope routing |
 | GPG encryption layer | Optional; OS-level encryption sufficient for now |
 | Automated rotation | Phase 2; manual rotation via provider UIs adequate |
-| Periodic sync cron on agents | Tris and Mr Data don't have cron jobs for sync yet |
 
 ### Resolved Questions
 
