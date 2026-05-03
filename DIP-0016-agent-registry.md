@@ -1830,6 +1830,45 @@ agents:
             channel: "#content"
 ```
 
+### 19. Lens event emission (DIP-0027 §8 contract)
+
+Schema 1.1 of DIP-0027 (Behavioural Observation Architecture) added the `agent.*` disciplined-core namespace. Subagent lifecycle hooks defined in §16 (pre/post execution) MUST emit lens events at firing time so the desktop app's Live Agent Stream, the Flow primitive, and Tier-3 contributable analytics see subagent activity in the same form as peer-agent activity (DIP-0023).
+
+The mapping from existing DIP-0016 hook points to DIP-0027 events:
+
+| DIP-0016 Hook | DIP-0027 event_type | Required metadata |
+|---|---|---|
+| `pre_execution` | `agent.session_started` | `session_id` |
+| `post_execution` (success) | `agent.session_ended` + `agent.task_completed` | `session_id`, `task_id`, `outcome="success"`, `tokens_used?` |
+| `post_execution` (failure) | `agent.session_ended` + `agent.task_failed` | `session_id`, `task_id`, `error_class` |
+| Tool invocation inside session | `ai_session.tool_called` (existing namespace) | `session_id`, `tool` |
+| Subagent spawning subagent | `agent.escalated` | `task_id`, `to` |
+
+Use the canonical SDK at `.datacore/lib/agent_event.py`:
+
+```python
+from agent_event import AgentEventEmitter
+
+# In pre_execution hook
+em = AgentEventEmitter(agent_id=agent_name, runtime="claude-code")
+em.session_started(session_id=run_id)
+
+# In post_execution hook
+em.task_completed(
+    task_id=task_id,
+    outcome="success",
+    tokens_used=metrics.tokens,
+    cost_usd=metrics.cost,
+)
+em.session_ended(session_id=run_id, duration_ms=elapsed_ms)
+```
+
+The `actor` field is `"agent"` (DIP-0027 §8.1 enum extension). The agent's identifier — the registry name from this DIP's `agents.yaml` — is carried in `metadata.agent_id`. For peer agents (DIP-0023) the same field carries the ActivityPub-shaped identifier; lens treats both id-spaces uniformly because the schema doesn't care which registry produced the actor.
+
+**Required for DIP-0016 compliance going forward**: any agent using lifecycle hooks (§16) MUST emit at least `agent.session_started`, `agent.session_ended`, and one of `agent.task_completed` / `agent.task_failed` per execution. Tool-call observation via `ai_session.tool_called` is RECOMMENDED but not required (it adds latency for tool-heavy agents and the existing nightshift logger already covers the core data).
+
+This is purely additive — agents that don't emit are unobserved by lens but otherwise function normally.
+
 ## Rationale
 
 ### Why This Design?

@@ -8,7 +8,7 @@
 | **Type** | Standards Track |
 | **Status** | Draft |
 | **Created** | 2026-05-01 |
-| **Updated** | 2026-05-01 |
+| **Updated** | 2026-05-03 |
 | **Tags** | `observation`, `privacy`, `capture`, `redaction`, `personalisation`, `metacognition` |
 | **Affects** | `lens` module, `health`, `trading`, `mail`, future appbuilder modules |
 | **Specs** | `lens/docs/spec.md`, `docs/research/2026-05-01-hci-foundations-lens-module.md` |
@@ -402,6 +402,81 @@ evolution follows three rules:
 
 Detectors filter by minimum schema version (`min_schema_version`) when they
 require a specific field. Events below that version are skipped, not errored.
+
+### 8. Agent observation (schema 1.1, 2026-05-03)
+
+Schema 1.1 adds the `agent.` disciplined-core namespace. The motivation: three classes of agent — Claude Code subagents (DIP-0016), peer agents (DIP-0023 contacts), and external Crews (future, via PLUR adapter) — converge on a single event vocabulary so the desktop app's Live Agent Stream, the Flow primitive (cadence engine event listener), and the Universal Inbox don't have to know which runtime produced the event.
+
+#### 8.1 Actor enum extension
+
+The `Actor` enum gains a fifth member:
+
+| Value | Meaning |
+|---|---|
+| `user` | The owner of this Datacore installation |
+| `system` | Internal automation (cron, scheduler, hooks acting on their own) |
+| `derived` | Tier-2 distillation pipelines emitting from Tier-1 facts |
+| `external` | Cross-host signals from non-Datacore sources |
+| **`agent`** | **Autonomous agent — subagent (DIP-0016) or peer (DIP-0023)** |
+
+The `agent` actor is the type discriminator. The agent's stable identifier (e.g., `mr-data@plur-claw` for peer agents per DIP-0023's ActivityPub model, plain registry name for DIP-0016 subagents) is carried in the event's `target_id` or in `metadata.agent_id`. Implementations SHOULD prefer ActivityPub-shaped identifiers when the agent is also an AP actor.
+
+#### 8.2 Disciplined-core types under `agent.`
+
+14 types registered in `DISCIPLINED_CORE_TYPES`. All under the `agent.` namespace, all subject to strict validation per §2 of DIP-0028.
+
+| event_type | Required metadata | Notes |
+|---|---|---|
+| `agent.tick` | (none) | Heartbeat liveness — runtime is alive at this `ts`. Suppressed by humans-facing channels by default. |
+| `agent.session_started` | `session_id` | Runtime opened a work session (e.g. heartbeat tick begins, user prompt arrives, scheduled cadence fires) |
+| `agent.session_ended` | `session_id` | Session closed; metadata SHOULD include `duration_ms`, `tokens_used`, `outcome` |
+| `agent.task_received` | `task_id`, `sender` | DIP-0023 ActivityPub `Create(Note, tag:#task)` arrived in agent inbox |
+| `agent.task_claimed` | `task_id` | Inbox state `QUEUED → WORKING` |
+| `agent.task_completed` | `task_id`, `outcome` | `WORKING → DONE`. `outcome ∈ {success, partial, nochange}` |
+| `agent.task_failed` | `task_id`, `error_class` | `WORKING → CANCELLED` with error |
+| `agent.approval_requested` | `request_id`, `action_class` | Agent wants to do something, defers to owner |
+| `agent.approval_resolved` | `request_id`, `granted` (bool) | Owner decided. `decision_latency_ms` SHOULD be in metadata |
+| `agent.message_sent` | `recipient`, `message_class` | Outbound ActivityPub activity to another actor |
+| `agent.message_received` | `sender`, `message_class` | Inbound from another actor |
+| `agent.decision` | `decision_id`, `branch` | A non-trivial choice was made; `branch` is the Flow router output (when applicable) |
+| `agent.escalated` | `task_id`, `to` | Cross-agent handoff; `to` is the recipient actor identifier |
+| `agent.error` | `error_class` | Runtime error not bound to a specific task |
+
+Naming convention: `agent.<verb>` flat — no sub-namespaces — matching the existing conventions in `task.*`, `engram.*`, `friction.*`, `decision.*`. The `agent.` namespace is added to `_DISCIPLINED_NAMESPACES`, so any unregistered `agent.*` event_type is rejected with `validation_error` rather than accepted into wide-net.
+
+#### 8.3 Engram extensions for PLUR analytics
+
+Two additions to the existing `engram.` namespace, motivated by ENG-2026-0501-009 (lens analytics pipeline as future PLUR.ai data product):
+
+| event_type | Required metadata | Tier-2 distillation | Tier-3 contributability |
+|---|---|---|---|
+| `engram.queried` | `query_hash`, `mode` | drop raw `query_text`; keep hash + mode | embedding-similarity to canonical query types only |
+| `engram.used` | `engram_id`, `used_kind` | keep | yes — efficacy signal |
+
+`used_kind ∈ {cited, paraphrased, contradicted, ignored}`. The `engram.used` event is the closing of PLUR's feedback loop today: implicit usage classification from the conversation transcript drives Hebbian updates without requiring opt-in `plur_feedback` calls.
+
+`engram.queried` MUST NOT carry the raw query text in any tier above Tier-1 (raw stream). The Tier-2 redactor for this source replaces `metadata.query_text` with `metadata.query_hash` (SHA-256 of the original) before any dual-write past Tier-1.
+
+#### 8.4 Cross-DIP responsibilities
+
+| DIP | Owns | Boundary contract |
+|---|---|---|
+| **DIP-0016 (Agent Registry)** | Subagent registry, lifecycle hooks (pre/post execution) | Hooks emit `agent.session_*`, `agent.tool_*` events using this schema; subagent registry name is the actor identifier |
+| **DIP-0023 (Messaging)** | Peer-agent identity (`contacts.yaml`), ActivityPub actor model, agent-inbox state machine | Each `agent_inbox` state transition emits the corresponding `agent.task_*` event; ActivityPub Create/Accept/Update activities emit `agent.message_*` events |
+| **DIP-0024 (Reactive Hooks)** | Claude Code hook composer + hook scripts | Hook scripts use the agent emitter SDK to emit lens events at hook firing time |
+| **DIP-0027 (this DIP)** | Disciplined-core schema, redaction policy, three-tier storage | Validates events from all three above; defines what's contributable |
+| **DIP-0028 (Capture Endpoint)** | HTTP wire format, bearer auth, batch semantics | Transports events to lens regardless of which DIP produced them |
+
+The convergence is on the schema (this DIP). Each producing DIP defines WHEN to emit; this DIP defines WHAT to emit.
+
+#### 8.5 Migration from schema 1.0
+
+Schema 1.1 is a strictly additive change per §7 (forward-only migration):
+- New actor enum value (`agent`) — does not affect events with existing actors
+- New `agent.` namespace — does not affect events with existing namespaces
+- Two new `engram.*` types — additive
+
+No re-derivation from Tier-1 required. Detectors compiled against 1.0 continue to function on 1.0 events; they MAY skip 1.1 events with `forward_compat=True` flagged.
 
 ## Compliance criteria
 

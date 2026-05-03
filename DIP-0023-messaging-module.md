@@ -905,6 +905,58 @@ inbox_feeds:
     triage_actions: [download, reject, archive]
 ```
 
+### 12.5 Lens event emission (DIP-0027 §8 contract)
+
+Every state transition in the agent inbox (`§5.2`) MUST emit a lens event using the `agent.*` disciplined-core namespace defined in DIP-0027 §8. The point of this contract: the same observation plane that captures Datacore subagent activity (per DIP-0016 §19) also captures peer-agent activity from this module — the desktop app's Live Agent Stream, the Flow primitive, and Tier-3 contributable analytics see all agents through one wire format.
+
+Identity mapping: the ActivityPub actor identifier (`gregor-claude@datacore.example.com` per §8.2) is the value of `metadata.agent_id` in lens events. The actor enum value is always `"agent"` (DIP-0027 §8.1).
+
+Mapping from agent-inbox state transitions to lens events:
+
+| DIP-0023 transition | DIP-0027 event_type | Required metadata |
+|---|---|---|
+| Incoming AP `Create(Note, tag:#task)` | `agent.task_received` | `task_id`, `sender`, `trust_tier?` |
+| `WAITING → QUEUED` (owner approves) | `agent.approval_resolved` | `request_id`, `granted=true` |
+| `WAITING → CANCELLED` (owner rejects) | `agent.approval_resolved` | `request_id`, `granted=false` |
+| `QUEUED → WORKING` (TaskClaim) | `agent.task_claimed` | `task_id` |
+| `WORKING → DONE` | `agent.task_completed` | `task_id`, `outcome` |
+| `WORKING → CANCELLED` (failure) | `agent.task_failed` | `task_id`, `error_class` |
+| Outbound `Create(#task)` to peer | `agent.message_sent` | `recipient`, `message_class="task_request"` |
+| Outbound `Update` (status change) | `agent.message_sent` | `recipient`, `message_class="task_status"` |
+| Outbound `Accept` / `Reject` | `agent.message_sent` | `recipient`, `message_class="task_ack"` / `"task_reject"` |
+| Inbound any AP activity | `agent.message_received` | `sender`, `message_class` |
+| Cross-agent escalation | `agent.escalated` | `task_id`, `to` |
+
+The `message-router` agent (§8.1) is the natural emit point for `message_received` events; `message-task-intake` emits `task_received` and `approval_resolved`; the agent-inbox writer (`message_store.py`) emits the task-lifecycle events at every `org-workspace.transition()` call.
+
+**Single chokepoint pattern** — wrap the org-workspace transition with a small helper that emits in the same call. Drift between the org file and the lens stream becomes structurally impossible:
+
+```python
+# modules/messaging/lib/messaging_state.py
+from agent_event import AgentEventEmitter
+
+def transition_with_lens(ws, node, target_state, emitter, **lens_kwargs):
+    """Atomic: org transition + lens emit."""
+    prev_state = node.todo
+    ws.transition(node, target_state)
+    event_type = {
+        "WORKING": "agent.task_claimed",
+        "DONE": "agent.task_completed",
+        "CANCELLED": "agent.task_failed",
+        "ARCHIVED": None,  # archive doesn't need its own event
+    }.get(target_state)
+    if event_type:
+        emitter.emit(event_type, metadata={
+            "task_id": node.get_property("ID"),
+            "prev_state": prev_state,
+            **lens_kwargs,
+        })
+```
+
+**Required for DIP-0023 compliance**: any module implementation MUST use a transition wrapper that emits to lens; raw `ws.transition()` calls bypass the contract and SHOULD be replaced.
+
+Reference SDK: `.datacore/lib/agent_event.py` (Python), `.datacore/lib/agent_event.mjs` (Node), `.datacore/lib/agent_event.sh` (Bash) — same wire format across runtimes.
+
 ### 13. Module Structure
 
 ```
