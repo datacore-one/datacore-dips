@@ -6,7 +6,7 @@
 | **Title** | Command-Scoped Engram Recall |
 | **Author** | @datacore-one |
 | **Type** | Standards Track |
-| **Status** | Draft |
+| **Status** | Final |
 | **Created** | 2026-05-12 |
 | **Updated** | 2026-05-12 |
 | **Tags** | `engrams`, `memory`, `commands`, `modules`, `recall`, `hooks`, `plur` |
@@ -184,14 +184,57 @@ The Superpowers skill system uses Markdown bodies without strict frontmatter. Fo
 
 ### Phase 4 — Cross-harness parity
 
-- OpenClaw plugin `@plur-ai/claw` honors `recall:` blocks in command files
-- Hermes shell hooks honor `recall:` for any sourced `.sh` command stub
-- Datacore desktop app honors `recall:` in its command palette
+Reference implementation lives in `.datacore/lib/hooks/command_recall_inject.py`.
+Any compliant harness MUST replicate the following contract:
+
+1. **Trigger surface.** Fire on every Skill / SlashCommand / Agent / module
+   entrypoint invocation (or the harness's local equivalent).
+2. **Discovery.** Map the tool's name to a command file:
+   - `.datacore/commands/<NAME>.md`
+   - `.datacore/modules/<MODULE>/commands/<NAME>.md` (including the explicit
+     `<MODULE>:<NAME>` form used by Skill names)
+   - `.datacore/agents/<NAME>.md` and `.datacore/modules/<MODULE>/agents/<NAME>.md`
+   - `.datacore/modules/<MODULE>/module.yaml` (module-level scope)
+3. **Frontmatter parse.** Read YAML frontmatter; extract the `recall:` block.
+4. **Composition.** Union module-level recall and command-level recall (per §4
+   of this DIP).
+5. **Resolution.** Resolve `ids` directly from the local PLUR store; resolve
+   `scopes`, `tags`, `query` via BM25-style retrieval against the same store.
+6. **Scoring.** Weights: explicit id = 100, scope = 50, tag = 30, query keyword
+   = 10 × hits. Plus implicit name match: 25 for `scope:command:<name>`, 10 for
+   `name` in tags, 5 for `name` in domain.
+7. **Injection.** Emit a markdown block titled `## Relevant memory for /<name>
+   (DIP-0029 ...)` containing one `- **ID** — statement` line per engram, capped
+   at ~2K tokens. The block MUST appear inside the same context turn as the
+   command body.
+8. **Fail-open.** Any error path returns empty context — never block tool
+   execution.
+
+Harness-specific notes:
+
+- **OpenClaw plugin `@plur-ai/claw`** — honors `recall:` blocks in command files
+  via its command-resolution pipeline. Same contract as above; node-side
+  implementation may share the PLUR npm package's recall API directly instead
+  of shelling out to Python.
+- **Hermes shell hooks** — `.sh` command stubs can declare a leading comment
+  block (`# recall: { ids: [...], scopes: [...] }`) parsed by a shell-side
+  helper. Reuse Datacore's Python resolver via a thin `plur-recall --command
+  <name>` CLI invocation.
+- **Datacore desktop app** — command palette renders the recall block as a
+  collapsible "Memory" section in the command preview UI, so the user can see
+  what context will be loaded before running.
 
 ### Phase 5 — Audit
 
-- `agent-registry-auditor` extended to check commands/modules for `recall:` coverage relative to known failure-mode engrams
-- New engrams with `scope:command:NAME` automatically suggested as additions to that command's `recall:` block
+- `agent-registry-auditor` extended to invoke
+  `.datacore/lib/audit_recall_coverage.py` and surface three drift categories:
+  `missing-recall`, `empty-recall`, `failure-mode-uncovered`.
+- Failure-mode uncovered: an engram whose scope/domain/tag matches the command
+  name AND whose type is `behavioral` / `corrective` / `operational` is treated
+  as a high-signal candidate for the command's `recall.ids`. Auto-suggest, do
+  not auto-apply (false-positive risk on tag matches).
+- Weekly review surfaces drift trends — the uncovered count should be flat or
+  shrinking.
 
 ## Rationale
 
@@ -243,3 +286,10 @@ The Superpowers skill system uses Markdown bodies without strict frontmatter. Fo
 ## Changelog
 
 - 2026-05-12: Initial draft. Authored after a documented /wrap-up failure where the engram designed to prevent the failure was not in context.
+- 2026-05-12: Phases 2-5 implemented. Status → Final.
+  - Phase 2: `command_recall_inject.py` rewritten to parse `recall:` frontmatter from command + module.yaml files; resolves ids/scopes/tags/queries with explicit scoring (id=100, scope=50, tag=30, query=10/hit). Composes module-level + command-level recall blocks.
+  - Phase 3a: 16 top-level commands migrated to `recall:` default block (`scopes: [command:NAME]`, `tags: [NAME]`).
+  - Phase 3b: 73 module commands migrated to `recall:` default block.
+  - Phase 3c: 34 `module.yaml` files received module-level `recall:` declarations.
+  - Phase 4: Cross-harness parity contract specified in §Implementation Plan §Phase 4 — reference implementation (`command_recall_inject.py`) is canonical; OpenClaw / Hermes / desktop app implementations follow the 8-step contract.
+  - Phase 5: `audit_recall_coverage.py` ships as the audit helper. `agent-registry-auditor` extended with a "Recall Coverage Audit" section that calls the helper. Drift categories: missing-recall, empty-recall, failure-mode-uncovered.
