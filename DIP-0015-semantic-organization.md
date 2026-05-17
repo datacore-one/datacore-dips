@@ -8,8 +8,8 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-21 |
-| **Updated** | 2026-03-04 |
-| **Tags** | `organization`, `files`, `structure`, `git-lfs`, `companion`, `media-index` |
+| **Updated** | 2026-05-17 |
+| **Tags** | `organization`, `files`, `structure`, `git-lfs`, `companion`, `media-index`, `generated-content`, `sidecar-metadata` |
 | **Affects** | `.gitattributes`, all spaces |
 | **Specs** | `datacore-specification.md` |
 | **Agents** | `ingest-orchestrator`, `knowledge-extractor`, `structural-integrity` |
@@ -191,6 +191,46 @@ Numbers indicate processing stage:
 #### Canonical Templates
 
 The datacore-org repository contains canonical templates for folder structures. This DIP references those templates as authoritative. Changes to structure should be made in datacore-org first, then referenced here.
+
+#### Generated Content Folders (`content/`)
+
+For **generated or curated media collections** (AI-generated images, video assets, presentation exports, podcast audio) — where the media *is* the artifact rather than an illustration for a document — spaces use a top-level `content/` folder, grouped by topic.
+
+**Path pattern**:
+
+```
+{space}/content/{topic-slug}/{descriptive-name}.{ext}
+{space}/content/{topic-slug}/json/{descriptive-name}.json
+```
+
+**Example** — PLUR brand visualizations generated for the LLM-gap positioning concept:
+
+```
+5-plur/content/plur-llm-gap/
+├── plur-hero-bridge.png
+├── plur-diagram-architecture.png
+├── plur-meme-goldfish.png
+└── json/
+    ├── plur-hero-bridge.json        # service, prompt, created_at, model, ...
+    ├── plur-diagram-architecture.json
+    └── plur-meme-goldfish.json
+```
+
+**Rules**:
+
+| Rule | Reason |
+|------|--------|
+| Route to the space the work belongs to | Same principle as 1-tracks/ — `5-plur/content/...` not root-level |
+| Group by **topic**, not by date or service | Humans recall by *what*, not *when*; dates/services are in the sidecar |
+| No `images/` segment | Drop until a topic mixes media types and crowding forces a split |
+| JSON sidecars in a `json/` subfolder | Keeps image-browse listings visually clean (Finder, `ls`) |
+| Sidecar lookup convention: `parent/json/<stem>.json` | NOT the default `Path.with_suffix('.json')` — tools must use the new resolution |
+| Unique descriptive filenames | Filename is the identifier; redundant tokens (`v1`, `-light`) belong in prompt iteration, not the final filename |
+| No root-level `~/Data/content/` | Each space owns its content; a future symlink layer can aggregate cross-space if needed |
+
+**Relationship to the Core Principle**: The principle *"an image lives with related content (not in a separate images folder)"* still holds — when an image illustrates a specific document, it lives next to that document. `content/` is for **collections** of generated media that *are* the content, not incidental assets.
+
+**Implementing tools**: `gemini-image-gen.py` (writes sidecars to `parent/json/` automatically), `image-library.py` (indexer auto-detects both new and legacy layouts via `_resolve_image_for_sidecar()`), `create-image` command (docs reference this pattern).
 
 ### Part 2: File Handling
 
