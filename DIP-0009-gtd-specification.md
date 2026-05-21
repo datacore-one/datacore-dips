@@ -8,7 +8,7 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-04 |
-| **Updated** | 2026-03-04 |
+| **Updated** | 2026-05-21 |
 | **Tags** | `gtd`, `task-management`, `org-mode`, `agents` |
 | **Affects** | `org/`, `.datacore/commands/`, `.datacore/agents/`, `.datacore/modules/gtd/` |
 | **Specs** | `org-mode-conventions.md` |
@@ -50,9 +50,115 @@ Datacore uses GTD methodology with org-mode as the coordination layer. A formal 
 1. **Augment, don't replace** - AI assists humans, humans make strategic decisions
 2. **Single capture point** - inbox.org is sacred, always process to zero
 3. **Org-mode as source of truth** - External tools sync to org-mode, not vice versa
-4. **Progressive processing** - Inbox → triage → next_actions → archive
+4. **Progressive processing** - Inbox → triage → routed to appropriate file → archive
 5. **Autonomous execution** - AI works overnight, user reviews in morning
 6. **Transparent logging** - Every AI action logged for human review
+7. **File location is the primary routing axis** (added 2026-05-20) — `next_actions.org` is human work, `ai.org` is realtime AI work, `nightshift.org` is deliberation AI work. The `:AI:` tag is no longer the routing mechanism (see Part 0 below).
+
+---
+
+## Part 0: 2026-05-20 Architecture Refactor
+
+**Context:** Prior to 2026-05-20, all tasks (human + AI) lived in a single
+`next_actions.org` per space. AI delegation was signalled by the `:AI:` tag
++ optional `:AI:type:` (e.g. `:AI:research:`, `:AI:pm:`). This created two
+problems:
+1. **Mixed surface:** the human's `next_actions.org` grew unbounded (550+
+   items in 0-personal alone) because AI work mingled with it. The user
+   couldn't see "what is mine to do" without filtering.
+2. **Silent stalling:** tasks tagged `:AI:` but never picked up by an
+   orchestrator sat indefinitely (87 such tasks accumulated by 2026-05-20).
+
+### The new file model
+
+Per-space:
+| File | Owner | Contents | Default state |
+|---|---|---|---|
+| `inbox.org` | capture | transient — processed daily | TODO |
+| `next_actions.org` | **human** | single physical/digital next actions you execute | TODO (NEXT only at weekly-review promotion) |
+| `projects.org` | human (outcomes) | multi-action outcomes; each spawns a next-action | PROJECT |
+| `someday.org` | parked | aspirations, stale items, quarterly-review surface | TODO (passive) |
+| `research_learning.org` | research-orchestrator | research backlog, auto-drained >60d | TODO |
+| `habits.org` (0-personal only) | habit engine | recurring personal disciplines | TODO + `+1d` repeater |
+
+Global (live in `0-personal/org/` and contain `:SPACE:` property to route output):
+| File | Owner | Contents | Latency |
+|---|---|---|---|
+| `ai.org` | **AI realtime** | quick AI tasks (<30 min), polled continuously | minutes |
+| `nightshift.org` | **AI deliberation** | deep AI tasks (audits, research, content), batched overnight | hours |
+
+### Routing decision tree (inbox processor)
+
+```
+Inbox item arrives
+    │
+    ├─ Q1: actionable at all?
+    │   ├─ no, reference  → 3-knowledge/pages/
+    │   ├─ no, aspiration → someday.org
+    │   └─ yes → continue
+    │
+    ├─ Q2: single action or multi-step outcome?
+    │   ├─ multi-step → projects.org (with :OUTCOME:) + spawn next-action below
+    │   └─ single   → continue
+    │
+    ├─ Q3: <2 min and can do now?
+    │   ├─ yes → do it, skip task creation
+    │   └─ no  → continue
+    │
+    ├─ Q4: recurring?
+    │   ├─ daily personal habit → habits.org (no repeater, habit engine handles)
+    │   ├─ periodic review     → next_actions.org with `SCHEDULED: <... +1w>`
+    │   ├─ cron AI deliverable → one-off :setup-cron: task (not a recurring GTD task)
+    │   └─ venture cadence     → declared in venture.yaml, not org
+    │
+    └─ Q5: who executes?
+        ├─ you           → next_actions.org
+        ├─ AI realtime   → ai.org (with :SPACE: property)
+        └─ AI deliberation → nightshift.org (with :SPACE: property)
+```
+
+### Tag semantics post-refactor
+
+- `:AI:` (bare) — **retired as routing marker**. File location is authoritative.
+- `:AI:research:`, `:AI:pm:`, `:AI:code:`, etc. — **still used** as sub-agent
+  dispatch markers within `ai.org` / `nightshift.org`. They tell `ai-task-executor`
+  which Claude subagent to invoke.
+- `:next-week:` — explicitly stated this-week priority by user
+- `:interrupt:` — same-day capture, drops after EOD
+- `:recurring:` — has a `+Nd/+Nw/+Nm` repeater; auto-advances on DONE
+- `:continuation:` — paused work; **defaults to NEXT state** (not TODO)
+- `:@laptop:`, `:@phone:`, `:@deep:`, etc. — GTD context tags (registered in `.datacore/tags.yaml`)
+
+### NEXT state discipline (added 2026-05-20)
+
+`NEXT` is no longer "any future task" — it's "this week's pull-from list."
+Promotion to NEXT is a **deliberate ritual** at weekly review (or when the
+user explicitly lists week priorities). Auto-NEXT exceptions:
+- `:continuation:` tag → defaults NEXT
+- DEADLINE within 7 days → auto-NEXT
+- `:recurring:` with this-week schedule → auto-NEXT
+- Stale NEXT items (sched >7 days ago) get auto-demoted A→B at weekly review
+
+Daily briefing pulls priorities from NEXT-marked items, not bulk TODO.
+
+### Repeater handling (org-workspace 0.4.4+)
+
+When a task with a SCHEDULED repeater (`+Nd`, `+Nw`, `+Nm`, `+Ny`,
+`++` for overdue, `.+` for habit-style) transitions to a terminal state
+(DONE), `OrgWorkspace.transition()`:
+1. Advances SCHEDULED by the repeater interval (mirrors Emacs org-mode)
+2. Reverts state to TODO (the next cycle is open)
+3. Records `:LAST_REPEAT: [YYYY-MM-DD Day HH:MM]` audit stamp
+
+This means recurring tasks **stay alive** across cycles — you don't "close"
+a weekly review by deleting it; flipping it DONE moves it forward by 1 week.
+
+### Retired files
+
+- `calendar.org` — Google Calendar is source of truth
+- `ideas.org` — merged into someday.org
+- `protocol.org` — moved to 3-knowledge/pages/ as reference
+- `1-datafund/{archive,inbox,questions,research_learning,someday}.org` — dead since 2025-12
 
 ---
 
