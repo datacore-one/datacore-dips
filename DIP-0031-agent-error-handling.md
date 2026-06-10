@@ -63,7 +63,7 @@ Rules:
 - `specification` failures MUST be detected before execution where
   possible (cheapest failure is the one that never runs).
 - A task failing with the same category ≥3 consecutive runs is a
-  *recurring failure* — CoS triage (DIP-0030) escalates it as a
+  *recurring failure* — CoS triage (orchestration spec, private module repo) escalates it as a
   decision item, and the executor MUST stop retrying it.
 
 ### 3. Recording
@@ -74,8 +74,10 @@ failed / skipped) writes a JSON record via `record_execution()` to
 ai_tag, status, score, duration_seconds, tokens_used, completed_at,
 error?, failure_analysis?`.
 
-- This directory is **git-synced** (the only synced subtree of `state/`)
-  so analytics, CoS triage, and the review queue work on every machine.
+- This directory is **machine-local** (state/ is gitignored — the root
+  repo is public and records carry task titles). Server→local record
+  sync via a private channel (rsync) is a tracked follow-up; until then
+  each machine's analytics see its own runs.
 - Non-record artifacts (hygiene, structural, registry reports) go in
   `state/nightshift/maintenance/` — the root is reserved for execution
   records (CoS ingest globs `*.json` there).
@@ -104,11 +106,11 @@ error?, failure_analysis?`.
 | 0 tasks completed with non-empty queue | Telegram alert | same run |
 | Git state broken / repeated 0-completions | watchdog (30 min systemd timer) | ≤30 min |
 | Failure rates, recurring, stale cadences | CoS System Pulse in /today | next morning |
-| Individual failed outputs | Review queue (DIP-0030 §5) | next morning |
+| Individual failed outputs | Review queue (CoS orchestration spec §5, private) | next morning |
 | Fallback/degraded code paths | stderr warnings (journalctl) | same run |
 
 Normative: no `except: pass` without a stderr warning. Fail-open is
-permitted for availability; fail-silent is forbidden (see DIP-0030 §6).
+permitted for availability; fail-silent is forbidden (CoS orchestration spec §6, private).
 
 ## Implementation Status
 
@@ -116,7 +118,7 @@ permitted for availability; fail-silent is forbidden (see DIP-0030 §6).
 |-----------|--------|
 | Non-empty error contract | Implemented 2026-06-10 |
 | Classification taxonomy | Implemented (pre-existing, now specified) |
-| Synced execution records | Implemented 2026-06-10 |
+| Synced execution records | Reverted 2026-06-10 (public-repo leak risk) — private channel pending |
 | Recurring-failure stop rule | Partial (CoS detects; executor stop not enforced) |
 | Exponential backoff | **Not implemented** — tracked gap |
 | Review queue surfacing | Implemented 2026-06-10 |
