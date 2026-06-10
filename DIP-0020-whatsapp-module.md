@@ -6,7 +6,7 @@
 | **Title** | WhatsApp Module |
 | **Author** | @datacore-one |
 | **Type** | Module |
-| **Status** | Partial |
+| **Status** | Accepted |
 | **Created** | 2026-01-28 |
 | **Updated** | 2026-03-04 |
 | **Related** | DIP-0010 (External Sync), DIP-0012 (CRM Module) |

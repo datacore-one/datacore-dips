@@ -6,7 +6,7 @@
 | **Title** | Credential Management |
 | **Author** | @datacore-one |
 | **Type** | Infrastructure |
-| **Status** | Active |
+| **Status** | Draft |
 | **Created** | 2026-01-15 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `credentials`, `security`, `portability`, `dotfiles` |
@@ -1872,7 +1872,7 @@ _Last audited: 2026-04-25 (final verification pass)_
 
 | Feature | Evidence |
 |---------|----------|
-| Central secrets repository | Bare git repo on BlackPi (`gregor@100.115.67.71:~/secrets.git`) |
+| Central secrets repository | Bare git repo on BlackPi (`gregor@<gitea-host>:~/secrets.git`) |
 | Credential split (global/space/project) | 10 scoped files: `global.env` + 8 `spaces/` + 1 `projects/` |
 | Instance manifests | `instances/{local,nightshift,tris,data-on-claw}.yaml` |
 | Sync script | `scripts/sync.sh` — git pull + assemble `.env` per manifest (5s timeout) |
@@ -1888,7 +1888,7 @@ _Last audited: 2026-04-25 (final verification pass)_
 | Three-tier architecture | Global + space-scoped + instance-local credentials |
 | Tailscale mesh (5 nodes) | mac, blackpi, nightshift, hermes, plur-claw — all interconnected |
 | All 4 instances deployed | local (86 creds), nightshift (84), tris (35), data-on-claw (35) |
-| All instances git-based sync | All pull from BlackPi via Tailscale IP (100.115.67.71) |
+| All instances git-based sync | All pull from BlackPi via Tailscale IP (<gitea-host>) |
 | FDS X credential aliases | Dual names: X_CONSUMER_KEY (canonical) + FDS_X_API_KEY (nightshift) |
 | Nightshift systemd migration | All 24 services + 5 scripts updated from `~/config/nightshift.env` |
 | `creds add` CLI command | Interactive + non-interactive mode, routes to scope, updates index, commits |

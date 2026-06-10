@@ -6,7 +6,7 @@
 | **Title** | Command-Scoped Engram Recall |
 | **Author** | @datacore-one |
 | **Type** | Standards Track |
-| **Status** | Final |
+| **Status** | Implemented |
 | **Created** | 2026-05-12 |
 | **Updated** | 2026-05-12 |
 | **Tags** | `engrams`, `memory`, `commands`, `modules`, `recall`, `hooks`, `plur` |
