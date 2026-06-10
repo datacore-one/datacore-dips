@@ -11,7 +11,7 @@
 | **Updated** | 2026-06-10 |
 | **Tags** | `errors`, `reliability`, `nightshift`, `observability` |
 | **Affects** | `.datacore/modules/nightshift/lib/{execute,run,execution_recorder}.py`, failure-analyzer agent |
-| **Specs** | DIP-0011 (Nightshift), DIP-0030 (CoS Orchestration) |
+| **Specs** | DIP-0011 (Nightshift); CoS orchestration spec lives in the private chief-of-staff module (publication undecided) |
 | **Agents** | failure-analyzer, all task executors |
 
 ## Summary
