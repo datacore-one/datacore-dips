@@ -163,11 +163,19 @@ While org-mode sees flat tags, Datacore agents **interpret adjacent tags as logi
 
 **AI Delegation Tags:**
 
+> **Routing authority changed 2026-05 (DIP-0009 Part 0):** FILE LOCATION is
+> the primary routing axis — AI deliberation tasks live in `nightshift.org`,
+> realtime AI tasks in `ai.org`. The bare `:AI:` tag is **retired as a
+> routing marker**; placing a task in the right file routes it. Typed tags
+> (`:AI:research:`, `:AI:pm:`, ...) remain in use *within* those files as
+> sub-agent dispatch markers. Where this section and DIP-0009 disagree,
+> DIP-0009 wins.
+
 ```org
 * Research ZK proofs                              :AI:research:
 ```
 
-- Tag 1: `AI` - Signals this task should be delegated to AI
+- Tag 1: `AI` - Part of the compound dispatch marker (no longer routes by itself)
 - Tag 2: `research` - Specifies the agent type (research-orchestrator)
 
 Both tags are independent. A task can have `:research:` without `:AI:` (human research task).

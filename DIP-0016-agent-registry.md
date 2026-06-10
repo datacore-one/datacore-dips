@@ -105,8 +105,13 @@ This section helps agents understand when and how to apply this DIP.
 Create `.datacore/registry/agents.yaml` as the single source of truth for agent metadata:
 
 > **Note:** The examples below use `gtd-research-processor` as a reference agent.
-> This agent has been superseded by `knowledge-extractor` per DIP-0021.
-> The examples are retained for pattern illustration; use current agent names in practice.
+> This agent has been superseded by `knowledge-extractor` per DIP-0021, and as
+> of 2026-06-10 its entry has been **removed from the live registry** (registry
+> hygiene via `registry_validate.py` prunes entries whose source file is gone).
+> The examples are retained for pattern illustration only — do NOT copy the
+> agent name, `source` path, or spawn relationships into new entries; use
+> current agent names (`knowledge-extractor`, `research-orchestrator`) in
+> practice. Registry-vs-disk drift is checked weekly (nightshift Phase 9.5).
 
 ```yaml
 # Agent Registry v1.0.0
