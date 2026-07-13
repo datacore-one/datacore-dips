@@ -8,7 +8,7 @@
 | **Type** | Module |
 | **Status** | Implemented |
 | **Created** | 2025-12-10 |
-| **Updated** | 2026-03-04 |
+| **Updated** | 2026-07-13 |
 | **Module** | nightshift |
 | **Depends On** | DIP-0002, DIP-0009, DIP-0010, Datacortex module |
 
@@ -392,7 +392,7 @@ If needs_revision:
 ```org
 * TODO Research competitor X :AI:research:
   :PROPERTIES:
-  :CREATED: [2025-12-10 Tue]
+  :CREATED: [2025-12-10 Wed]
   :SPACE: 1-teamspace
   :PRIORITY: A
   :END:
@@ -400,21 +400,21 @@ If needs_revision:
 # After queuing:
 * NEXT Research competitor X :AI:research:
   :PROPERTIES:
-  :NIGHTSHIFT_QUEUED: [2025-12-10 Tue 23:00]
+  :NIGHTSHIFT_QUEUED: [2025-12-10 Wed 23:00]
   :NIGHTSHIFT_ID: exec-2025-12-10-001
   :END:
 
 # During execution:
 * WORKING Research competitor X :AI:research:
   :PROPERTIES:
-  :NIGHTSHIFT_STARTED: [2025-12-10 Tue 02:15]
+  :NIGHTSHIFT_STARTED: [2025-12-10 Wed 02:15]
   :NIGHTSHIFT_EXECUTOR: server:personal
   :END:
 
 # After completion:
 * DONE Research competitor X :AI:research:
   :PROPERTIES:
-  :NIGHTSHIFT_COMPLETED: [2025-12-10 Tue 02:27]
+  :NIGHTSHIFT_COMPLETED: [2025-12-10 Wed 02:27]
   :NIGHTSHIFT_SCORE: 0.85
   :NIGHTSHIFT_OUTPUT: [space]/0-inbox/nightshift-001-research.md
   :END:
@@ -686,11 +686,57 @@ Users can override per-task:
 Local and server both work on `main` with atomic operations protocol.
 
 **Key Principles**:
-1. Pull before any operation
-2. Claim tasks via commit + push (distributed lock)
-3. Server only modifies designated files
-4. Append-only patterns for shared files
-5. Commit messages prefixed with `nightshift:`
+1. **HEAD MUST be on the repo's default branch — enforced, not assumed** (see below)
+2. Pull before any operation
+3. Claim tasks via commit + push (distributed lock)
+4. Server only modifies designated files
+5. Append-only patterns for shared files
+6. Commit messages prefixed with `nightshift:`
+
+### The default-branch invariant (added 2026-07-13)
+
+Principle 1 used to be implicit. This DIP said "local and server both work on
+`main`" and then specified `git_commit(...)` / `git_push()` with no branch
+argument — an invariant stated in prose and enforced nowhere. It cost two months
+of work.
+
+**What happened.** `~/Data/5-plur` on the nightshift server was left checked out
+on `ops/b17-sprint-claim` after a sprint claim in May. Nobody ran
+`git checkout main`. Every claim, cadence run, journal entry and zettel since
+went to that branch: **610 commits — 52 zettels, 19 literature notes, every
+weekly content calendar since mid-June, 15 journal entries — none of it on
+`main`, none of it visible to anyone.**
+
+**Why nothing caught it.** `check_and_repair_git()` ran a health check before
+every run and guarded three failure modes: stuck rebase, detached HEAD, missing
+upstream tracking. A stray branch passes all three — it is not detached, has no
+rebase in flight, and tracks its upstream cleanly. The health check inspected
+that branch every night for two months and correctly reported nothing wrong.
+
+> **A health check that only tests for BROKEN states will not catch a VALID
+> state that is simply WRONG.** This generalises well beyond git.
+
+**Enforcement.** `check_and_repair_git()` now resolves the default branch from
+`origin/HEAD` and adds a fourth check: if HEAD is on any other branch, stash any
+dirty tree and check out the default. No `reset --hard` — unlike the rebase and
+detached-HEAD cases the tree is not broken, only pointed at the wrong branch, so
+the stray branch and its commits are left intact on origin. Shipped in
+`datacore-nightshift@9f56c49`.
+
+**Known gap.** This guard lives in nightshift's `run.py`, so it protects Miles
+only. Tris (Hermes/hermes) and Mr Data (OpenClaw/plur-claw) run different
+runtimes with no equivalent, and at the time of writing neither host had any
+cron or timer touching git at all — which is how Tris accumulated 53 uncommitted
+competitor scans over two months that reached nobody, and how Mr Data's `~/Data`
+came to sit on stray branch `openclaw/manual-install-adaptations` with no PR.
+
+The runtime-independent fix is a commit path that resolves its own destination
+rather than inheriting whatever HEAD happens to be — `git hash-object` /
+`commit-tree` / `update-ref` can land a knowledge write on the default branch
+while HEAD sits on a feature branch, with no checkout and no worktree. Until
+that exists, `.datacore/lib/git_fleet_audit.py` (read-only detector) and
+`.datacore/lib/git_fleet_sync.py` (bidirectional lander) are the backstop and
+are intended to run on a timer on **every** agent host, not just nightshift.
 
 ### Sync Flow
 
@@ -747,9 +793,23 @@ def claim_task(task: Task, executor_id: str):
     task.properties['NIGHTSHIFT_EXECUTOR'] = executor_id
     task.properties['NIGHTSHIFT_STARTED'] = now()
 
+    # The branch is NOT optional. A bare commit+push inherits whatever HEAD
+    # happens to be, which is exactly how 610 commits landed on a stale sprint
+    # branch and were never seen again. Assert the destination, do not inherit it.
+    assert_on_default_branch(repo)          # raise, do not guess
+
     git_commit(f"nightshift: claim {task.id}")
     git_push()
 ```
+
+> **Anti-pattern — do not reintroduce.** The real `claim.py` shipped
+> `git_commit_push()` as `git add -A` → `git commit` → `git push`, with no branch
+> argument and no assertion, called from five sites in `run.py`. That is the
+> defect. An agent writes the *file*; deterministic code commits it — so there is
+> no point in the call stack where an LLM chooses a branch, and therefore no
+> point where memory, prompting, or a knowledge pack could have prevented this.
+> **Invariants belong where they can be enforced, not where they can be
+> remembered.**
 
 ### Files Modified by Server
 
