@@ -380,12 +380,17 @@ If needs_revision:
 | `TODO` | Captured, not queued | Human |
 | `NEXT` | Queued for nightshift | Human/System |
 | `QUEUED` | In nightshift queue (alias: `NEXT` with `:NIGHTSHIFT_QUEUED:`) | System |
-| `EXECUTING` | Currently executing (org-mode: `WORKING`) | Nightshift |
+| `WORKING` | Currently executing | Nightshift |
 | `DONE` | Completed and approved | Nightshift |
 | `REVIEW` | Needs human review (nightshift extension) | Nightshift |
 | `FAILED` | Execution failed | Nightshift |
 
-> **Implementation note:** Org-mode headers use `WORKING` for in-progress tasks (more natural for org-mode). The code accepts both `WORKING` and `EXECUTING` as valid states.
+> **Implementation note (updated 2026-07-25, DIP-0009 v1.1):** `WORKING` is the
+> canonical in-progress keyword; `EXECUTING` is **retired** — parsers may still
+> read it for legacy files, but no writer may emit it. Execution states are
+> valid in ANY task file (the nightshift.org-only scoping is retired) and every
+> state write goes through the shared chokepoint writer that strips stacked
+> keywords — see DIP-0009 Part 2 "Writer and Coverage Requirements".
 
 ### Task Properties
 

@@ -8,7 +8,7 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-04 |
-| **Updated** | 2026-05-21 |
+| **Updated** | 2026-07-24 (v1.1 — canonical state vocabulary; see Part 2 amendment note) |
 | **Tags** | `gtd`, `task-management`, `org-mode`, `agents` |
 | **Affects** | `org/`, `.datacore/commands/`, `.datacore/agents/`, `.datacore/modules/gtd/` |
 | **Specs** | `org-mode-conventions.md` |
@@ -254,28 +254,71 @@ Regular reviews ensure system integrity.
 
 ## Part 2: Task States
 
+> **Amendment note (v1.1, 2026-07-24).** v1.0 scoped the nightshift states to
+> `nightshift.org` only. Implementation reality diverged: executors write
+> execution states into any space's `next_actions.org`/`inbox.org`, per-file
+> `#+SEQ_TODO` headers fragmented into 4+ incompatible sets, and org-workspace's
+> default config recognized neither `WORKING` nor `QUEUED`/`REVIEW`/`FAILED`.
+> Result: ~80 tasks stalled invisibly (19 WORKING, 24 QUEUED, 39 REVIEW) plus
+> stacked-keyword corruption (`NEXT WORKING`, `DONE WORKING ×5`) audited
+> 2026-07-24. v1.1 therefore: (1) defines ONE canonical vocabulary valid in
+> every task file, (2) makes the `#+SEQ_TODO` header normative and mandatory,
+> (3) retires `EXECUTING` (`WORKING` is canonical), (4) requires a chokepoint
+> state writer and full requeue coverage.
+
+### Canonical Vocabulary (normative)
+
+Every task-carrying org file MUST declare this exact header, and parsers MUST
+read per-file `#+SEQ_TODO` headers as the source of truth (falling back to
+this canonical set when a header is absent):
+
+```org
+#+SEQ_TODO: TODO(t) NEXT(n!) WAITING(w!) DEFERRED(f) QUEUED(q) WORKING(W!) REVIEW(r!) | DONE(d!) FAILED(x!) CANCELLED(c!)
+```
+
+Exemption: `projects.org` keeps its separate sequence
+(`PROJECT ACTIVE PAUSED | COMPLETED CANCELLED`) — it tracks projects, not tasks.
+
 ### State Definitions
 
-**Standard GTD States** (next_actions.org, research_learning.org):
+**Human flow states** (owned by the human):
 
 | State | Meaning | Terminal | Required Properties |
 |-------|---------|----------|---------------------|
 | `TODO` | Standard next action | No | - |
 | `NEXT` | High priority, work today | No | - |
 | `WAITING` | Blocked on external | No | `:WAITING_ON:` |
-| `DONE` | Completed successfully | Yes | `CLOSED:` timestamp |
 | `DEFERRED` | Someday/maybe | No | `:DEFERRED_REASON:` (optional) |
+| `DONE` | Completed successfully | Yes | `CLOSED:` timestamp |
 | `CANCELLED` | Will not do | Yes | `:CANCEL_REASON:` |
 
-**Nightshift States** (nightshift.org only):
+**Execution overlay states** (owned by the executor while it holds the task;
+valid in ANY task file):
 
 | State | Meaning | Terminal | Required Properties |
 |-------|---------|----------|---------------------|
-| `QUEUED` | Waiting in AI queue | No | - |
-| `EXECUTING` | Currently being processed by AI (org-mode: `WORKING`) | No | `:NIGHTSHIFT_EXECUTOR:`, `:NIGHTSHIFT_STARTED:` |
-| `REVIEW` | Output needs human review before approval | No | `:NIGHTSHIFT_SCORE:` |
-| `DONE` | Completed successfully with quality gates | Yes | `CLOSED:` timestamp, `:NIGHTSHIFT_SCORE:` |
-| `FAILED` | Needs human review (evaluation failed) | No | `:NIGHTSHIFT_REASON:` |
+| `QUEUED` | Claimed into the AI queue | No | - |
+| `WORKING` | Executor active (`EXECUTING` is retired — do not write it) | No | `:NIGHTSHIFT_EXECUTOR:`, `:NIGHTSHIFT_STARTED:` |
+| `REVIEW` | Output awaits human decision (eval gate) | No | `:NIGHTSHIFT_SCORE:` |
+| `FAILED` | Execution failed — awaits human decision | No | `:NIGHTSHIFT_REASON:` |
+
+**Overlay semantics:** a heading carries exactly ONE state keyword at all
+times. Overlay states borrow the same keyword slot for the duration of
+execution, then hand back to a human state (`DONE` via approval, `NEXT` via
+requeue, `CANCELLED` via dismissal). Two adjacent state keywords on one
+heading is corruption, never a valid state.
+
+### Writer and Coverage Requirements (v1.1)
+
+1. **Chokepoint writer:** every state transition MUST go through a single
+   shared writer that strips ALL leading state keywords before writing the
+   new one (self-healing against stacked-keyword corruption). Direct string
+   composition of `** STATE Heading` lines is prohibited.
+2. **Requeue coverage:** every non-terminal overlay state MUST be reachable
+   by the stalled-task requeue scan in every file — a state the pickup loop
+   cannot see and the requeue loop cannot rescue is a zombie class.
+3. **Review routing:** `REVIEW`/`FAILED` tasks surface as decisions in the
+   nightshift digest (mail-triage model), not as folder contents.
 
 ### State Transitions
 
@@ -296,13 +339,20 @@ Regular reviews ensure system integrity.
     └───────────────┴─────────▶ CANCELLED
 ```
 
-**Valid transitions:**
+**Valid transitions (human flow):**
 - `TODO` → `NEXT`, `WAITING`, `DEFERRED`, `DONE`, `CANCELLED`
 - `NEXT` → `TODO`, `WAITING`, `DONE`, `CANCELLED`
 - `WAITING` → `TODO`, `NEXT`, `DONE`, `CANCELLED`
 - `DEFERRED` → `TODO`, `CANCELLED`
 - `DONE` → (terminal)
 - `CANCELLED` → (terminal)
+
+**Valid transitions (execution overlay — executor writes, v1.1):**
+- `NEXT`/`TODO` (`:AI:` tagged) → `QUEUED` (routing) or `WORKING` (direct claim)
+- `QUEUED` → `WORKING` (claim) · `NEXT` (stalled requeue — any file, not just nightshift.org)
+- `WORKING` → `DONE` (approved) · `REVIEW` (eval gate) · `FAILED` (execution error) · `NEXT` (stalled requeue)
+- `REVIEW` → `DONE` (human approves) · `NEXT` (human requeues) · `CANCELLED` (human dismisses)
+- `FAILED` → `NEXT` (retry authorized) · `CANCELLED` (dropped)
 
 ### Archival Behavior
 
@@ -344,7 +394,7 @@ The nightshift queue file mirrors the structure of next_actions.org to preserve 
 
 ```org
 #+TITLE: Nightshift Queue
-#+TODO: QUEUED EXECUTING | DONE FAILED
+#+SEQ_TODO: TODO(t) NEXT(n!) WAITING(w!) DEFERRED(f) QUEUED(q) WORKING(W!) REVIEW(r!) | DONE(d!) FAILED(x!) CANCELLED(c!)
 
 * TIER 1: STRATEGIC FOUNDATION
 ** /Verity
@@ -2492,7 +2542,7 @@ _Last audited: 2026-03-04_
 | Part | Title | Status | Notes |
 |------|-------|--------|-------|
 | 1 | GTD Workflow | Implemented | Five stages, capture/clarify/organize/review/do |
-| 2 | Task States | Implemented | TODO/NEXT/WAITING/DONE + AI states (QUEUED/EXECUTING/FAILED) |
+| 2 | Task States | Implemented | Canonical vocabulary v1.1 — human flow + execution overlay (QUEUED/WORKING/REVIEW/FAILED) |
 | 3 | File Structure | Implemented | inbox.org, next_actions.org, Rich Task Standard |
 | 4 | AI Agent Architecture | Implemented | ai-task-executor, gtd-inbox-coordinator, routing |
 | 5 | Review Cycles | Implemented | /today, /wrap-up, weekly review, monthly review |
