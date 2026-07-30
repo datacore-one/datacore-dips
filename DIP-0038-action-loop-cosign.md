@@ -209,6 +209,34 @@ All eight checks run before `log.append` is ever called, so a rejected event
 never touches the log file — `PolicyError` is raised on validation, not on a
 partially-committed write that then has to be rolled back.
 
+### Amendment: Closed Effects Vocabulary — Precondition for Wiring (final-review wave, 2026-07-30)
+
+Before this amendment, an effect tag that didn't match anything in
+`cosign_effects` was treated as simply "not gated" — including a *typo'd*
+effect (`emial.send` instead of `email.send`). That is a silent-bypass
+gap: the whole point of `cosign_effects` is to force a human grant onto
+specific side-effecting operations, and a misspelled effect string would
+sail a `task.create` straight through ungated with no error of any kind.
+Landed this wave, ahead of Phase 6 wiring (real `cos_approval_*` MCP tools
+and Telegram handlers acting on `guarded_append`'s decisions): the policy
+gains an optional `known_effects` list — the complete, closed vocabulary
+of valid effect tags a `task.create` may declare, defaulting to
+`cosign_effects` when the policy file omits it. `guarded_append` now
+checks every effect named in a create's `effects` list against
+`policy.effective_known_effects` and **fails closed** with `PolicyError`
+naming the unknown effect if any isn't registered — unconditionally,
+regardless of whether that effect would have required cosign at all. A
+legitimate non-cosign effect must be explicitly added to a custom
+`known_effects` list to remain usable; the tracked default
+`.datacore/keys/approvals_policy.yaml` now carries `known_effects` equal
+to the three default `cosign_effects`.
+
+This is a precondition for wiring, not the wiring itself: Phase 6's real
+approval surfaces can now assume that every effect tag reaching
+`guarded_append` is either a registered, deliberately-non-gated effect or
+one of `cosign_effects` — never an unrecognized string masquerading as
+"harmless because it didn't match."
+
 ### The `TRUST BOUNDARY` (verbatim, from `ledger/policy.py`'s module docstring)
 
 This is load-bearing enough to the whole gate's honesty that it is
