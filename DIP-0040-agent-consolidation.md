@@ -208,6 +208,30 @@ DIP-0016, confirmed by Task 7.1's read against the live file):
   not yet closed by any of the three hardening passes that preceded this
   real run.
 
+### Amendment: Gitignored-Source Guard (final-review wave, 2026-07-30)
+
+A fifth guard, alongside the four above: before physically moving a
+deprecated entry's `source:` def file, `apply()` now checks whether that
+path is itself git-ignored in the repo rooted at `base_dir`
+(`git -C <base_dir> check-ignore -q <source>`). `archive_dir` is a
+*tracked* location — silently moving a gitignored file into it would
+either vanish the file from the disk-tracking expectations its own
+`.gitignore` entry encodes, or require force-adding it against the
+repo's own stated intent, and a mechanical GC pass has no business
+deciding that on its own. When the source is ignored, the physical move
+is skipped exactly like the shared-source collision case — the entry is
+still archived as metadata (so it no longer clutters the live registry),
+`entry["source"]` is left pointing at the original, unmoved location, and
+a `"[gc] WARNING gitignored source retained: <path> (archive entry
+created, file left in place)"` line is added to the action log.
+
+Determining "ignored" is deliberately best-effort: if `git` isn't
+installed, `base_dir` isn't inside a git working tree, or the check
+otherwise fails to run, the path is treated as **not** ignored and
+`apply()` falls back to its normal archival move — this keeps every
+pre-existing tmp_path test fixture (none of which are git repos)
+behaving exactly as before this guard was added.
+
 ### Personas-as-data: the evaluator roster
 
 The first (and, to date, only) consolidation actually carried out through
