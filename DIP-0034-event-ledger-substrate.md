@@ -280,6 +280,42 @@ Task lifecycle rules, each independently load-bearing:
 `spend_by_actor()`); it is never a source of truth and is always safe to
 delete and rebuild from the event log by re-running `fold()` + `build_index()`.
 
+### Amendment: Poison-Event Defense (final-review wave, 2026-07-30)
+
+`fold()` KeyError'd on two payload shapes, both empirically confirmed via
+`ledger_cli`: a `task.*`-family event missing `"id"` (or carrying a
+non-string/empty one), and `spend.record` with a missing, non-`int`,
+`bool`, or negative `"cents"`. Because `fold()` is a substrate primitive
+every space depends on, a single poisoned event line was enough to brick
+`ledger_cli tasks`/`balances` for the whole space with an unhandled
+traceback — the opposite of the "mechanically auditable, never silently
+corrupting" posture this DIP commits to.
+
+Landed this wave:
+
+- A `task.*` event without a non-empty string `"id"` is routed to
+  `LedgerState.orphans` as `"{hlc} {type} -"` instead of being looked up
+  (`KeyError`) or fabricated into task state — this makes the pre-existing
+  `.get("id", "?")` fallback in `_orphan` actually reachable for the first
+  time (a missing/invalid id used to `KeyError` before ever reaching it).
+- `spend.record` with an invalid `"cents"` (missing, non-`int`, `bool` —
+  Python's `bool` is an `int` subclass — or negative) is skipped entirely
+  (no balance mutation) and recorded as an orphan
+  `"{hlc} spend.record invalid"`.
+- The negative-`cents` rejection is the **substrate-side half of the
+  ledger's conservation floor**: spend only ever accumulates upward; it
+  can never be pushed backwards by a single poisoned event, independent of
+  whatever policy-side guard (DIP-0038) sits above it.
+- `fold()` now never raises on any payload shape, for any event type it
+  handles — a malformed event always becomes an orphans entry, and
+  folding continues; the rest of the space's state is unaffected.
+
+Substrate-level robustness amendment, not a behavior change for any
+well-formed event: every pre-existing test in `tests/test_ledger_fold.py`
+continues to pass unmodified; the new poison-shape tests (per event type,
+plus a `ledger_cli tasks`/`balances`-on-a-poisoned-space subprocess check)
+are additive.
+
 ### Key custody
 
 Two locations with different trust properties and different git treatment:
