@@ -10,7 +10,7 @@
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-07-30 |
 | **Tags** | `topology`, `box`, `mac-spof`, `installer`, `artifact-sync`, `job-verify`, `datacore-v2` |
-| **Affects** | `.datacore/lib/v2_box_setup.sh`, `.datacore/lib/artifact_sync.py`, `.datacore/lib/config_plane.py`, `.datacore/lib/job_verify.py`, `.datacore/lib/jobs/manifest.yaml`, `~/.datacore/datacore.env` (box canonical env), `~/.datacore/datacore.env` (mac canonical env, new), box root crontab, `modules/chief-of-staff/server/lib/cos_verify_morning.py` (named for retirement, not yet retired) |
+| **Affects** | `.datacore/lib/v2_box_setup.sh`, `.datacore/lib/artifact_sync.py`, `.datacore/lib/config_plane.py`, `.datacore/lib/job_verify.py`, `.datacore/lib/jobs/manifest.yaml`, `.datacore/lib/jobs/checks.py` (regex check now `re.MULTILINE`, same-day fix), `~/.datacore/datacore.env` (box canonical env), `~/.datacore/datacore.env` (mac canonical env, new), box root crontab, `modules/chief-of-staff/server/lib/cos_verify_morning.py` (named for retirement, not yet retired) |
 | **Specs** | `.datacore/lib/v2_box_setup.sh`, `.datacore/lib/artifact_sync.py` |
 | **Agents** | any process that reads CoS briefing artifacts on the mac (datacore-app, `/today`); the box installer itself; `job_verify.py --machine box` as the box-side monitor this DIP puts on a cron |
 | **Relates to** | `ENG-2026-0612-017` (the original Mac-SPOF finding this whole DIP answers), `ENG-2026-0727-008` (three-machine topology: mac / box (Winston) / nightshift, corrected in place, canonical role split), DIP-0034 (Event Ledger Substrate — `metric.attest` events `job_verify.py` writes), DIP-0035 (Job Contracts + Unified Verifier — the manifest and verifier this DIP puts into production on a real box for the first time), DIP-0036 (Config Plane — `config_plane.py`'s canonical/legacy env model, which `v2_box_setup.sh` and `artifact_sync.py` both consume) |
@@ -227,9 +227,24 @@ concatenated, failing the string-equality check against `"600"` even though
 the file's real permissions are correct. Verified independently: `ls -la
 ~/.datacore/datacore.env` on the box shows `-rw-------` (600), confirming
 this is a verify-script portability bug in the stat probe, not an actual
-permission defect. **Not fixed here** — this DIP's Task 6.3 scope is
-run-and-record, not patch-the-installer; the fix belongs to whoever owns
-`v2_box_setup.sh` next.
+permission defect.
+
+**UPDATE (same day, after this section was first written):** fixed —
+commit `7f68d7d` swapped the probe order to GNU-first (`stat -c '%a'`),
+BSD (`stat -f '%Lp'`) kept only as a fallback for this Mac's local fixture
+suite. Fixture suite green (21/21, including `test_verify_passes_after_apply`),
+full suite green (609/609). Rsynced the fixed `v2_box_setup.sh` to the box
+and re-ran `--verify`: now exits 0 clean —
+
+```
+[v2] cryptography: OK 41.0.7
+[v2] env: OK /root/.datacore/datacore.env exists, 0600, non-empty
+[v2] cron: OK job_verify cron already present
+[v2] todo-report:
+  (none)
+[v2] verify: OK all v2 box-setup checks passed
+EXIT_CODE:0
+```
 
 **Live `job_verify.py --machine box --alert log --no-emit`:** exit 1. 9 of
 10 box jobs passed silently (no per-job output by design — only failures
@@ -241,10 +256,48 @@ job 'box-briefing' FAILED:
 alert: job.verify FAILED: box-briefing (1 failure(s))
 ```
 
-This is the verifier doing its job — a real gap between the manifest's
-assumed journal-heading contract and what `cos_morning.sh` actually wrote
-today. Recorded as a finding for whoever owns that job's contract or its
-generator next; not chased here.
+**Determination (same day): this was a REGEX BUG, not a true positive.**
+The box's actual journal
+(`/root/Data/0-personal/notes/journals/2026-07-30.md`) contains both
+`## Daily Briefing` and `## Good Morning` verbatim, confirmed by direct
+inspection on the box — `cos_morning.sh` did not fail. Root cause, traced
+and reproduced: `jobs/checks.py`'s `regex` check ran `re.search(pattern,
+text)` **without `re.MULTILINE`**. The manifest's pattern is
+`^##\s+(Daily Briefing|Good Morning)` — a line-anchored assertion by
+intent ("some line in this file starts with one of these headings"). But
+without `re.MULTILINE`, Python's `^` anchors only to position 0 of the
+*entire file string*, and every journal file opens with a YAML frontmatter
+block (`---\ndate: ...`), so position 0 is always `-`, never `#` — the
+pattern could never match *any* journal file, regardless of whether the
+target heading is present later in the text, exactly as it is here.
+Reproduced directly (`re.search` with vs. without `re.MULTILINE` against
+the real journal shape) before touching the fix.
+
+This is ruled an Important defect, not a mere finding to log and move
+past: a verifier that raises false-positive alerts erodes trust in the
+verifier itself — precisely the failure mode DIP-0035 exists to prevent
+(a check must be *right*, not merely *present*). **Fixed same day**:
+`jobs/checks.py`'s regex check now always passes `re.MULTILINE`
+(documented in both the module docstring and an inline comment at the
+call site); a new fixture test
+(`test_regex_matches_line_anchored_pattern_after_frontmatter_preamble`)
+mirrors the real journal shape (frontmatter + a later `##` heading) and
+was verified RED against the pre-fix code before the fix landed, then
+GREEN after. Full suite: 610/610 (609 + 1 new test), no regressions.
+Rsynced the fixed `checks.py` to the box and re-ran the live verifier:
+
+```
+$ ssh <box> "DATACORE_V2=1 DATACORE_ROOT=/root/Data python3 /root/Data/.datacore/lib/job_verify.py --machine box --alert log --no-emit"
+OK 10 jobs 15 artifacts
+EXIT_CODE:0
+```
+
+**10 of 10 box jobs now OK** — the false failure is gone; nothing else in
+the manifest was hiding behind it. Scope note: the missing `re.MULTILINE`
+was in the *generic* regex-check handler, so it could equally have
+false-failed any other `check: regex` manifest entry with a `^`-anchored
+pattern against a multi-line file with a preamble — this fix protects all
+of them, not just `box-briefing`.
 
 **Mac-side `artifact_sync.py --role client`:** dry-run planned 3 pairs
 correctly (reading the new `COS_SERVER_SSH` from the freshly-created mac
@@ -257,27 +310,33 @@ is a finding: those two artifacts are not yet produced by any box process,
 a gap for a later phase, not a sync bug.
 
 **Retirement clock:** the 7-green-days clock for retiring
-`cos_verify_morning.py` **STARTS today, 2026-07-30** — but today's own run
-was not green (`job_verify` exited 1 on `box-briefing`, and the installer's
-own post-apply `--verify` was not clean). The clock names the *start of
-monitoring*, not day 1 of a clean streak; the streak count as of this DIP's
-authoring is **0 of 7**. `cos_verify_morning.py` retirement and a
-notebook-off simulation (running with the mac's own datacore-app fully
-absent, so the box artifacts are the only signal, real or synthetic) are
-**dated follow-up gates, not claimed done here**: both require 7
-consecutive clean `job_verify --machine box` runs first, which as of this
-DIP's authoring have not occurred even once.
+`cos_verify_morning.py` **STARTS today, 2026-07-30**. Nuance, stated
+honestly rather than smoothed over: the box's *actual scheduled* `08:00
+UTC` cron fired once already today, before either same-day fix (stat
+probe, `re.MULTILINE`) had landed, and its logged run was not clean. A
+**manual** re-run after both fixes now shows the box fully green (installer
+`--verify` exit 0, `job_verify` 10/10 OK) — but that is a manual
+confirmation of present health, not a second scheduled cron execution.
+Whether the retirement gate should count "7 consecutive calendar days
+ending clean" (in which case today could plausibly count, given the
+system is demonstrably clean as of this update) or "7 consecutive
+*scheduled cron* runs" (in which case today's actual 08:00 UTC firing was
+not clean, and the streak has not started) is exactly the ambiguity Open
+Question 4 names — this DIP still takes no position on it. Streak count,
+under either reading, is **0 of 7 confirmed scheduled-runs** as of this
+update; `cos_verify_morning.py` retirement and the notebook-off simulation
+remain **dated follow-up gates, not claimed done here**.
 
 ## Open Questions
 
-1. **The `stat -f`/`stat -c` portability bug in `v2_box_setup.sh`** — needs
-   a real fix (e.g. probe `stat --version` once, or use `stat -c '%a'`
-   unconditionally since the box is always Linux and the BSD branch only
-   ever mattered for local test-fixture runs on the author's mac). Deferred
-   to whoever owns the installer next; not fixed in this DIP's scope.
-2. **`box-briefing`'s journal-heading regex mismatch** — is the manifest's
-   contract wrong, or did `cos_morning.sh` actually fail to write the
-   expected heading today? Needs its own investigation, out of scope here.
+1. **RESOLVED (same day)**: the `stat -f`/`stat -c` portability bug in
+   `v2_box_setup.sh` was fixed by swapping the probe to GNU-first,
+   BSD-fallback (commit `7f68d7d`) — see Honest Status update above.
+2. **RESOLVED (same day)**: `box-briefing`'s journal-heading regex
+   "mismatch" was a regex bug (missing `re.MULTILINE`), not a real
+   contract violation — the journal was correct all along. Fixed in
+   `jobs/checks.py`; see Honest Status determination above for the full
+   root-cause trace and live 10/10 re-verify.
 3. **`answers.yaml` and `facts.json` do not exist on the box at all** — is
    this a not-yet-implemented producer, a naming mismatch with what some
    other process actually writes, or a manifest/sync-plan entry that should
