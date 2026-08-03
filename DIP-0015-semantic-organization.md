@@ -8,11 +8,11 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-21 |
-| **Updated** | 2026-05-17 |
-| **Tags** | `organization`, `files`, `structure`, `git-lfs`, `companion`, `media-index`, `generated-content`, `sidecar-metadata` |
-| **Affects** | `.gitattributes`, all spaces |
+| **Updated** | 2026-08-03 |
+| **Tags** | `organization`, `files`, `structure`, `git-lfs`, `companion`, `media-index`, `generated-content`, `sidecar-metadata`, `space-discovery` |
+| **Affects** | `.gitattributes`, all spaces, `.datacore/lib/spaces.py` |
 | **Specs** | `datacore-specification.md` |
-| **Agents** | `ingest-orchestrator`, `knowledge-extractor`, `structural-integrity` |
+| **Agents** | `ingest-orchestrator`, `knowledge-extractor`, `structural-integrity`, `create-space`, `scaffolding-auditor` |
 
 ## Summary
 
@@ -84,6 +84,75 @@ Current gaps:
 - No guidance for large files, companion files, or AI readability
 
 ## Specification
+
+### Part 0: Space Identity and Discovery
+
+A **space** is a directory carrying `.datacore/config.yaml` with a `space:` key.
+That marker is what makes it a space — not its name, and not its location.
+
+```yaml
+space:
+  name: example        # stable identity; the same across every install
+  type: team           # personal | team | meta | client
+  owner: other-space   # optional — the space that owns this one
+```
+
+#### The numeric prefix is a local ordinal
+
+Directories are conventionally named `[0-9]-<name>`, but **that prefix is
+per-install sort order and carries no identity.** The same space repository is
+`5-thing` in one contributor's install and `9-thing` in another's, because each
+person numbers spaces in the order they cloned them. Nothing may key on it.
+
+Discovery therefore uses the marker, the way git finds `.git` and monorepo
+tooling finds `package.json`. Three consequences:
+
+- **Location is free.** A space may sit at the install root, nested inside
+  another space, or anywhere else within the walk bound.
+- **Kind is expressible.** `type` lets a subsystem process team spaces while
+  skipping, say, the install-level `meta` capture point — which the old
+  `[0-9]-*/` glob matched indiscriminately.
+- **Relationships are metadata, not directories.** `owner` records that one
+  space belongs to another without encoding it in the filesystem, so it survives
+  the relationship changing. A client space transferred between owning entities
+  is a one-line edit.
+
+#### Discovery is centralised
+
+All discovery goes through `.datacore/lib/spaces.py`:
+
+```python
+from spaces import discover_spaces, find_space
+
+for space in discover_spaces():            # every space
+for space in discover_spaces(types={"team"}):
+owning = find_space(some_path)             # innermost space containing a path
+```
+
+Nothing may re-implement discovery by globbing. Fifteen call sites previously
+did, across five parallel implementations, which meant any structural change
+required a fifteen-file sweep and a missed site removed a space from that
+subsystem **silently** — no error, just absent from journals, hygiene runs, or
+tag validation until someone noticed.
+
+#### The marker must be emitted, never requested
+
+`install.yaml` already carried a `spaces:` registry and decayed to 2 of 9
+entries, because glob discovery made registration optional. Any mechanism that
+asks a human to register a space reaches the same state.
+
+Therefore: `create-space` writes the marker as part of creating a space, and
+`scaffolding-auditor` / `structural-integrity` flag a space directory that
+lacks one. A marker is never something a person is asked to remember.
+
+#### Migration
+
+`discover_spaces()` returns the **union** of marker-discovered and legacy
+`[0-9]-*/` directories, so nothing previously found stops being found.
+`discovery_discrepancy()` reports where the two disagree; the legacy-only set
+must be empty before `include_legacy` defaults to False and the glob is removed.
+A space repository that does not commit its marker keeps working until then, but
+must gain one before removal.
 
 ### Part 1: Folder Structure
 
