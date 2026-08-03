@@ -13,6 +13,7 @@
 | **Affects** | `.datacore/lib/jobs/` (`manifest.py`, `checks.py`, `manifest.yaml`), `.datacore/lib/job_verify.py` |
 | **Specs** | `.datacore/lib/jobs/*.py`, `.datacore/lib/job_verify.py` |
 | **Agents** | any process operating a scheduled job on mac/box/nightshift; `job_verify.py` itself as the verification runner |
+| **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — hard: event schema, `EventLog`, actor resolution (DIP-0034 is itself unratified/Draft, so this dependency chain is Draft → Draft) |
 | **Relates to** | DIP-0034 (Event Ledger Substrate — `metric.attest` sink), `ENG-2026-0729-016` (ledger-mindset direction, item 2: verification contracts), `ENG-2026-0728-001` (silent-degradation failure genre), `ENG-2026-0423-001` (nightshift git-lock silent failure — same failure genre) |
 
 ## Summary
@@ -29,6 +30,57 @@ shared contract format and no common durable record. This DIP is Phase 2 of
 the v2 rollout DIP-0034 names in its Rollout Plan; it consumes DIP-0034's
 event schema and `EventLog`/actor-resolution conventions without changing
 them.
+
+## Agent Context
+
+This section helps agents understand when and how to apply this DIP.
+
+### When to Reference This DIP
+
+**Always reference when:**
+- Adding a new scheduled job (cron entry, systemd timer, launchd agent) on
+  `mac`, `box`, or `nightshift` and deciding whether it needs artifact
+  verification
+- About to write a new one-off watchdog script for a job — check
+  `jobs/manifest.yaml` first; ending that pattern is this DIP's reason to
+  exist
+- Interpreting a `metric.attest` event carrying `metric: "job.verify"` in
+  the DIP-0034 event ledger
+- Reconciling nightshift's own success signals (org-state properties,
+  `execution_recorder`, `failure-analyzer`'s classification) against a
+  `job_verify.py` verdict for the same run
+- Diagnosing whether a job failure is a per-execution error (DIP-0031's
+  territory) or a missing/stale output artifact (this DIP's territory)
+
+### Quick Reference for Agents
+
+| Question | Answer |
+|----------|--------|
+| How do I add a new scheduled job to verification coverage? | Add one entry to `jobs/manifest.yaml` — see the worked example in Specification — instead of writing a new watchdog script |
+| Does `job_verify.py` replace nightshift's own success tracking? | No — it's a third, coarser per-machine artifact-existence signal alongside nightshift's org-state and `failure-analyzer`'s per-execution classification (DIP-0011, DIP-0031); reconciling the three is out of Phase 2 scope |
+| What event type does a verification verdict use? | `metric.attest` with payload `metric: "job.verify"` — this DIP owns only that one class of DIP-0034's namespaced `metric.attest` family, not the event type itself |
+| What agent runs `job_verify.py`? | None — it's invoked directly by the OS scheduler (cron/systemd/launchd), outside the agent registry; see Relationship to Adjacent DIPs |
+| How do I pick `max_age_hours` and `check` for a new artifact? | See "Choosing `max_age_hours` and `check` type" in Specification |
+
+### Related Agents
+
+| Agent | Uses This DIP For |
+|-------|-------------------|
+| `nightshift-orchestrator` | Nightshift is one of the three `--machine` targets `job_verify.py` checks; this agent's own org-state completion signal is a separate, complementary success signal for the same runs |
+| `failure-analyzer` | Classifies *why* an individual nightshift task execution failed (DIP-0031); complements, does not duplicate, `job_verify.py`'s output-side artifact check on the job as a whole |
+
+No registry agent currently invokes `job_verify.py` itself — it runs as a
+scheduler-triggered script (cron/systemd/launchd), never through the
+registry's `spawns`/`can_be_called_by` graph. See the DIP-0022 relationship
+below for why no agent-registry mechanism covers this yet.
+
+### Integration Points
+
+- [DIP-0034](DIP-0034-event-ledger-substrate.md) — hard dependency: `EventLog`, actor resolution, and the `metric.attest` namespaced family this DIP allocates its `job.verify` class from
+- [DIP-0031](DIP-0031-agent-error-handling.md) — complementary, not overlapping: per-execution diagnostic classification vs. this DIP's output-side artifact verification
+- [DIP-0024](DIP-0024-reactive-hooks-infrastructure.md) — no shared mechanism: its hook families have no scheduled-job event type; `job_verify.py` is scheduler-triggered, not hook-triggered
+- [DIP-0022](DIP-0022-module-specification.md) — silent on scheduled-work declaration; `jobs/manifest.yaml` is a new, orthogonal registry, not an extension of anything DIP-0022 defines
+- [DIP-0011](DIP-0011-nightshift-module.md) — nightshift is one of the three `--machine` targets; adjacent to, not a replacement for, its own org-state and `execution_recorder` signals
 
 ## Motivation
 
@@ -85,13 +137,15 @@ success.**
    never looks at a job's own exit status; it independently inspects the
    filesystem after the fact, so a job's own (possibly wrong) success report
    cannot mask its output's absence.
-3. **A mechanical verification tier feeding the ledger** — `metric.attest`
-   events (reserved by DIP-0034 explicitly for this consumer) give
-   `job_verify.py`'s per-run verdict a durable, hash-chained, queryable
-   record, rather than only a line in a log file that might itself be the
-   artifact under test.
+3. **A mechanical verification tier feeding the ledger** —
+   `job_verify.py`'s verdicts land as `metric.attest` events carrying
+   `metric: "job.verify"`, the class this DIP owns within DIP-0034's
+   namespaced `metric.attest` family (see DIP-0034's event-type table for
+   the other allocated classes, e.g. DIP-0037's `fact` class), giving each
+   per-run verdict a durable, hash-chained, queryable record, rather than
+   only a line in a log file that might itself be the artifact under test.
 4. **A foundation for consolidating the box's watchdogs** — Phase 6 revisits
-   whether `cos_verify_morning.sh` and similar scripts can retire once the
+   whether `cos_verify_morning.py` and similar scripts can retire once the
    manifest covers their jobs with enough confidence (see Rollout Plan);
    this DIP does not retire anything itself.
 
@@ -136,6 +190,55 @@ duplicate job names are flagged; `machine`/`on_fail`/`check` must be one of
 their enumerated values; every job needs at least one artifact; an artifact's
 `arg` type must match what its `check` requires (`json_has_keys` needs a list,
 `regex` needs a string, `exists`/`nonempty` must carry no `arg` at all).
+
+### Worked example: a manifest job entry
+
+```yaml
+version: 1
+jobs:
+  - name: box-cos-morning-briefing
+    machine: box
+    schedule: "30 8 * * *"          # cron: 08:30 daily
+    cmd: "python3 cos_morning.py"
+    on_fail: telegram
+    required_env:
+      - ANTHROPIC_API_KEY
+      - OLLAMA_MODEL
+    artifacts:
+      - path: "~/cos/briefings/{today}.md"
+        check: nonempty
+        max_age_hours: 4            # daily job; ~half the interval plus slack
+      - path: "~/cos/state/morning_report.json"
+        check: json_has_keys
+        arg: ["status", "sections_generated"]
+        max_age_hours: 4
+```
+
+This entry would have caught the `ENG-2026-0728-001` failure modes it was
+modeled on: a missing `ANTHROPIC_API_KEY` or `OLLAMA_MODEL` is documented
+(though not itself checked by `job_verify.py` in Phase 2), and either an
+empty briefing file or a report JSON missing its expected keys fails the
+artifact checks independent of `cos_morning.py`'s own exit code.
+
+### Choosing `max_age_hours` and `check` type
+
+Neither choice is mechanically derivable from the schema, so:
+
+- **`max_age_hours`** — set it to roughly **2x the job's own schedule
+  interval**: a daily job then tolerates one missed run before alerting
+  rather than flapping on ordinary run-time jitter; an hourly job's
+  artifact should rarely be older than ~2 hours. Tighten it for artifacts
+  whose staleness has direct user impact (a briefing nobody saw this
+  morning); loosen it for low-stakes housekeeping jobs where a missed run
+  for a day is a shrug, not an incident.
+- **`check` type** — use `json_has_keys` for structured reports with an
+  expected shape (this catches "ran, wrote *a* file, but the fields
+  consumers actually read are missing" — exactly the `ENG-2026-0728-001`
+  failure mode); use `regex` for a content marker inside an otherwise
+  unstructured log or report; use `nonempty` for simple logs or briefings
+  where "wrote *something*" is the whole contract; reserve bare `exists`
+  for artifacts where presence alone is meaningful (a lock file, a
+  completion sentinel) and content is checked elsewhere.
 
 ### Check types, path expansion, and freshness semantics (`jobs/checks.py`)
 
@@ -198,8 +301,12 @@ isolation: a fault in one unit of work must never take down the whole run.
 **`metric.attest` events**: unless `--no-emit` is passed, the runner appends
 one `metric.attest` event per checked job via `EventLog(space, actor)`
 (DIP-0034), with payload `{"metric": "job.verify", "job": <name>, "ok":
-<bool>, "failures": [<error strings>]}`. Actor resolution matches
-`ledger_cli.py`: `$DATACORE_ACTOR`, else `socket.gethostname()`.
+<bool>, "failures": [<error strings>]}`. `job.verify` is this DIP's sole
+allocated class within DIP-0034's namespaced `metric.attest` family — the
+`metric` field is the discriminator other classes (e.g. DIP-0037's `fact`
+class) use to share the same event type without colliding; see DIP-0034's
+event-type table. Actor resolution matches `ledger_cli.py`:
+`$DATACORE_ACTOR`, else `socket.gethostname()`.
 
 **Alert dispatch semantics**: each job's own manifest-declared `on_fail`
 (`log` or `telegram`) is the **source of truth** for which channel that
@@ -272,6 +379,52 @@ produce — the exact class of failure named in `ENG-2026-0728-001` and
   — `job_verify.py` runs alongside them. See Rollout Plan for the retirement
   criteria that would eventually change that.
 
+### Relationship to Adjacent DIPs (DIP-0031, DIP-0024, DIP-0022, DIP-0011)
+
+This DIP's mechanism is scheduled-job artifact verification. Four adjacent
+DIPs cover nearby ground without conflicting:
+
+- **DIP-0031 (Agent Error Classification & Recovery)** targets the same
+  "silent-degradation" failure genre this DIP does, at a different layer:
+  DIP-0031 diagnoses *why* an individual agent/task execution failed
+  (non-empty error strings, `transient`/`context`/`capability`/
+  `specification` classification, retry semantics) inside nightshift's own
+  task-execution pipeline. `job_verify.py` checks *whether a scheduled
+  job's output artifact exists and is fresh*, independent of any execution
+  diagnostic, across all three machines. They are complementary layers —
+  execution diagnostics vs. output-side contract verification — not
+  competing ones, and neither DIP's mechanism shares a code path with the
+  other.
+- **DIP-0024 (Reactive Hooks Infrastructure)** has no scheduled-job event
+  type in any of its hook families (Claude Code, Git, Datacore
+  Internal/agent-lifecycle). `job_verify.py` is invoked directly by the OS
+  scheduler (cron, systemd timer, launchd), not through DIP-0024's hook
+  composer — there is no shared trigger mechanism to reconcile.
+- **DIP-0022 (Module Specification)** does not define any mechanism for a
+  module to declare scheduled/cron work — its five capability layers
+  (tool/skill/agent/command/workflow) and `module.yaml` schema have no
+  `schedule:` field. `jobs/manifest.yaml` therefore neither conforms to,
+  extends, nor bypasses anything DIP-0022 specifies; it is a new,
+  orthogonal, cross-machine registry with no DIP-0022 precedent to align
+  with.
+- **DIP-0011 (Nightshift Module)** already gives nightshift two of its own
+  success signals — org-mode task states (`NIGHTSHIFT_STATUS`/
+  `NIGHTSHIFT_SCORE` properties) and DIP-0031's execution records via
+  `failure-analyzer`. Declaring nightshift's 6 scheduled jobs in this DIP's
+  manifest adds a *third*, coarser-grained signal: "did this scheduled
+  invocation produce its expected artifact," checked independently of both.
+  The three signals answer different-grained questions and none
+  contradicts another in principle, but this DIP does not attempt to
+  reconcile them if they ever disagree (e.g. nightshift reports "5/5 tasks
+  completed" while `job_verify.py` reports the batch-report artifact is
+  stale) — that reconciliation is out of Phase 2 scope (see Open Questions).
+  Separately, DIP-0011's own `.datacore/modules/nightshift/schedules.yaml`
+  is nightshift's *internal* scheduler-adapter config (id/schedule/command/
+  enabled, consumed by `cron_adapter.py`/`systemd_adapter.py` to decide
+  when nightshift itself runs) — a different artifact with a different
+  purpose from this DIP's cross-machine, cross-module verification
+  manifest. The two are not meant to merge.
+
 ## Rationale
 
 **Why a declarative manifest instead of another hand-rolled script per
@@ -300,9 +453,13 @@ content should be reported as both problems in a single run rather than
 forcing a fix-rerun cycle per symptom.
 
 **Why `metric.attest` into the ledger rather than only a log line?**
-DIP-0034 reserves this event type explicitly for this consumer (its Rollout
-Plan names Phase 2/DIP-0035 directly). A durable, hash-chained, queryable
-record of "did job X actually produce its artifact, and when" survives
+DIP-0034 defines `metric.attest` as a namespaced family, one class per
+consumer, distinguished by a `metric` discriminator in the payload; this
+DIP allocates and owns the `job.verify` class (its Rollout Plan names Phase
+2/DIP-0035 as that class's first consumer). Other classes — e.g. DIP-0037's
+`fact` class — share the same event type without colliding. A durable,
+hash-chained, queryable record of "did job X actually produce its artifact,
+and when" survives
 independently of whichever log file might itself be the artifact under test,
 and it gives the "mechanical artifact checks" verification tier named in
 `ENG-2026-0729-016` (item 2) its first real consumer and its first real
@@ -399,7 +556,7 @@ fallback. No cron entry, systemd unit, or launchd agent is changed;
 thresholds directly on box, mac, and nightshift. (2) Switch the box's own
 verification step to invoke `job_verify.py` (directly, or wired into
 `cos_sync`'s own health surface) once (1) is resolved. (3) Retire
-`cos_verify_morning.sh` only after 7 consecutive green days of
+`cos_verify_morning.py` only after 7 consecutive green days of
 `job_verify.py` running in its place for the jobs it covers — a deliberate
 overlap period rather than a flag-day cutover, so a manifest gap does not
 silently reintroduce the exact failure genre this DIP exists to close.
@@ -438,10 +595,11 @@ silently reintroduce the exact failure genre this DIP exists to close.
   happened.
 - `ENG-2026-0729-016` — ledger-mindset direction; item 2 ("verification
   contracts declared at task creation") is this DIP's mandate.
-- DIP-0034 — Event Ledger Substrate; reserves `metric.attest` explicitly for
-  this DIP's consumer (its Rollout Plan names Phase 2/DIP-0035 directly) and
-  defines the `EventLog`/actor-resolution conventions `job_verify.py` reuses
-  without modification.
+- DIP-0034 — Event Ledger Substrate; defines `metric.attest` as a
+  namespaced family and allocates this DIP the `job.verify` class within it
+  (see DIP-0034's event-type table; its Rollout Plan names Phase 2/DIP-0035
+  as that class's first consumer), and defines the `EventLog`/actor-resolution
+  conventions `job_verify.py` reuses without modification.
 - `cos_verify_morning.py` — the retrofitted, hand-built watchdog whose own
   docstring documents the concrete silent-degradation incidents this DIP's
   manifest-and-runner approach generalizes a fix for.
