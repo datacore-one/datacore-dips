@@ -10,7 +10,7 @@
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-07-30 |
 | **Tags** | `agents`, `registry`, `lifecycle`, `gc`, `personas-as-data`, `datacore-v2` |
-| **Affects** | `.datacore/lib/registry_gc.py`, `.datacore/lib/tests/test_registry_gc.py`, `.datacore/registry/agents.yaml`, `.datacore/registry/archive/agents-deprecated.yaml`, `.datacore/registry/evaluators.yaml`, `.datacore/agents/_deprecated/`, `.datacore/lib/agents/evaluator.md`, `.datacore/modules/nightshift/module.yaml` (deploy-side, not in this repo) |
+| **Affects** | `.datacore/lib/registry_gc.py`, `.datacore/lib/tests/test_registry_gc.py`, `.datacore/registry/agents.yaml`, `.datacore/registry/archive/agents-deprecated.yaml`, `.datacore/registry/evaluators.yaml`, `.datacore/4-archive/agents/` (archive destination — corrected; see "Correction: archive destination was harness-visible" in Implementation), `.datacore/lib/agents/evaluator.md`, `.datacore/modules/nightshift/module.yaml` (deploy-side, not in this repo) |
 | **Specs** | `.datacore/lib/registry_gc.py`, `.datacore/registry/evaluators.yaml` |
 | **Agents** | `agent-registry-auditor`, `context-maintainer`, any agent spawned via the registry (`ai-task-executor`, `nightshift-orchestrator`) |
 | **Depends** | [DIP-0016](DIP-0016-agent-registry.md) (schema and both top-level sections this DIP's tooling operates on) |
@@ -56,7 +56,7 @@ This section helps agents understand when and how to apply this DIP.
 | How do I archive deprecated entries? | `python3 .datacore/lib/registry_gc.py --apply` — on-demand only, not scheduled |
 | Which deprecation marker should a *new* entry use? | `deprecated: true` + `superseded_by: <agent>` (canonical, per DIP-0021). `status: deprecated` and a `[DEPRECATED]` description marker are accepted legacy aliases; tooling must keep recognizing all three |
 | Is `evaluators.yaml` a second agent registry? | No — it is parameter data for the single `evaluator` agent (though that agent currently has **no** `agents.yaml` entry of its own; see Specification, "Personas-as-data" and Open Questions) |
-| Where do archived agent definitions go? | Files: `.datacore/agents/_deprecated/`. Metadata: `.datacore/registry/archive/agents-deprecated.yaml` (non-authoritative historical record, not a second registry) |
+| Where do archived agent definitions go? | Files: `.datacore/4-archive/agents/` — **outside** `.datacore/agents/**`, because the harness scans that tree recursively (`.claude` symlinks to `.datacore`). Metadata: `.datacore/registry/archive/agents-deprecated.yaml` (non-authoritative historical record, not a second registry) |
 | Do `registry_gc.py` and `registry_validate.py` conflict? | Not in production today (nightshift runs the latter report-only), but their overlap on orphan handling is undeclared — see Specification and Open Questions |
 
 ### Related Agents
@@ -212,9 +212,12 @@ DIP-0016, confirmed by Task 7.1's read against the live file):
 - **`apply(report, registry_path, archive_dir) -> list[str]`** — mutates,
   in a crash-safe order: (0) unconditional duplicate-key pre-flight abort,
   before any file is opened for writing; (1) each deprecated entry's
-  `source:` file is moved into `archive_dir` — the concrete value used by
-  this DIP's own run is `.datacore/agents/_deprecated/` — (unless the
-  shared-source guard below fires) and its metadata staged into an
+  `source:` file is moved into `archive_dir` — the corrected concrete
+  value, per the final-review fix wave, is `.datacore/4-archive/agents/`
+  (this DIP's own first real run used `.datacore/agents/_deprecated/`,
+  which was later found harness-visible and superseded; see "Correction:
+  archive destination was harness-visible" in Implementation) — (unless
+  the shared-source guard below fires) and its metadata staged into an
   in-memory merge of
   `<registry_dir>/archive/agents-deprecated.yaml`, under that entry's *own*
   section key (an `agents:` entry archives under the archive file's
@@ -240,12 +243,32 @@ subagents by scanning agent directories directly (`.datacore/agents/*.md`,
 fully spawnable no matter what the registry says about it; only removing
 it from the scanned tree closes that hole, which is why step (1) above
 physically relocates the definition file instead of relying on the
-registry entry's removal alone. Corroborating this: `.datacore/agents/_deprecated/`
-and `.datacore/agents/_patterns/` are already special-cased as
-skip-directories in `registry_validate.py`'s own `AGENT_GLOBS` scan
-(`SKIP_PARTS = {'_deprecated', '_patterns'}`) — the destination this DIP
-archives into already carries recognized graveyard status elsewhere in
-the codebase.
+registry entry's removal alone.
+
+**Correction — a subdirectory of the scanned tree is not "removed from the
+scanned tree."** An earlier draft of this section cited
+`registry_validate.py`'s own `AGENT_GLOBS` scan special-casing
+`.datacore/agents/_deprecated/` and `.datacore/agents/_patterns/` as
+skip-directories (`SKIP_PARTS = {'_deprecated', '_patterns'}`) as
+corroboration that archiving into `.datacore/agents/_deprecated/` was
+safe. That reasoning was wrong, and the mistake is instructive: `SKIP_PARTS`
+is *Datacore's own registry loader* choosing not to look at that
+subdirectory — it does not, and cannot, bind any other harness. `.claude`
+is a symlink to `.datacore`, and Claude Code's Task tool scans
+`.claude/agents/**` **recursively**, with no knowledge of
+`registry_validate.py`'s skip-list. Because `.datacore/agents/_deprecated/`
+is still a path *inside* `.datacore/agents/`, every file placed there
+remained fully discoverable and spawnable by the harness the whole time —
+this was verified directly (six deprecated defs — `conversation-processor`,
+`gtd-process-inbox`, `gtd-research-processor`, `ingest-coordinator`,
+`ingest-processor`, `research-link-processor` — sit in
+`.datacore/agents/_deprecated/` on `main` today and load into every live
+session) and is why the v2 final-review pass flagged it Critical and
+relocated all archived defs to `.datacore/4-archive/agents/`, a path
+outside `.datacore/agents/` entirely. An internal loader's skip-list is
+never sufficient protection on its own: it only affects what *that one
+tool* reports or ignores, not what a harness with independent,
+recursive directory-scanning discovery will load.
 
 ### Guards (hardened across two post-review passes before this real run)
 
@@ -607,6 +630,30 @@ already executed.
 | 7. Remaining consolidation families (`gtd-*`, `health-*`, research pipeline, megaphone pipeline) | Follow-up scope | **Not started** — named, not scheduled (Open Question 2) |
 | 8. Fold lifecycle/archival model into DIP-0016 | Governance | Drafted below (ready to fold in as new §20); lands on ratification, not yet applied to DIP-0016's live text |
 | 9. DIP-0011 Implementation Status table correction | Cross-DIP consistency | **Not done** — flagged; pending ratification |
+| 10. Archive destination corrected from `.datacore/agents/_deprecated/` to `.datacore/4-archive/agents/` (harness-visibility fix) | Tool + this DIP's text | Done in code, on `feat/datacore-v2`, for the 34 defs archived by that branch's own run. **Not done for `main`** — see "Correction" below and Open Question 6 |
+
+### Correction: archive destination was harness-visible
+
+This DIP's own first real `--apply` run (the one recorded in "Achieved vs
+Target") archived deprecated defs into `.datacore/agents/_deprecated/`,
+following the Specification and §20 amendment text as originally drafted.
+During the v2 final review, that destination was found to still be
+harness-visible: `.claude` symlinks to `.datacore`, and Claude Code's Task
+tool scans `.claude/agents/**` recursively, so every file placed in
+`.datacore/agents/_deprecated/` — a subdirectory *inside* the scanned
+`.datacore/agents/` tree — remained fully discoverable and spawnable
+regardless of its `agents.yaml` status. This was flagged Critical, and the
+fix wave relocated all archived agent definitions (34 on `feat/datacore-v2`,
+covering both this DIP's evaluator consolidation and the pre-existing
+DIP-0021-era deprecations) to `.datacore/4-archive/agents/`, a path
+outside `.datacore/agents/` entirely, and removed `_deprecated/`.
+
+This DIP's Specification and §20 amendment above have been corrected to
+name `.datacore/4-archive/agents/` as the destination going forward. The
+history is recorded here rather than silently rewritten: the first real
+run's actual destination was the harmful one, and that is why the
+Normative rule below is now stated as harness-tree-independent rather
+than as a specific path.
 
 ### Reference Implementation
 
@@ -661,6 +708,19 @@ this one.
    turn today's non-race into a real one. Also resolve, at the same time,
    the marker-recognition mismatch between the two tools' `deprecated`
    classifiers (Specification, "Known implementation gap").
+6. `main` (as opposed to `feat/datacore-v2`, where the relocation already
+   happened) still carries 6 deprecated defs in
+   `.datacore/agents/_deprecated/` —
+   `conversation-processor`, `gtd-process-inbox`, `gtd-research-processor`,
+   `ingest-coordinator`, `ingest-processor`, `research-link-processor` —
+   which, per the harness-visibility finding above, load into every live
+   session on `main` today. Relocating them is out of scope for this DIP's
+   branch (this DIP does not touch `main` directly), but they need the
+   same `.datacore/4-archive/agents/` relocation `feat/datacore-v2`
+   applied. **Trigger**: before or immediately upon `feat/datacore-v2`
+   merging to `main` — whichever lands first — so `main` is never left in
+   the known-harness-visible state longer than necessary once the fix is
+   known.
 
 ## References
 
@@ -742,11 +802,11 @@ is removed from the live registry.
 
 **`archived` (terminal state).** A garbage-collection pass (DIP-0040's
 `registry_gc.py --apply`, or any future tool performing the same
-transition) moves a deprecated entry's `source:` definition file out of
-every harness-scanned agent directory (`.datacore/agents/`,
-`.datacore/modules/*/agents/`) into a dedicated archive directory
-(`.datacore/agents/_deprecated/`), removes the entry from the live
-`agents.yaml`, and records its full metadata in
+transition) moves a deprecated entry's `source:` definition file
+completely out of every harness-scanned agent directory
+(`.datacore/agents/`, `.datacore/modules/*/agents/`) into an archive
+directory that is itself outside that scanned tree, removes the entry
+from the live `agents.yaml`, and records its full metadata in
 `.datacore/registry/archive/agents-deprecated.yaml`, under that entry's
 own top-level section key (`agents:` or `module_agents:`, never
 flattened together). §1's "single source of truth" claim for
@@ -754,14 +814,24 @@ flattened together). §1's "single source of truth" claim for
 non-authoritative historical record, kept for provenance, not a second
 registry.
 
-**Normative**: archived definitions MUST NOT remain discoverable by any
-agent-loading, routing, or harness subagent-discovery path. Physical
-relocation — not a status flag alone — is required to guarantee this,
-because harnesses (e.g. Claude Code's Task tool, nightshift's own
-dispatcher) discover subagents by scanning agent directories directly,
-independent of `agents.yaml`'s `status`/`deprecated` field; a file merely
-flagged deprecated but left in a scanned directory remains fully
-spawnable.
+**Normative**: archived agent definitions MUST NOT reside anywhere
+within a harness-scanned tree; on this installation that means outside
+`.datacore/agents/**`, because `.claude` symlinks to `.datacore` and
+harnesses (e.g. Claude Code's Task tool) scan `.claude/agents/**`
+**recursively** — a subdirectory of `.datacore/agents/` is still inside
+that tree and does not satisfy this rule. **The concrete destination is
+`.datacore/4-archive/agents/`.** An earlier version of this DIP archived
+into `.datacore/agents/_deprecated/`, a subdirectory of the scanned tree;
+that was found to remain fully harness-discoverable and spawnable
+regardless of registry status, was flagged Critical in the v2 final
+review, and was corrected (see DIP-0040's Implementation, "Correction:
+archive destination was harness-visible"). An internal tool's own
+skip-list (e.g. `registry_validate.py`'s `SKIP_PARTS`) is not sufficient
+evidence of safety: it governs only what that one tool reports or
+ignores, not what an independent, recursively-scanning harness will load.
+Physical relocation *out of the scanned tree* — not a status flag, and
+not merely a differently-named subdirectory within it — is what this rule
+requires.
 
 **Applies to both sections.** `agents:` and `module_agents:` entries
 follow the identical state machine and the identical archive-file
