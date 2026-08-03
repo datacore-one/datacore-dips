@@ -574,6 +574,103 @@ for the common case — raw captures (news digests, email forwards, quick
 jots) that have no `:ID:` yet — not a replacement for the existing
 "preserve an id that's already there" rule.
 
+### Designated inbox processor
+
+Owner decision, folded into this DIP: **inbox processing gets a single
+designated processor per space, and for `0-personal`, Winston (the box) is
+it.** Four points, then the trade-off this decision is not free of.
+
+1. **Ownership is enforced as data, not convention.** A `policy.set` event
+   (DIP-0034's existing event type — its only current consumer is DIP-0038's
+   co-sign threshold, so this is a second, distinct use and needs its own
+   discriminator key in the payload, the same `metric.attest`-style
+   namespacing this DIP already relies on elsewhere) names the designated
+   inbox-processor actor for a space. Other automated actors check this
+   before running `/process-inbox` unattended and **decline rather than
+   assume** — no automated actor infers "I should probably handle this"
+   from the mere fact that the inbox has entries. This makes explicit what
+   already happens operationally: `.datacore/lib/cos_inbox.sh` (and its
+   module-hosted twin under `chief-of-staff/server/lib/`) already runs on a
+   schedule as exactly this: `cos_sync.sh` (sync) → a routed
+   `inbox-processing` task invocation via `cos_route.py`/`cos_llm.sh`
+   ("ollama → local, cloud → hermes, fail-soft to hermes" per that script's
+   own comment) calling `/process-inbox` (run) → `git commit` (commit) →
+   `cos_sync.sh` again (sync). The sync-run-commit-sync ordering is itself
+   the fix for a past incident where the box could otherwise act on stale
+   data or leave its own output unpublished — this DIP does not introduce
+   that discipline, it names an actor that already follows it and makes the
+   naming a ledger fact instead of an implicit assumption about which
+   cron job happens to exist. Framed against DIP-0034's claim-safety policy,
+   this is **case 1, partitioned**: the actor is set once, out of band, at
+   `policy.set` time — "the owner executes; no claim, no grant, no race" —
+   applied to a *role* (who processes this space's inbox) rather than a
+   single ledger item, so there is exactly one eligible executor and nothing
+   to arbitrate.
+2. **Idempotence remains the safety net — single-processor ownership does
+   not replace it.** A single designated processor makes collisions between
+   two automated actors *improbable by design*; the content-hash keying two
+   sections above makes a collision *harmless if the rule is ever violated
+   anyway* — a misconfigured `policy.set`, a stale second cron job, a
+   migration window where two processors briefly coexist. This DIP keeps
+   both deliberately, in the same "guard early, don't rely solely on
+   downstream tolerance" spirit as the genesis importer's own idempotence
+   guard (Specification) and Phase 1's belt-and-braces refuse-to-overwrite
+   enforcement (Migration Phases) — ownership is not a reason to drop the
+   hashing.
+3. **Liveness is a stated property with a contract, not an assumption.** If
+   the designated processor is down, capture still works — `inbox.org`'s
+   append-only exemption (Specification) guarantees this unconditionally —
+   and processing is merely delayed. **That is correct behavior, not a
+   fault**, the same no-single-point-of-failure shape DIP-0034's own
+   sequencer-degradation design already commits to (writes continue,
+   finality pauses; here, capture continues, routing pauses). But an inbox
+   holding unprocessed entries older than N hours **MUST make noise** —
+   this needs its own [DIP-0035](DIP-0035-job-contracts.md) job contract
+   (a manifest entry whose freshness check is "does the oldest unprocessed
+   `inbox.org` entry's timestamp exceed N hours," alerting through the same
+   `winston_send.py`/`cos_alert.sh` primitives `cos_inbox.sh` already calls
+   for its own delivery-failure case, not a new alert channel invented for
+   this). The failure mode this is designed against is named explicitly:
+   **silent backlog** — the same "Complete! 0 tasks, 0 errors,
+   undetected for three days" shape as `ENG-2026-0423-001` (Motivation),
+   here applied to capture instead of task claiming.
+4. **Human override is always permitted.** The designation binds
+   **automated** actors only — the owner can process the inbox in-session,
+   interactively, at any time, whether or not Winston's scheduled run has
+   or hasn't happened. An overlap (a human runs `/process-inbox` manually
+   moments before the box's timer also fires) is possible and is rendered
+   harmless by the same idempotent content-hash keying named in point 2, not
+   by any coordination between the two.
+
+**This is a trade-off, not a pure win, and this DIP records it as one.**
+Routing an inbox entry is a judgment call, and the box runs a
+lighter-weight, differently-tiered model for this task than an interactive
+session does — `cos_llm.sh`'s own routing comment for the `inbox-processing`
+task class states it plainly: "ollama → local, cloud → hermes." Concentrating
+classification onto one consistently lighter-resourced processor bounds
+routing quality for every capture that goes through it, system-wide. That
+bound is fine for confident, close-to-mechanical classification — "this is a
+task, tag it `:AI:research:`" — and shakier for genuinely judgment-heavy
+captures — "this capture is actually three tasks and a decision," where
+under-decomposition silently loses structure rather than just picking a
+slightly wrong tag. The mitigation this DIP specifies: the designated
+processor handles confident cases directly and **escalates ambiguous ones
+rather than guessing**, the same partial-automation shape DIP-0034 already
+uses for its Chief-of-Staff merge gatekeeper (`metric.attest` class
+`merge.review`, payload `{space, branch, verdict, reasons[]}` — a bounded
+verdict-plus-reasons, never a silent unilateral action). The escalation
+channel is not new: an ambiguous capture lands in the existing open-questions
+loop ([DIP-0006](DIP-0006-open-questions-management.md), superseded into
+[DIP-0013](DIP-0013-meetings-module.md) §4) rather than inventing a second
+one. What transfers from DIP-0013 is the *shape* — a bounded confidence
+check that lands unresolved items in a durable, human-reviewable queue
+instead of guessing — not DIP-0013 §5.2's specific counting heuristic
+("3+ appearances across 7 days of daily standups"), which is tuned for
+meeting cadence and has no direct analogue for a capture seen once. This
+DIP does not design that mapping; it names the reuse and the caveat, the
+same honesty DIP-0038 already applied to the same heuristic for a different
+consumer.
+
 ## Projection Timing
 
 The projector runs on two triggers, not one, and both are required:
