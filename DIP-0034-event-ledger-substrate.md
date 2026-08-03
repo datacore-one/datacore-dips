@@ -13,6 +13,7 @@
 | **Affects** | `.datacore/lib/ledger/` (`hlc.py`, `events.py`, `log.py`, `verify.py`, `fold.py`, `index.py`), `.datacore/lib/ledger_cli.py`, `<space>/.datacore/events/`, `~/.datacore/keys/`, `.datacore/keys/registry.yaml` |
 | **Specs** | `.datacore/lib/ledger/*.py`, `.datacore/lib/ledger_cli.py` |
 | **Agents** | any agent that creates, claims, completes, or verifies a task; any process that spends budget on an agent's behalf |
+| **Depends** | — (foundation DIP; no dependencies. [DIP-0035](DIP-0035-job-contracts.md), [DIP-0038](DIP-0038-action-loop-cosign.md), and [DIP-0041](DIP-0041-executor-adapters.md) depend on this DIP — see Phase → DIP table in Specification) |
 | **Renumbered from** | DIP-0033 (claimed by a parallel session for "Delivery Verification & Smoke Scenarios" before this DIP landed) |
 | **Relates to** | ENG-2026-0729-016 (ledger-mindset direction), ENG-2026-0729-030 (signing opt-in amendment), ENG-2026-0727-004 (Mac↔box sync failure genre), ENG-2026-0423-001 (nightshift git-lock silent failure), DIP-0011 (Nightshift), DIP-0018 (Credential Management) |
 
@@ -32,6 +33,69 @@ covers Phase 1 only: the `ledger` package (`hlc`, `events`, `log`, `verify`,
 config plane, grounded briefings, the action loop/co-sign policy, server-first
 artifacts, agent consolidation, and executor adapters are follow-on DIPs
 (0035–0041) that build on this substrate.
+
+> **Source-of-truth boundary.** org-mode remains the coordination layer and
+> the system of record for GTD tasks, exactly as specified in
+> [DIP-0009](DIP-0009-gtd-specification.md) and reaffirmed by
+> [DIP-0010](DIP-0010-external-sync-architecture.md); this DIP does not change
+> that and defines no migration of org state. The event ledger is the system
+> of record for a *disjoint* class of objects: briefing items, approvals,
+> verification attestations, and spend records. No object exists in both
+> systems. A ledger event never completes an org task, and an org state
+> change never emits a ledger event.
+
+## Agent Context
+
+### When to Reference This DIP
+
+**Always reference when:**
+- Implementing any of the follow-on ledger DIPs ([DIP-0035](DIP-0035-job-contracts.md)
+  through [DIP-0041](DIP-0041-executor-adapters.md)) that append to or fold
+  `.datacore/events/` — this DIP is the schema, HLC, locking, and fold-semantics
+  contract they all build on.
+- Writing or reviewing code that appends events to
+  `<space>/.datacore/events/<actor>.jsonl`, or that reads/folds ledger state.
+- Deciding whether a piece of state belongs in org-mode (GTD tasks, governed by
+  [DIP-0009](DIP-0009-gtd-specification.md)) or in the ledger (briefing/
+  approval/attestation/spend records) — the Source of Truth Boundary above is
+  the disambiguation rule.
+- Allocating a new `metric.attest` measurement class (amend the discriminator
+  table in Specification; do not invent an ad hoc payload shape for an
+  existing class).
+- Considering migrating an existing coordination path (e.g. nightshift's
+  `git push` task claim, [DIP-0011](DIP-0011-nightshift-module.md)) onto
+  ledger `task.*` events — this requires its own ratified DIP, not an implicit
+  consequence of this substrate existing.
+
+### Quick Reference for Agents
+
+| Question | Answer |
+|----------|--------|
+| Is a ledger `task.*` event a GTD task? | No. See Source of Truth Boundary above — org-mode ([DIP-0009](DIP-0009-gtd-specification.md)) remains the sole source of truth for GTD task state; see also the Naming note in Specification. |
+| Where do events live? | `<space>/.datacore/events/<actor>.jsonl` — one file per writer actor. |
+| How do I allocate a new `metric.attest` class? | Amend the discriminator table in Specification (Event schema). Consumers MUST ignore classes they don't recognise. |
+| Is signing required? | No. Opt-in via `DATACORE_LEDGER_SIGN=1`; unsigned (`sig=""`) is the MVP default (`ENG-2026-0729-030`). |
+| Which DIP implements which ledger phase? | See the Phase → DIP table in Specification. |
+| Can I add a new field to an existing event type's payload? | Yes — payload dicts are additive (Invariant 6); consumers must ignore unknown keys. |
+| Can I route a human capture through `ledger_cli.py append` instead of `inbox.org`? | No — `materialize()`-style item creation and its relationship to the single-capture-point principle is [DIP-0038](DIP-0038-action-loop-cosign.md)'s concern, not this DIP's; this DIP defines the substrate only. |
+
+### Related Agents
+
+| Agent | Uses This DIP For |
+|-------|-------------------|
+| `nightshift-orchestrator` | Owns the `git push`-as-lock task-claim mechanism ([DIP-0011](DIP-0011-nightshift-module.md)) this ledger is designed to eventually replace, per Phase 2+ — any migration work reads this DIP's fold semantics and per-writer file model first. |
+| `dip-preparer` | Treats this DIP as the foundation and dependency anchor when authoring or amending [DIP-0035](DIP-0035-job-contracts.md)–[DIP-0041](DIP-0041-executor-adapters.md); enforces the Source of Truth Boundary and the `metric.attest` discriminator table when reviewing those drafts for consistency. |
+| `context-maintainer` | Owns the follow-up (recorded under Implementation/Rollout) to qualify the `Org-Mode-as-Coordination-Layer` zettel and the CLAUDE.base.md "org-mode for AI" principle once this DIP ratifies, since ratification bifurcates the coordination layer into two disjoint substrates. |
+
+### Integration Points
+
+- [DIP-0009: GTD Specification](DIP-0009-gtd-specification.md) — owns GTD task identity, dedup, and the org-mode task-state vocabulary this DIP's `task.*` events are explicitly disjoint from.
+- [DIP-0010: External Sync Architecture](DIP-0010-external-sync-architecture.md) — owns the "org-mode is the coordination layer" claim this DIP's boundary statement is scoped against.
+- [DIP-0011: Nightshift Module](DIP-0011-nightshift-module.md) — the `git push`-as-lock claiming mechanism this ledger is designed to eventually replace (Phase 2+, its own ratified DIP).
+- [DIP-0018: Credential Management](DIP-0018-credential-management.md) — key-custody convention (private key outside repo, public registry tracked) this DIP's `keys.py` follows.
+- [DIP-0035: Job Contracts](DIP-0035-job-contracts.md) — Phase 2; allocates the `job.verify` class of `metric.attest`.
+- [DIP-0037: Grounded Briefings](DIP-0037-grounded-briefings.md) — allocates the `fact` class of `metric.attest`, not a new event type (see the discriminator table in Specification).
+- [DIP-0038: Action Loop & Co-Sign Policy](DIP-0038-action-loop-cosign.md) — Phase 5; consumes `policy.set` and `task.create.payload.effects[]`, and relies on the fold-level guarantee that `task.dismiss` is terminal.
 
 ## Motivation
 
@@ -143,6 +207,44 @@ registry) is built and tested but dormant until that trigger fires.
 
 ## Specification
 
+> **Source-of-truth boundary** (repeated from Summary). org-mode remains the
+> coordination layer and the system of record for GTD tasks, exactly as
+> specified in [DIP-0009](DIP-0009-gtd-specification.md) and reaffirmed by
+> [DIP-0010](DIP-0010-external-sync-architecture.md); this DIP does not change
+> that and defines no migration of org state. The event ledger is the system
+> of record for a *disjoint* class of objects: briefing items, approvals,
+> verification attestations, and spend records. No object exists in both
+> systems. A ledger event never completes an org task, and an org state
+> change never emits a ledger event.
+
+**Naming note.** The event family is spelled `task.*` (`task.create`,
+`task.claim`, …) although these objects are deliberately *not* GTD tasks (see
+the boundary statement above). The name is a legacy of the substrate's first
+consumer. Renaming the family to `item.*` is recorded as Open Question OQ-5;
+it is cheap while the ledger holds only briefing/approval/attest/spend events
+and becomes a schema migration once third parties run this system.
+
+### Phase → DIP mapping
+
+Explicit, not positional — resolves which DIP owns which deliverable and
+which event types it consumes, so a follow-on DIP is implementable without
+inferring order from prose:
+
+| Phase | DIP | Deliverable | Ledger event types consumed/added |
+|---|---|---|---|
+| 1 | DIP-0034 (this DIP) | The substrate: `ledger` package + `ledger_cli.py` | All 11 `EVENT_TYPES` reserved; `task.*`, `owner.set`, `spend.record` folded |
+| 2 | [DIP-0035](DIP-0035-job-contracts.md) | Job contracts + unified verifier (`job_verify.py`) | Allocates `metric.attest` class `job.verify` |
+| 3 | [DIP-0036](DIP-0036-config-plane.md) | Config plane | No new event types |
+| 4 | [DIP-0037](DIP-0037-grounded-briefings.md) | Grounded briefings | Allocates `metric.attest` class `fact` — **not** a new event type (see payload-extensibility invariant and the discriminator table below) |
+| 5 | [DIP-0038](DIP-0038-action-loop-cosign.md) | Action loop + co-sign policy | Consumes `policy.set`; extends `task.create.payload` with `effects[]` |
+| 6 | [DIP-0039](DIP-0039-server-first-artifacts.md) | Server-first artifact sync | Consumes `artifact.attest` |
+| 7 | [DIP-0040](DIP-0040-agent-consolidation.md) | Agent-registry consolidation | No new event types |
+| 8 | [DIP-0041](DIP-0041-executor-adapters.md) | Executor adapters | `spend.record` goes live end-to-end |
+
+A ninth allocation of `metric.attest` (`merge.review`) belongs to the
+Chief-of-Staff merge gatekeeper, a component rather than a DIP — see the
+discriminator table below.
+
 ### Event schema
 
 Every event is one canonical-JSON line in a per-writer `.jsonl` file:
@@ -176,24 +278,34 @@ needing a signature.
 
 | Event type | Purpose |
 |---|---|
-| `task.create` | Introduce a task (`id`, `title`, optional `owner`) |
-| `task.claim` | An actor takes ownership of a `created` task |
-| `task.release` | An owner un-claims a `claimed` task back to `created` |
+| `task.create` | Introduce a **ledger task** — a delegation/verification/briefing unit, **not** a GTD task (`id`, `title`, optional `owner`); see the Source-of-truth boundary and Naming note above |
+| `task.claim` | An actor takes ownership of a `created` ledger task |
+| `task.release` | An owner un-claims a `claimed` ledger task back to `created` |
 | `task.complete` | The claiming owner marks work done |
-| `task.verify` | A completed task is confirmed (mechanical check or panel, DIP-0035) |
-| `task.dismiss` | Terminally close a task — no later event can revive it |
+| `task.verify` | A completed ledger task is confirmed (mechanical check or panel, [DIP-0035](DIP-0035-job-contracts.md)) |
+| `task.dismiss` | Terminally close a ledger task — no later event can revive it |
 | `owner.set` | Administrative ownership override |
 | `spend.record` | Meter cost (`cents`) against an actor — shadow accounting |
-| `metric.attest` | Record a mechanical verification outcome (DIP-0035's `job_verify.py`) |
-| `artifact.attest` | Content-address an artifact by hash (DIP-0039) |
-| `policy.set` | Change a co-sign/approval threshold (DIP-0038) |
+| `metric.attest` | A **namespaced family**. Every payload MUST carry a `metric` discriminator naming the measurement class; all other payload fields are defined by the DIP that allocates that class. See the discriminator table below. |
+| `artifact.attest` | Content-address an artifact by hash ([DIP-0039](DIP-0039-server-first-artifacts.md)) |
+| `policy.set` | Change a co-sign/approval threshold ([DIP-0038](DIP-0038-action-loop-cosign.md)) |
+
+**`metric.attest` allocated classes** (new classes are allocated by amending
+this table; consumers MUST ignore classes they do not recognise):
+
+| `metric` value | Payload owner | Payload shape |
+|---|---|---|
+| `job.verify` | [DIP-0035](DIP-0035-job-contracts.md) | `{job, ok, failures[]}` |
+| `fact` | [DIP-0037](DIP-0037-grounded-briefings.md) | `{id, value, unit, source}` |
+| `merge.review` | Chief-of-Staff merge gatekeeper | `{space, branch, verdict, reasons[]}` |
 
 Only `task.create` … `task.dismiss`, `owner.set`, and `spend.record` have
 fold-time handlers in Phase 1 (below); `metric.attest`, `artifact.attest`, and
 `policy.set` are accepted event types with reserved semantics for the DIPs
-that consume them (0035, 0039, 0038) — Phase 1's `fold()` ignores them
-without erroring, by design (forward-compatible schema, narrow current
-behavior).
+that consume them ([DIP-0035](DIP-0035-job-contracts.md)/[DIP-0037](DIP-0037-grounded-briefings.md),
+[DIP-0039](DIP-0039-server-first-artifacts.md), [DIP-0038](DIP-0038-action-loop-cosign.md)) —
+Phase 1's `fold()` ignores them without erroring, by design (forward-compatible
+schema, narrow current behavior).
 
 ### Hybrid logical clock (HLC)
 
@@ -386,6 +498,46 @@ caught and reported as a clean one-line stderr message with a nonzero exit
 code — never a raw traceback; genuinely unexpected exceptions are allowed to
 propagate, since hiding those is not this script's job.
 
+### Worked example
+
+A single actor (`box`) creating, claiming, and completing one ledger task —
+three lines appended to `<space>/.datacore/events/box.jsonl` (whitespace
+added for readability; the real file has one canonical-encoded line per
+event, `sig` empty because signing is off, the MVP default):
+
+```jsonc
+{"seq":0,"hlc":"1785400000000.0000.box","actor":"box","type":"task.create",
+ "payload":{"id":"t-042","title":"Verify DIP-0035 job_verify.py output schema"},
+ "prev":"GENESIS","hash":"9f2c...a1","sig":""}
+{"seq":1,"hlc":"1785400015000.0000.box","actor":"box","type":"task.claim",
+ "payload":{"id":"t-042"},
+ "prev":"9f2c...a1","hash":"3b7e...d4","sig":""}
+{"seq":2,"hlc":"1785400600000.0000.box","actor":"box","type":"task.complete",
+ "payload":{"id":"t-042"},
+ "prev":"3b7e...d4","hash":"c081...9e","sig":""}
+```
+
+`read_events(space_dir)` merges this file (and every other actor's file, if
+any) sorted by `hlc`, giving the fold its input order. `fold()` over just
+these three events produces:
+
+```python
+LedgerState(
+    tasks={"t-042": TaskState(id="t-042", status="completed", owner="box",
+                               title="Verify DIP-0035 job_verify.py output schema",
+                               history=[...])},
+    spend={},
+    orphans=[],
+)
+```
+
+`ledger_cli.py tasks --space <space> --status completed` reads this same
+folded state through the disposable SQLite projection and prints the task as
+one JSON line to stdout. Note `t-042` is a **ledger task** per the Source of
+Truth Boundary above — it is never rendered as an org TODO heading and is
+never read by any GTD tool as authoritative task state; it exists only in
+`.datacore/events/` and whatever `LedgerState`/index is folded from it.
+
 ### Changes Required
 
 - **New**: `.datacore/lib/ledger/` package — `hlc.py`, `events.py`, `log.py`,
@@ -425,10 +577,11 @@ propagate, since hiding those is not this script's job.
 
 ## Invariants
 
-Five upgrade-readiness invariants (`ENG-2026-0729-016`), amended by the
-signing ruling (`ENG-2026-0729-030`) as noted, that this substrate must never
-violate — because every later phase (0035–0041) and any future real
-consensus/chain assumes they hold:
+Six invariants — the five upgrade-readiness invariants from
+`ENG-2026-0729-016` (amended by the signing ruling `ENG-2026-0729-030` as
+noted), plus a sixth (payload extensibility) made explicit by this amendment
+pass — that this substrate must never violate, because every later phase
+(0035–0041) and any future real consensus/chain assumes they hold:
 
 1. **Events are append-only and immutable.** Nothing in this package ever
    rewrites or deletes a line in a writer's `.jsonl` file. `append()`'s only
@@ -460,6 +613,17 @@ consensus/chain assumes they hold:
    writes) can be replaced, restarted, or run redundantly without the ledger
    itself needing to change, because ordering is a property of the HLC
    stamps, not of write-time arbitration by a single process.
+6. **Payload dicts are additive, never closed.** A payload for a given event
+   type may gain new keys in a later phase without that being a schema
+   change to this DIP — e.g. `task.create.payload.effects[]` is a
+   [DIP-0038](DIP-0038-action-loop-cosign.md) addition to an existing event
+   type's payload, and the `metric` discriminator inside `metric.attest`'s
+   payload (see Event schema) is exactly this pattern applied to an entire
+   namespaced sub-family. Readers MUST ignore keys they do not recognise;
+   `fold()` never validates a payload exhaustively, only the keys its own
+   handler needs. This is the invariant the Phase → DIP mapping and the
+   `metric.attest` discriminator table both rely on to add functionality
+   without a follow-on DIP guessing at an undocumented extension rule.
 
 ## Rationale
 
@@ -518,17 +682,23 @@ truth that itself needs to stay consistent under concurrent writes.
 
 ## Backwards Compatibility
 
-Additive and non-breaking. No existing org-mode file, JSON state file, or
-nightshift claiming path is modified, removed, or migrated by this DIP —
-`.datacore/events/` is a new directory that exists alongside them. Org files
-remain the source of truth for GTD tasks in v2; the ledger tracks
-briefing/delegation/verification objects (this is a deliberate v2 scope
-boundary, revisited as v2.1 — see Open Questions). A space with no
-`.datacore/events/` directory behaves exactly as before: `read_events` on a
-missing directory returns `[]`, and no ledger command errors on an
-as-yet-unused space. Adopting the ledger for a given coordination path (e.g.
-routing a nightshift claim through `task.claim` instead of `git push`) is a
-follow-on integration task in later phases, not part of this DIP.
+Additive and non-breaking; nothing here breaks an existing installation and
+there is no migration path because nothing is migrated. No existing org-mode
+file, JSON state file, or nightshift claiming path is modified, removed, or
+migrated by this DIP — `.datacore/events/` is a new directory that exists
+alongside them. Org files remain the source of truth for GTD task state per
+[DIP-0009](DIP-0009-gtd-specification.md), and org-mode remains the
+coordination layer per [DIP-0010](DIP-0010-external-sync-architecture.md);
+the ledger tracks a disjoint class of briefing/delegation/verification/spend
+objects (this is the Source of Truth Boundary stated in Summary and repeated
+at the head of Specification — this is a deliberate v2 scope boundary,
+revisited as v2.1 — see Open Questions). A space with no `.datacore/events/`
+directory behaves exactly as before: `read_events` on a missing directory
+returns `[]`, and no ledger command errors on an as-yet-unused space.
+Adopting the ledger for a given coordination path (e.g. routing a nightshift
+claim through `task.claim` instead of `git push`) is a follow-on integration
+task in later phases, requiring its own ratified DIP per the boundary
+statement — not part of this DIP.
 
 ## Security Considerations
 
@@ -606,14 +776,33 @@ Config plane, grounded briefings, the action loop + co-sign policy
 (`artifact.attest`), agent-registry consolidation, and executor adapters
 (`spend.record` going live end-to-end) each build on this event schema
 without changing it. Each is expanded into its own DIP at that phase's start.
+See the explicit Phase → DIP mapping table at the head of Specification for
+the deliverable-to-DIP-number assignment — that table, not this prose list,
+is the normative mapping.
+
+**Doctrine follow-up (not a ledger-code deliverable, tracked here so it isn't
+lost).** Ratifying this DIP bifurcates "the coordination layer" into two
+disjoint substrates (org-mode for GTD tasks, the ledger for
+briefing/approval/attestation/spend objects) where the corpus currently
+describes it as a single, unqualified layer — both
+`2-datacore/3-knowledge/zettel/Org-Mode-as-Coordination-Layer.md` and
+CLAUDE.base.md's "org-mode for AI" principle state the claim in unqualified,
+singular terms. On ratification, `context-maintainer` should qualify both to
+state the Source of Truth Boundary from Summary: org-mode is the coordination
+layer for GTD tasks; the event ledger is a second, disjoint coordination
+substrate for briefing/approval/attestation/spend objects.
 
 ## Open Questions
 
 1. **Org-file projection of ledger tasks** — deliberately **out of v2 scope**.
-   Org files remain the source of truth for GTD tasks; the ledger tracks
-   briefing/delegation/verification objects, a distinct object class.
+   Org files remain the source of truth for GTD tasks per
+   [DIP-0009](DIP-0009-gtd-specification.md), and org-mode remains the
+   coordination layer per [DIP-0010](DIP-0010-external-sync-architecture.md);
+   the ledger tracks briefing/delegation/verification/spend objects, a
+   distinct, disjoint object class (see Source of Truth Boundary in Summary).
    Whether/how ledger tasks eventually project into or replace org-mode task
-   headings is deferred to v2.1.
+   headings is deferred to v2.1, and would itself require its own ratified
+   DIP per that boundary statement.
 2. **Signing rollout mechanics** — when the trigger fires (foreign agent, or
    an audit requirement), what is the migration path for *already-written*
    unsigned events in an existing `.jsonl` file? This DIP does not specify a
@@ -630,6 +819,13 @@ without changing it. Each is expanded into its own DIP at that phase's start.
    defines pure accumulation; whether overspend hard-blocks vs. escalates is
    future work once shadow accounting has been observed for long enough to
    set a sane threshold.
+5. **Rename `task.*` to `item.*`.** The event family is named `task.*` even
+   though these objects are deliberately not GTD tasks (see the Naming note
+   in Specification) — a legacy of the substrate's first consumer being
+   task-shaped. Renaming is cheap now (Phase 1 only, no third-party
+   installations) and becomes a schema migration later. **Trigger: rename
+   before any external installation adopts the ledger, or before any org-
+   projection work (Open Question 1) begins — whichever comes first.**
 
 ## References
 
@@ -648,10 +844,35 @@ without changing it. Each is expanded into its own DIP at that phase's start.
   attempts independently of a fragile shared-lock primitive.
 - `ENG-2026-0304-027` — the general Datacore pattern (`fcntl` locking around
   concurrent JSON/file writers) this DIP's per-writer append lock follows.
-- DIP-0011 — Nightshift module (the claiming mechanism this ledger is
-  designed to eventually replace, per Phase 2+).
-- DIP-0018 — Credential Management (key-custody conventions this DIP's
-  private-key-outside-repo / public-registry-tracked split follows).
-- DIP-0032 — Egress Enforcement (structural precedent for this DIP's format
-  and for "policy file + fail-closed defaults" reasoning, reused for
-  `ledger/policy.py` in Phase 5).
+- [DIP-0009](DIP-0009-gtd-specification.md) — GTD Specification. Owns GTD
+  task identity (`:ID:` UUID v4), the `gtd.duplicate_check` dedup mechanism,
+  and the canonical org-mode task-state vocabulary
+  (`TODO/NEXT/WAITING/DEFERRED/QUEUED/WORKING/REVIEW/DONE/FAILED/CANCELLED`).
+  This DIP's `task.*` event vocabulary is disjoint from that state machine —
+  see the Source of Truth Boundary in Summary and the Naming note in
+  Specification.
+- [DIP-0010](DIP-0010-external-sync-architecture.md) — External Sync
+  Architecture. Owns the "org-mode is the coordination layer / source of
+  truth for all content" claim this DIP's boundary statement is scoped
+  against; the ledger is a machine-internal substrate alongside org-mode, not
+  a rival external-sync target in DIP-0010's adapter model.
+- [DIP-0011](DIP-0011-nightshift-module.md) — Nightshift module (the claiming
+  mechanism this ledger is designed to eventually replace, per Phase 2+, via
+  its own ratified DIP).
+- [DIP-0018](DIP-0018-credential-management.md) — Credential Management
+  (key-custody conventions this DIP's private-key-outside-repo /
+  public-registry-tracked split follows).
+- [DIP-0022](DIP-0022-module-specification.md) — Module Specification.
+  `.datacore/lib/ledger/` is deliberately core-lib, not a module registered
+  under this DIP's `module.yaml` system — the same precedent as
+  `org_workspace_adapter.py` and `focus_mode.py`.
+- [DIP-0026](DIP-0026-architectural-primitives.md) — Architectural
+  Primitives. Not cited as a dependency; the append-only/HLC/fold/replay
+  pattern this DIP establishes is a candidate for a future addition to its
+  catalog, since DIP-0035–0041 all reuse it. No change to DIP-0026 is made or
+  required by this DIP.
+- DIP-0032 — Egress Enforcement (**Draft, unratified at the time of this
+  citation**; cited only as structural/stylistic precedent for this DIP's
+  format and for "policy file + fail-closed defaults" reasoning, reused for
+  `ledger/policy.py` in Phase 5 — not a functional dependency, so DIP-0034
+  does not require DIP-0032 to ratify first).
