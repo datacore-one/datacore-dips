@@ -8,31 +8,85 @@
 | **Type** | Infrastructure |
 | **Status** | Draft |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-07-30 |
+| **Updated** | 2026-08-03 |
 | **Tags** | `briefing`, `grounding`, `hallucination`, `fact-table`, `validation`, `datacore-v2` |
+| **Depends On** | [DIP-0034](DIP-0034-event-ledger-substrate.md) (Event Ledger Substrate — Draft, unratified; `emit_facts` writes into `metric.attest`'s `fact` class — see Relationship to DIP-0034 in Integration) |
 | **Affects** | `.datacore/lib/briefing/` (`fact_table.py`, `render.py`), `.datacore/lib/briefing_grounded.py`, future `cos_generate.py`/`cos_reasoning.py` call sites |
 | **Specs** | `.datacore/lib/briefing/fact_table.py`, `.datacore/lib/briefing/render.py`, `.datacore/lib/briefing_grounded.py` |
-| **Agents** | any process that generates briefing prose via an LLM (`/today`, `cos_generate.py`, `cos_reasoning.py`, nightshift briefing jobs) |
-| **Relates to** | `ENG-2026-0728-002` (the motivating incident), DIP-0034 (Event Ledger Substrate — `metric.attest` sink for facts), DIP-0035 (Job Contracts — fact-freshness verification), DIP-0038 (Action Loop + Co-sign — briefing items become ledger tasks downstream of this DIP's output) |
+| **Agents** | any process that generates briefing prose via an LLM (`/today`, `cos_generate.py`, `cos_reasoning.py`, nightshift briefing jobs) — see Agent Context below |
+| **Relates to** | `ENG-2026-0728-002` (the motivating incident), [DIP-0035](DIP-0035-job-contracts.md) (Job Contracts — fact-freshness verification), [DIP-0038](DIP-0038-action-loop-cosign.md) (Action Loop + Co-sign — briefing items become ledger tasks downstream of this DIP's output) |
 
 ## Summary
 
 Introduces a **grounded-briefing pipeline**: a deterministic `Fact` table
-built by read-only adapters (`briefing.fact_table`), a token contract that
-forces an LLM to reference every figure via `{{fact:ID}}` rather than typing
-a number directly (`briefing.render.render`), a post-render validator that
-re-scans the fully rendered text and flags any digit sequence that cannot be
-traced to something real (`briefing.render.validate`), and a pipeline entry
-point (`briefing_grounded.py`) that composes these into two functions —
+built by read-only **fact adapters** (`briefing.fact_table` — see the
+terminology note in Specification: this is *not* the DIP-0010/DIP-0026
+`SyncAdapter`), a token contract that forces an LLM to reference every
+figure via `{{fact:ID}}` rather than typing a number directly
+(`briefing.render.render`), a post-render validator that re-scans the fully
+rendered text and flags any digit sequence that cannot be traced to
+something real (`briefing.render.validate`), and a pipeline entry point
+(`briefing_grounded.py`) that composes these into two functions —
 `prompt_block(facts)` (what the LLM is shown) and `finalize(llm_text, facts,
 allow=None)` (what a briefing consumer receives back) — with the property
 that **finalize() never returns an unvalidated LLM-typed number**. On either
 failure path (an unknown token, or a number typed directly that fails
 validation) the caller receives a deterministic, fully-grounded fallback
 text instead of the LLM's prose. This DIP is Phase 4 of the v2 rollout
-DIP-0034 names in its Rollout Plan; it consumes DIP-0034's event schema
-(`metric.attest`) for fact durability and is itself consumed by DIP-0038
-(briefing items becoming ledger tasks).
+DIP-0034 names in its Rollout Plan; its `emit_facts` writes into
+DIP-0034's `metric.attest` **namespaced family**, owning the `fact` class
+only (see Relationship to DIP-0034 in Integration, and R2 of the
+2026-08-03 amendment rulings) for fact durability, and it is itself
+consumed by DIP-0038 (briefing items becoming ledger tasks).
+
+## Agent Context
+
+### When to Reference This DIP
+
+**Always reference when:**
+- Generating briefing prose via an LLM for `/today`, a Chief-of-Staff
+  briefing (`cos_generate.py`, `cos_reasoning.py`), or any nightshift
+  briefing job that will state a count, date, or other figure
+- Adding a new fact source (a fact adapter) that a briefing pipeline
+  should be able to cite
+- Reviewing a `finalize()` fallback occurrence (grounded-fallback text
+  shipped instead of LLM prose) to judge whether the gate caught a real
+  fabrication or over-fired on a false positive
+- Wiring `COS_GROUNDED=1` into a live briefing generator, or deciding
+  whether a new LLM-authored artifact with numeric claims should adopt
+  `prompt_block`/`finalize`
+- Emitting or reading `metric.attest` ledger events with
+  `payload.metric == "fact"`
+
+### Quick Reference for Agents
+
+| Question | Answer |
+|----------|--------|
+| How does an LLM cite a number safely? | It emits `{{fact:ID}}`; `render()` substitutes the real `Fact.value` verbatim — it never types a digit itself |
+| What happens if the LLM types a number directly? | `validate()` flags any digit sequence that doesn't trace to a fact value or an allowlisted date/year/caller-supplied pattern; `finalize()` discards the whole LLM text on any such error |
+| What does a caller get back on failure? | `_fallback_text(facts)` — every real fact, plainly listed, with **zero** LLM-authored prose — plus a nonempty `errors` list |
+| Is a fallback ever silent? | No — Invariant 5 requires a caller to alert loudly, and (per this amendment) to log the discarded `llm_text` alongside the alert |
+| Where do facts get built? | `briefing.fact_table.build_facts(root, adapters=None, now=None)`, default fact adapters `git_status_counts` + `ledger_task_counts` |
+| How does a fact become durable/auditable? | `emit_facts` writes one `metric.attest` event per fact with `payload.metric == "fact"` (DIP-0034) |
+| Does this DIP touch org-mode? | No — facts are read from git/ledger state, never from `.org` files; no conflict with DIP-0009's org-mode-as-source-of-truth |
+| Is "adapter" here the same as a DIP-0010 sync adapter? | No — a **fact adapter** is a pure, unauthenticated, read-only local function; DIP-0010/DIP-0026's `SyncAdapter` talks to an external service. See Specification's terminology note |
+
+### Related Agents
+
+| Agent | Uses This DIP For |
+|-------|-------------------|
+| `journal-coordinator` | Coordinates `/today` and `/tomorrow` journal generation — the primary current call site this DIP's `COS_GROUNDED=1` wiring phase targets |
+| `journal-entry-writer` | Writes the daily journal/briefing prose `journal-coordinator` spawns it to produce — the LLM-authored text this DIP's `render()`/`validate()`/`finalize()` gate is designed to constrain once wired |
+| `nightshift-orchestrator` | Coordinates overnight task execution, including nightshift briefing jobs named in this DIP's front matter `Agents` field |
+
+No agent in `.datacore/registry/agents.yaml` is registered for this DIP yet — `cos_generate.py`/`cos_reasoning.py` (the Chief-of-Staff module's briefing generators) are pre-registry scripts, and `module.yaml` for the `chief-of-staff` module currently declares `agents: []`. The three agents above are the closest real, registered consumers of `/today` and nightshift briefing generation as of this writing; a future `chief-of-staff` registry entry should add `DIP-0037` to its `references.dips` once one exists, so DIP-0016's `context-inject` hook (§16.3/§18.2) can extract this section automatically.
+
+### Integration Points
+
+- [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate: `emit_facts` writes the `fact` class of the `metric.attest` namespaced family this DIP does not exclusively own (see Relationship to DIP-0034)
+- [DIP-0035](DIP-0035-job-contracts.md) — Job Contracts: fact-freshness verification is a job-contract concern, deliberately not reinvented here; also owns the `job.verify` class of the same `metric.attest` family
+- [DIP-0038](DIP-0038-action-loop-cosign.md) — Action Loop + Co-sign: downstream consumer of grounded briefing output as candidate ledger tasks
+- [DIP-0009](DIP-0009-gtd-specification.md) — GTD Specification: Part 3.7's "do not fabricate, leave empty rather than invent" is the same anti-fabrication discipline this DIP applies to briefing figures instead of task properties
 
 ## Motivation
 
@@ -128,6 +182,17 @@ LLM-authored sentence containing a number that hasn't passed both checks.
 
 ### Fact table (`briefing.fact_table`, consumed unchanged by this DIP)
 
+> **Terminology note — "adapter" here is a *fact adapter*, not a
+> DIP-0010/DIP-0026 `SyncAdapter`.** DIP-0010 (reinforced by DIP-0026's
+> "Adapter Pattern" primitive) establishes "adapter" as the class
+> implementing `SyncAdapter(ABC)`: it authenticates, fetches, and pushes to
+> an *external service*, credentialed per DIP-0018. A **fact adapter**
+> (`git_status_counts`, `ledger_task_counts`, and any future one) is
+> structurally different: a pure, read-only, local function — no auth, no
+> external service, no push direction, no credentials. The two share a
+> word, not a mechanism; this DIP always says "fact adapter" when the
+> distinction matters, and the rest of this section uses that name.
+
 Every number a grounded briefing can show must trace to a `Fact`:
 
 ```python
@@ -141,14 +206,50 @@ class Fact:
 ```
 
 `build_facts(root, adapters=None, now=None) -> dict[str, Fact]` runs a list
-of adapters (default: `git_status_counts`, `ledger_task_counts`) against one
-`root` directory and merges their `Fact` dicts. Adapter isolation is load
-bearing: one adapter raising (or returning a malformed value) never aborts
-the others — it is folded into a synthetic `_meta.adapter_errors` fact
-instead; a duplicate fact id produced by two *different* adapters is a
-config bug, not a runtime surprise, and raises `FactError` naming both.
-`write_facts` persists the table to JSON; `emit_facts` records one
-`metric.attest` ledger event per fact (see Relationship to DIP-0034, below).
+of fact adapters (default: `git_status_counts`, `ledger_task_counts`)
+against one `root` directory and merges their `Fact` dicts. Fact-adapter
+isolation is load bearing: one fact adapter raising (or returning a
+malformed value) never aborts the others — it is folded into a synthetic
+`_meta.adapter_errors` fact instead; a duplicate fact id produced by two
+*different* fact adapters is a config bug, not a runtime surprise, and
+raises `FactError` naming both. `write_facts` persists the table to JSON;
+`emit_facts` records one `metric.attest` ledger event per fact, in the
+`fact` class of that event's namespaced family (see Relationship to
+DIP-0034, below).
+
+#### Fact adapter contract
+
+A fact adapter's callable signature is `Adapter = Callable[[AdapterCtx],
+dict[str, Fact]]`, where `AdapterCtx` carries exactly `root: Path` and
+`now: float`:
+
+- **`now` handling.** A fact adapter never reads a clock itself.
+  `build_facts` reads `time.time()` once per call (or accepts an injected
+  `now`, the pattern this DIP's own pure functions never need since they
+  do no clock reads at all) and threads that single value through
+  `AdapterCtx.now` to every fact adapter and into every `Fact.computed_at`
+  it produces — one `build_facts()` call shares one timestamp across all
+  fact adapters, never one clock read per adapter.
+- **What "malformed value" means.** `build_facts` calls each fact adapter
+  as `dict(adapter(ctx))` inside one try/except per adapter. This isolates
+  two distinct failure shapes identically: an adapter that raises an
+  exception, and an adapter that returns something `dict(...)` cannot
+  coerce into `dict[str, Fact]` (e.g. `None`, a list, a malformed mapping)
+  — both are caught by the same `except Exception`, and both fold the
+  adapter's name into the same comma-joined `_meta.adapter_errors` fact.
+  The error text does not distinguish "raised" from "returned garbage";
+  only the adapter's `__name__` is recorded.
+- **Registering a new fact source today.** There is currently no
+  DIP-0022-style module-declared registration mechanism for fact
+  adapters. `DEFAULT_ADAPTERS` is a fixed two-item list
+  (`git_status_counts`, `ledger_task_counts`) inside `fact_table.py`
+  itself. A module wanting to contribute a fact source has exactly two
+  options today, neither of which is a registry hook: edit
+  `DEFAULT_ADAPTERS` directly, or pass an explicit `adapters=[...]` list
+  at its own `build_facts()` call site — which means that call site's
+  facts do not appear in any *other* caller's table unless that caller's
+  own `adapters=` list is updated too. This is a real, disclosed gap, not
+  an oversight: see Open Question 4.
 
 ### Token contract (`briefing.render.render`, consumed unchanged by this DIP)
 
@@ -336,29 +437,64 @@ the substring-grounding check meaningful at all.
 
 ## Integration
 
-### Relationship to DIP-0034 (facts are ledger attest events)
+### Relationship to DIP-0034 (facts are ledger attest events — `metric.attest`'s `fact` class)
 
 `briefing.fact_table.emit_facts` records one `metric.attest` event per fact
-(`payload.metric == "fact"`) using DIP-0034's `EventLog`/`metric.attest`
-event type — this DIP does not introduce a new event type; it is a consumer
-of the type DIP-0034 already reserves. A fact table is therefore durable and
-mechanically auditable ("what did the briefing pipeline actually see, and
-when") independent of whatever briefing text was generated from it, the
-same durability property DIP-0034 provides for task/ownership state.
+using DIP-0034's `EventLog`, but `metric.attest` is not this DIP's alone to
+claim: per the 2026-08-03 amendment rulings (R2), DIP-0034's event-type
+table defines `metric.attest` as a **namespaced family**, where every
+payload MUST carry a `metric` discriminator naming the measurement class
+it belongs to, and each class's payload shape is owned by the DIP that
+allocates it:
+
+| `metric` value | Payload owner | Payload shape |
+|---|---|---|
+| `job.verify` | [DIP-0035](DIP-0035-job-contracts.md) | `{job, ok, failures[]}` |
+| `fact` | **DIP-0037 (this DIP)** | `{id, value, unit, source}` |
+| `merge.review` | Chief-of-Staff merge gatekeeper | `{space, branch, verdict, reasons[]}` |
+
+**This DIP owns the `fact` class only.** `emit_facts`' actual payload is
+`{"metric": "fact", "id": fact.id, "value": fact.value, "unit": fact.unit,
+"source": fact.source}` — the discriminator plus exactly the four `Fact`
+fields that aren't already carried by the event envelope itself
+(`computed_at` maps to the event's own timestamp). This DIP does not
+introduce a new event *type*; it is a discriminated co-consumer of
+`metric.attest`, alongside DIP-0035's `job.verify` class and the
+Chief-of-Staff merge gatekeeper's `merge.review` class, not the type's
+sole reserving DIP. New classes are allocated by amending DIP-0034's
+table, not by this DIP unilaterally widening its own claim. A fact table
+is therefore durable and mechanically auditable ("what did the briefing
+pipeline actually see, and when") independent of whatever briefing text
+was generated from it, the same durability property DIP-0034 provides for
+task/ownership state — this holds regardless of how many other classes
+share the `metric.attest` type, since consumers reading the ledger MUST
+ignore `metric.attest` events whose `metric` discriminator they don't
+recognize.
 
 ### Relationship to DIP-0035 (fact freshness is a job contract)
 
 Whether a fact table is *fresh enough* to ground a briefing — e.g. "the
 `facts.json` this pipeline reads was built in the last N minutes, not
 stale from a failed prior run" — is explicitly **not** reinvented by this
-DIP. It is a DIP-0035 job-contract concern: a manifest entry for the job
-that produces `facts.json` (or emits its `metric.attest` events), with an
-artifact-freshness check run by `job_verify.py`, is the correct place to
-assert and alert on staleness, the same "assert outputs, not exit codes"
-discipline DIP-0035 applies to every other scheduled job. This DIP's own
-functions (`build_facts`, `prompt_block`, `finalize`) have no clock-based
-freshness logic and should not grow any — that check belongs one layer up,
-in the job contract, not in the grounding pipeline itself.
+DIP. It is a [DIP-0035](DIP-0035-job-contracts.md) job-contract concern: a
+manifest entry for the job that produces `facts.json` (or emits its
+`metric.attest` events), with an artifact-freshness check run by
+`job_verify.py`, is the correct place to assert and alert on staleness,
+the same "assert outputs, not exit codes" discipline DIP-0035 applies to
+every other scheduled job. This DIP's own functions (`build_facts`,
+`prompt_block`, `finalize`) have no clock-based freshness logic and should
+not grow any — that check belongs one layer up, in the job contract, not
+in the grounding pipeline itself.
+
+### Relationship to DIP-0026's Hook Lifecycle (out of scope, deliberately)
+
+DIP-0026's "Hook Lifecycle" primitive (governed by DIP-0024) is how
+modules (trading, mail, crm, news) already inject deterministic markdown
+into `/today` output today. That content is out of this DIP's scope:
+hook-contributed markdown is never LLM-synthesized, so it cannot exhibit
+the failure mode this DIP exists to catch. This DIP constrains only the
+LLM-authored prose layer — whatever a briefing generator's own model call
+produces — not any hook's deterministic output composed alongside it.
 
 ### Rollout: `COS_GROUNDED=1` behind a flag, with fallback + alert
 
@@ -387,6 +523,15 @@ site) happens behind an opt-in environment flag, `COS_GROUNDED=1`:
   same genre one layer up: the fix "worked" (no fabricated number shipped)
   but nobody would know the LLM's prose was being discarded until much
   later, if ever.
+- **The alert MUST also log the discarded `llm_text`, not only the
+  `errors` list.** `finalize()`'s return contract is not changed by this
+  requirement (`llm_text` is the caller's own argument, not a new return
+  value) — but a caller that alerts on `errors` alone gives a human no way
+  to tell a true catch (a genuine fabrication, the "639" shape) from a
+  false positive (the Threat Model's disclosed adjacent-token-merge
+  over-flagging path, which can legitimately discard well-grounded
+  prose). Logging the original `llm_text` alongside every fallback alert
+  is what makes that distinction reviewable after the fact.
 
 ## Invariants
 
@@ -400,16 +545,19 @@ site) happens behind an opt-in environment flag, `COS_GROUNDED=1`:
    clock or generates randomness.
 3. **`Fact.value` is always `str`, never a timestamp or other long
    incidentally-numeric string** (see Threat Model). This is a contract on
-   every adapter, present and future, not just an implementation detail of
-   the two shipped adapters.
+   every fact adapter, present and future, not just an implementation
+   detail of the two shipped fact adapters.
 4. **`prompt_block()`'s output is reproducible.** Fact lines are sorted by
    id; the same fact table always produces byte-identical prompt text
    regardless of dict insertion order.
-5. **A `finalize()` fallback is always visible, never silent**, once wired
-   behind `COS_GROUNDED=1` per the Rollout section above — this is a
-   requirement on integration call sites, not on `finalize()` itself (which
-   correctly returns the fallback text and an errors list; what a caller
-   *does* with a nonempty errors list is the integration's responsibility).
+5. **A `finalize()` fallback is always visible, never silent, and always
+   reviewable**, once wired behind `COS_GROUNDED=1` per the Rollout section
+   above — this is a requirement on integration call sites, not on
+   `finalize()` itself (which correctly returns the fallback text and an
+   errors list; what a caller *does* with a nonempty errors list is the
+   integration's responsibility). "Reviewable" means the alert MUST carry
+   the discarded `llm_text` alongside the `errors` list, not `errors`
+   alone — see the Rollout section's alert requirement above.
 
 ## Rationale
 
@@ -458,16 +606,48 @@ treating it as free.
   caller could approximate today by passing a narrow `allow` list and
   otherwise treating any nonempty `validate()` result as fatal, which is
   exactly what `finalize()`'s fallback path already does.
+- **Sentence-level or partial redaction, instead of whole-text discard on
+  any single failure** — considered and rejected for this DIP.
+  `finalize()`'s granularity is deliberately all-or-nothing: one
+  ungrounded digit anywhere discards the entire briefing's narrative and
+  prioritization, not just the offending clause. Redacting only the
+  failing sentence would require `validate()` to retain the span/offset of
+  each match and `render()` to preserve token-boundary information it
+  currently discards by the time `validate()` runs (`render.py`'s own
+  docstring: validation happens on rendered text, full stop) — a real
+  design change, not a parameter. Rejected for this DIP because the
+  simpler, coarser guarantee ("the whole thing is either fully grounded or
+  fully replaced by fact-only text") is easier to reason about and to test
+  exhaustively than a partial-redaction contract would be, at the real UX
+  cost the Threat Model's adjacent-token-merge over-flagging path already
+  discloses: a legitimately-grounded briefing can lose its entire prose
+  layer over one false positive. This tradeoff is not free, and is noted
+  here as a considered one rather than an accidental one.
 
-## Backwards Compatibility
+## Compatibility
 
-Purely additive. `briefing.fact_table` and `briefing.render` are consumed
-unchanged (this DIP adds no new fields, no new event types, no schema
-changes to either). `briefing_grounded.py` is a new file; no existing
-briefing generation path is modified by this DIP itself — the Integration
-section's `COS_GROUNDED=1` flag is the explicit mechanism by which adoption
-happens opt-in, at a later wiring step, not as part of this DIP's own
-change set.
+**What's additive.** Purely additive. `briefing.fact_table` and
+`briefing.render` are consumed unchanged (this DIP adds no new fields, no
+new schema changes to either). `briefing_grounded.py` is a new file. The
+`fact` class this DIP registers within DIP-0034's `metric.attest`
+namespaced family (see Relationship to DIP-0034 in Integration) is a new
+discriminator value, not a new event type — existing `metric.attest`
+readers that ignore unrecognized `metric` discriminators are unaffected.
+
+**What breaks.** Nothing. No existing briefing generation path is modified
+by this DIP itself — the Integration section's `COS_GROUNDED=1` flag is
+the explicit mechanism by which adoption happens opt-in, at a later wiring
+step, not as part of this DIP's own change set. A pre-existing
+`metric.attest` consumer that assumed the type was DIP-0035's alone (per
+the reservation claim this amendment corrects — see Relationship to
+DIP-0034) should update to read `payload.metric` rather than assume every
+`metric.attest` event is a `job.verify` result; this is a documentation
+correction, not a wire-format change, since `emit_facts`'s payload shape
+was never actually `job.verify`-shaped to begin with.
+
+**Migration.** None required. There is no prior grounded-briefing state to
+migrate; this DIP's Rollout Plan (below) is itself the adoption path, not
+a migration of existing data.
 
 ## Security Considerations
 
@@ -546,16 +726,49 @@ define or depend on that integration.
    requiring `render()` to hand `validate()` more than plain rendered
    text)? Deferred until the wiring phase produces evidence of how often
    this actually degrades a genuinely-grounded briefing to fallback.
+4. **Should fact-adapter registration become a real, DIP-0022-style
+   module-declared mechanism** rather than the current fixed
+   `DEFAULT_ADAPTERS` list plus ad hoc `adapters=[...]` overrides at
+   individual `build_facts()` call sites (see Specification's Fact
+   Adapter Contract)? Deferred: with exactly two fact adapters and one
+   call site (`briefing_grounded.py --demo`), a registration mechanism
+   would be speculative infrastructure for a problem that does not yet
+   exist. Trigger, not a date: the first module beyond the two founding
+   fact adapters that needs to contribute a fact to a shared `/today`
+   fact table — at that point a fixed list in `fact_table.py` stops being
+   adequate and this becomes a real gap, not a hypothetical one.
 
 ## References
 
 - `ENG-2026-0728-002` — the motivating incident: four precise, individually
   wrong briefing claims, three of four prescribed remedies harmful,
   precision as the mechanism of false credibility.
-- DIP-0034 — Event Ledger Substrate (`metric.attest` event type this DIP's
-  `emit_facts` consumes; format and structure this DIP follows).
-- DIP-0035 — Job Contracts + Unified Verifier (fact-freshness verification
-  belongs here, not in this DIP; `ENG-2026-0728-001` silent-by-degradation
-  genre that motivates this DIP's fallback+alert integration requirement).
-- DIP-0038 — Action Loop + Co-sign (consumes grounded briefing output as
-  candidate ledger tasks; follow-on, out of this DIP's scope).
+- [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate.
+  `metric.attest`'s namespaced-family table (amended 2026-08-03, R2) is
+  where this DIP's `fact` class is allocated; `emit_facts` writes into
+  that class, not an exclusive type this DIP reserves alone. Depended on
+  (see front matter); this DIP is functionally implementable without it
+  (`render()`, `validate()`, `prompt_block()`, `finalize()` have no ledger
+  dependency) — losing DIP-0034 would only remove the durable audit trail
+  of what facts were shown when, not the grounding guarantee itself.
+- [DIP-0035](DIP-0035-job-contracts.md) — Job Contracts + Unified Verifier
+  (fact-freshness verification belongs here, not in this DIP;
+  `ENG-2026-0728-001` silent-by-degradation genre that motivates this
+  DIP's fallback+alert integration requirement; owns the `job.verify`
+  class of the same `metric.attest` family this DIP's `fact` class
+  shares).
+- [DIP-0038](DIP-0038-action-loop-cosign.md) — Action Loop + Co-sign
+  (consumes grounded briefing output as candidate ledger tasks; follow-on,
+  out of this DIP's scope).
+- [DIP-0009](DIP-0009-gtd-specification.md) — GTD Specification, Part
+  3.7's "do not fabricate, leave empty rather than invent" — the same
+  anti-fabrication discipline this DIP applies to briefing figures.
+- [DIP-0010](DIP-0010-external-sync-architecture.md) /
+  [DIP-0026](DIP-0026-architectural-primitives.md) — source of the
+  `SyncAdapter` meaning of "adapter" this DIP's fact adapters are
+  deliberately disambiguated from (see Specification's terminology note).
+- CLAUDE.base.md, "Verification Protocol" section — "state the recalled
+  fact explicitly... never interpolate between two engrams to produce a
+  'probably correct' composite" is the same anti-fabrication discipline
+  this DIP applies to briefing generation, for a different subsystem
+  (engram recall vs. LLM-authored prose).
