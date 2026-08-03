@@ -8,14 +8,25 @@
 | **Type** | Infrastructure |
 | **Status** | Draft |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-07-30 |
+| **Updated** | 2026-08-03 |
+| **Depends On** | DIP-0035 (Job Contracts — `required_env` schema `doctor()` audits directly); DIP-0034 (Event Ledger Substrate — Rollout Plan phase numbering only, no event type consumed) |
 | **Tags** | `config`, `env`, `secrets`, `doctor`, `datacore-v2` |
 | **Affects** | `.datacore/lib/config_plane.py`, `.datacore/lib/job_verify.py` (`--doctor` flag, `DATACORE_CANONICAL_ENV`), `~/.datacore/datacore.env` (canonical, per machine), legacy sources: `~/.config/cos.env`, `/etc/datacored.env`, `~/.hermes/.env` |
 | **Specs** | `.datacore/lib/config_plane.py`, `.datacore/lib/job_verify.py` |
 | **Agents** | any process reading a job's `required_env`; `job_verify.py --doctor` as the audit surface; `cos-server-setup.sh` (Phase 6 migration) |
-| **Relates to** | DIP-0034 (Event Ledger Substrate), DIP-0035 (Job Contracts + Unified Verifier — `required_env` is this DIP's own audit input), `ENG-2026-0728-001` (silent-degradation failure genre, item 1: token-refresh sync gap), `ENG-2026-0725-016` (single-refresher-owner pattern for rotating credentials) |
+| **Relates to** | DIP-0018 (Credential Management — this DIP is a machine-local consumption view over DIP-0018's stores, not a replacement; see Relationship to DIP-0018), DIP-0034 (Event Ledger Substrate), DIP-0035 (Job Contracts + Unified Verifier — `required_env` is this DIP's own audit input), `ENG-2026-0728-001` (silent-degradation failure genre, item 1: token-refresh sync gap), `ENG-2026-0725-016` (single-refresher-owner pattern for rotating credentials) |
 
 ## Summary
+
+**What "config plane" means here.** This DIP names its scope after the
+control-plane/data-plane distinction: the *config plane* is the read path a
+running process uses to resolve its own configuration and required
+credentials at start-up — one canonical file per machine. It is distinct
+from the *storage and distribution* path — where credential values are
+generated, indexed, tiered, and synced across machines in the first place —
+which is [DIP-0018](DIP-0018-credential-management.md)'s domain and remains
+untouched by this DIP (see Relationship to DIP-0018, in Specification,
+below). This DIP defines and audits only the local read path.
 
 Introduces a single canonical per-machine env file (`~/.datacore/datacore.env`)
 as the one place process configuration is read from, replacing the ambiguous
@@ -35,6 +46,54 @@ directly and has no event type of its own on DIP-0034's ledger.
 below. The real-machine audit that this DIP's own Phase 3 close performed
 found `~/.datacore/env` already occupied by a pre-existing directory; the
 amendment resolves that collision rather than merely documenting it.
+
+## Agent Context
+
+This section helps agents understand when and how to apply this DIP.
+
+### When to Reference This DIP
+
+**Always reference when:**
+- Diagnosing why a scheduled job, cron script, or daemon on mac/box/nightshift
+  can't find a credential or config value it expects (the failure genre
+  `ENG-2026-0728-001` names)
+- Setting up, auditing, or migrating a machine's env-file configuration —
+  running or interpreting `job_verify.py --doctor` output
+- Adding a new job to a machine's manifest and declaring its `required_env`
+  (DIP-0035), or wiring `cos-server-setup.sh`'s Phase 6 migration
+- Writing or reviewing a DIP or spec that touches credential/config storage
+  or consumption, to check it against the DIP-0018 boundary this DIP
+  declares (see Relationship to DIP-0018, in Specification)
+- Deciding where a new process-configuration value should live: canonical
+  `datacore.env` (this DIP) vs. a DIP-0018-governed credential store
+
+### Quick Reference for Agents
+
+| Question | Answer |
+|----------|--------|
+| Where does a process on this machine read its config from? | `~/.datacore/datacore.env` (`config_plane.CANONICAL_PATH`) — one flat file per machine |
+| Is `datacore.env` the credential store? | No. It is a machine-local materialised consumption view over DIP-0018's stores — DIP-0018 remains system of record (see Relationship to DIP-0018) |
+| How do I audit a machine's config coverage? | `python3 job_verify.py --machine <name> --doctor` — prints a names-only report, exit 0 unless the manifest or an env file itself fails to load |
+| Does `doctor()` ever write or fix files? | No — report-only, by design (see Rationale); migration is manual today, Phase 6 (DIP-0039) work |
+| Where do audited `required_env` names come from? | The DIP-0035 job manifest — not DIP-0022's `module.yaml requires.env_vars.required`, which `doctor()` does not consume (see Open Questions) |
+| Can a `doctor()` report ever contain a secret value? | No — names only, enforced as a tested property (see SECRETS RULE) |
+
+### Related Agents
+
+| Agent | Uses This DIP For |
+|-------|-------------------|
+| `nightshift-orchestrator` | Consulting canonical config coverage before dispatching scheduled mac/box/nightshift jobs that declare `required_env`, so a job isn't routed to a machine missing a credential it needs |
+| `dip-preparer` | Cross-checking new credential- or config-touching DIPs against this DIP's declared DIP-0018 boundary before ratification, so the config/credential domain doesn't re-fragment |
+| `scaffolding-auditor` | Extending spec-compliance checks to the canonical env-file convention this DIP defines, once Phase 6 migration begins retiring legacy sources |
+
+### Integration Points
+
+- **[DIP-0018: Credential Management](DIP-0018-credential-management.md)** — system of record for credential storage, discoverability, and cross-machine portability; this DIP is a machine-local consumption view over it, not a replacement (see Relationship to DIP-0018)
+- **[DIP-0034: Event Ledger Substrate](DIP-0034-event-ledger-substrate.md)** — names this DIP as Phase 3 of the v2 Rollout Plan; no event type consumed
+- **[DIP-0035: Job Contracts + Unified Verifier](DIP-0035-job-contracts.md)** — source of the `required_env` field `doctor()` audits directly
+- **[DIP-0022: Module Specification](DIP-0022-module-specification.md)** — defines the parallel `module.yaml requires.env_vars.required` field, not currently consumed by `doctor()`
+- **[DIP-0005: Installation & Upgrade](DIP-0005-installation-upgrade.md)** — env-var and config-file registries (§4, §5) this DIP's artifacts should be registered in on ratification
+- **[DIP-0011: Nightshift Module](DIP-0011-nightshift-module.md)** — "Server deployment" conventions `cos-server-setup.sh` (Phase 6) extends
 
 ## Motivation
 
@@ -145,6 +204,43 @@ canonical path a legacy convention already had a real, differently-shaped
 use for. Doing both is cheap and each closes a distinct failure mode.
 
 ## Specification
+
+### Relationship to DIP-0018 (Credential Management)
+
+> [DIP-0018](DIP-0018-credential-management.md) remains the system of record for credential storage, discoverability and cross-machine portability. This DIP does not replace it and defines no new storage tier. `~/.datacore/datacore.env` is a **machine-local materialised consumption view**: values originate in the DIP-0018 stores, are materialised onto one machine for runtime processes (cron jobs, daemons) that cannot query an index, and are never synced, never committed, and never authoritative. Losing it is recoverable by re-materialising from DIP-0018's stores. It MUST be registered in DIP-0018's credential index like any other credential location, and its `0600` mode requirement is inherited from DIP-0018 §8 (Security), not invented here.
+
+This is why the worked example below (Implementation) is dominated by
+credential-shaped `hermes.env` variables (`DISCORD_BOT_TOKEN`,
+`ELEVENLABS_API_KEY`, `TELEGRAM_BOT_TOKEN`, ...): `datacore.env`'s content is
+expected to be mostly secrets, because it is the local read side of
+DIP-0018's storage, not a competing store for a different, non-secret class
+of config. [DIP-0010](DIP-0010-external-sync-architecture.md)'s "All
+credentials in `.datacore/env/.env`, never in config" statement governs that
+same DIP-0018-owned storage tier — it is not in tension with the
+machine-local view described here; both statements describe the same
+credential, at two different points in its path from store to process.
+
+The `~/.datacore/env` directory this DIP's own Amendment (above) found
+already occupying the originally-drafted canonical path is, on inspection,
+doing the same job DIP-0018 assigns to `.datacore/env/`, just under a
+different root (`~/.datacore/` rather than the repo-relative
+`.datacore/env/` DIP-0005 and DIP-0010 describe) and one file per service
+rather than one flat file. It is left untouched by this DIP — collision
+avoidance is `~/.datacore/datacore.env`'s job (see Amendment), not a
+reconciliation of that directory's own convention, which remains DIP-0018
+territory to resolve if it chooses to.
+
+**Registries this DIP's artifacts belong in on ratification.** Per
+[DIP-0005](DIP-0005-installation-upgrade.md)'s §4 (Environment Variables)
+and §5 (Configuration Files) registries — the established home for exactly
+this kind of artifact — `DATACORE_CANONICAL_ENV` and
+`~/.datacore/datacore.env` should be added to those tables when this DIP
+ratifies; DIP-0005 is merged, so that addition is a follow-on amendment to
+DIP-0005, not part of this DIP. [DIP-0011](DIP-0011-nightshift-module.md)'s
+"Server deployment" section (systemd service/timer files, setup scripts) is
+the closer analog for this DIP's actual target machines (mac, box/cos,
+nightshift) and the natural place `cos-server-setup.sh`'s Phase 6 section
+(Rollout Plan, below) should cross-reference once written.
 
 ### Canonical path
 
@@ -272,6 +368,18 @@ declaring its own list?** DIP-0035 already gives every job a declared
 manifest would recreate the exact two-sources-of-truth drift this DIP is
 designed to close elsewhere.
 
+**Why doesn't `doctor()` also consume DIP-0022's `module.yaml
+requires.env_vars.required`?** [DIP-0022](DIP-0022-module-specification.md)
+declares a structurally similar but scoped-differently field: a module's
+env-var requirements at *install* time, independent of whether any job
+using that module is actually scheduled on a given machine. `doctor()`
+intentionally audits only DIP-0035's per-machine, per-scheduled-job
+`required_env` — the narrower, more directly actionable question of "does
+this machine's canonical file cover what its scheduled jobs need right
+now." Whether the two declarations should eventually be unified (or
+cross-validated against drift) is tracked as an Open Question, below, not
+resolved by this DIP.
+
 **Why report-only — why doesn't `doctor()` ever write canonical from
 legacy?** An automatic three-way merge that guesses which of several
 conflicting values is "the real one" is exactly the kind of silent,
@@ -297,16 +405,24 @@ resolve deliberately, once — it never encodes a guess.
   SECRETS RULE above). Revisit only if a signed, access-controlled event
   store becomes an actual requirement.
 
-## Backwards Compatibility
+## Compatibility
 
-Additive. No legacy file (`cos.env`, `datacored.env`, `hermes.env`) is
-deleted, modified, or migrated by this DIP — `doctor()` only *reads* them
-(never writes) to compute a report. A machine with no `~/.datacore/datacore.env`
-yet behaves exactly as before: `load()` returns `{}` and every job keeps
-reading whatever it reads today; `doctor()` simply reports every
-`required_env` var as "missing" until migration happens. Migrating
-variables onto the canonical file, and retiring the legacy files, is
-explicitly Phase 6 (`cos-server-setup.sh`) work — not this DIP's.
+**Additive; nothing breaks.** No legacy file (`cos.env`, `datacored.env`,
+`hermes.env`) is deleted, modified, or migrated by this DIP — `doctor()`
+only *reads* them (never writes) to compute a report. A machine with no
+`~/.datacore/datacore.env` yet behaves exactly as before: `load()` returns
+`{}` and every job keeps reading whatever it reads today; `doctor()` simply
+reports every `required_env` var as "missing" until migration happens.
+Migrating variables onto the canonical file, and retiring the legacy files,
+is explicitly Phase 6 (`cos-server-setup.sh`) work — not this DIP's.
+
+Also additive relative to DIP-0018: no DIP-0018-governed storage tier,
+credential-index entry, or sync mechanism is deleted, modified, or migrated
+by this DIP (see Relationship to DIP-0018, in Specification). The one
+follow-on registration this DIP creates — `DATACORE_CANONICAL_ENV` and
+`~/.datacore/datacore.env` in DIP-0005 §4/§5 — is an addition to those
+tables, not a change to their existing entries; it lands as a separate
+DIP-0005 amendment on this DIP's ratification, not as part of this diff.
 
 ## Security Considerations
 
@@ -477,6 +593,14 @@ only after that migration — never by this DIP.
    confirms the source file's eventual retirement) are Phase 6/DIP-0039
    scope; this DIP defines the audit that feeds that process, not the
    process itself. **Still open.**
+5. **`doctor()` does not consume DIP-0022's `module.yaml
+   requires.env_vars.required`** — a second, parallel required-env
+   declaration mechanism, scoped to installed modules rather than scheduled
+   jobs (see Rationale). Whether the two should be unified, cross-validated
+   for drift, or are legitimately different concerns that should stay
+   separate, is unresolved. **Still open.** Trigger: revisit if a module's
+   declared `requires.env_vars.required` is ever found to have drifted from
+   what its installed jobs actually declare in the DIP-0035 manifest.
 
 ## References
 
@@ -494,3 +618,22 @@ only after that migration — never by this DIP.
   `required_env` field `doctor()`'s `missing` section audits against, and
   of the "assert the real thing, not a proxy for it" verification
   discipline this DIP applies to configuration).
+- [DIP-0018](DIP-0018-credential-management.md) — Credential Management;
+  system of record this DIP's canonical file materialises a view over (see
+  Relationship to DIP-0018, in Specification).
+- [DIP-0005](DIP-0005-installation-upgrade.md) — Installation & Upgrade;
+  §4 (Environment Variables) and §5 (Configuration Files) are the
+  registries `DATACORE_CANONICAL_ENV` and `~/.datacore/datacore.env`
+  should be added to on this DIP's ratification (see Compatibility).
+- [DIP-0010](DIP-0010-external-sync-architecture.md) — External Sync
+  Architecture; its "All credentials in `.datacore/env/.env`, never in
+  config" statement governs the same DIP-0018 storage tier this DIP reads
+  from, not a competing claim (see Relationship to DIP-0018).
+- [DIP-0011](DIP-0011-nightshift-module.md) — Nightshift Module; its
+  "Server deployment" section (systemd service/timer files, setup scripts)
+  is the closer analog for this DIP's actual target machines than DIP-0005,
+  and the natural place Phase 6's `cos-server-setup.sh` section should
+  cross-reference once written.
+- [DIP-0022](DIP-0022-module-specification.md) — Module Specification;
+  defines the parallel `module.yaml requires.env_vars.required` field
+  `doctor()` does not currently consume (see Rationale, Open Question 5).
