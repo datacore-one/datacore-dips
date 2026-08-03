@@ -13,7 +13,8 @@
 | **Affects** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py`, `.datacore/keys/approvals_policy.yaml`, future `cos_approval_*` MCP wiring, Telegram dismiss/approve handlers |
 | **Specs** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py` |
 | **Agents** | any process that materializes briefing items into ledger tasks (`briefing.actions.materialize`); any human approver granting cosign for a side-effecting task |
-| **Relates to** | winston-open-gaps item 7 (approvals loop built but never wired), DIP-0034 (Event Ledger Substrate — the event schema this DIP's `task.create`/`approval.grant` events use), DIP-0037 (Grounded Briefings — the upstream producer of the items this DIP materializes), DIP-0032 (Egress Enforcement — structural precedent for "policy file + fail-closed defaults"), `ENG-2026-0729-030` (signing opt-in amendment — the trust boundary this DIP's co-sign gate operates under) |
+| **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate. Non-functional without it: the `task.create`/`approval.grant` event schema, `EVENT_TYPES`, and the Task 5.2b cross-actor HLC ordering fix this DIP's grant→create causality relies on. |
+| **Relates to** | winston-open-gaps item 7 (approvals loop built but never wired), DIP-0037 (Grounded Briefings — the upstream producer of the items this DIP materializes, soft/optional), DIP-0032 (Egress Enforcement — structural precedent for "policy file + fail-closed defaults"), DIP-0009 (GTD Specification — adjacent, disambiguated GTD task-state model, see Specification), DIP-0013 (Meetings Module §5.2 — escalation-detection pattern cited in Open Questions), DIP-0006 (Open Questions Management — superseded into DIP-0013 §4, cited for the same reason), `ENG-2026-0729-030` (signing opt-in amendment — the trust boundary this DIP's co-sign gate operates under) |
 
 ## Summary
 
@@ -32,6 +33,75 @@ long-standing gap named in the Winston deep-audit's open-gaps list: approval
 machinery (`cos_approval_*` MCP tools) that existed, unwired, for months,
 while cron-generated briefings kept ending in questions ("queue those into
 nightshift?") nobody had a mechanical way to act on.
+
+**Ledger tasks are not GTD tasks.** Ledger task states are disjoint from
+org-mode's TODO/NEXT/WAITING/DONE; dismissing a briefing item never completes
+an org task. `materialize()` never writes to `inbox.org` or
+`next_actions.org` — briefing items are system-generated candidates for
+review, not human-authored intentions, so they deliberately run outside the
+single-capture-point chain rather than through it. See [DIP-0034](DIP-0034-event-ledger-substrate.md)'s
+source-of-truth boundary and [DIP-0009](DIP-0009-gtd-specification.md) for
+the GTD side of this; the full disambiguation and the capture-point argument
+are in Specification below.
+
+**Trust boundary, stated up front, not buried.** While signing is dormant,
+the actor asserting a grant is self-declared, not cryptographically
+authenticated — this gate is a **process-boundary control** that prevents an
+*accidental* ungated side effect, not a defense against adversarial forgery
+by a process that can already write to the approver's actor file. Do not read
+"co-sign" as cryptographically binding until `DATACORE_LEDGER_SIGN=1` is on;
+see TRUST BOUNDARY below for the exact scope.
+
+## Agent Context
+
+### When to Reference This DIP
+
+**Always reference when:**
+- Turning a briefing/candidate item into a durable ledger task — calling,
+  wrapping, or reasoning about `briefing.actions.materialize`.
+- Appending or evaluating a `task.create` whose declared `effects` intersect
+  a cosign-gated set (`email.send`, `payment`, `prod.deploy` by default) —
+  anything that must pass `ledger.policy.guarded_append`.
+- Building or reasoning about Phase 6 wiring: `cos_approval_*` MCP tools,
+  Telegram dismiss/approve handlers, or any new caller of
+  `materialize`/`act`.
+- Answering whether a dismissed briefing item can be recovered, or whether
+  ledger task state overlaps `inbox.org`/`next_actions.org` GTD state.
+- Adding a new event type or payload shape whose id might collide with
+  `briefing.actions.item_id`'s dedupe key, or reasoning about the escalation
+  path for a permanently-blocked (ungranted) item.
+
+### Quick Reference for Agents
+
+| Question | Answer |
+|----------|--------|
+| Does dismissing a briefing item touch `inbox.org` or `next_actions.org`? | No. Ledger tasks are a disjoint object class from org-mode GTD tasks ([DIP-0034](DIP-0034-event-ledger-substrate.md), [DIP-0009](DIP-0009-gtd-specification.md)); `materialize()`/`act()` never write to org files. |
+| Is a co-sign grant cryptographically verified today? | No. Actor identity is self-declared, process-boundary trust only, until `DATACORE_LEDGER_SIGN=1` — see TRUST BOUNDARY. |
+| Can a dismissed item be un-dismissed? | No mechanism exists in the current event vocabulary. Dismissal is fold-level terminal; the only recovery is creating an unrelated new task under a new id — see Open Question 4. |
+| Which event authorizes a gated `task.create`? | `approval.grant`, validated by `guarded_append`'s 8 ordered checks (actor-bound, id-bound, replay-blocked). |
+| Where does an ungranted side-effecting item go? | `MaterializeResult.blocked`; nothing is written to the log, and it reappears on every re-materialize call until granted — see Open Question 3 for the (deferred) escalation path. |
+| Who can gate a `task.create`? | Only the single `policy.approver` named in `.datacore/keys/approvals_policy.yaml`; per-effect approvers are Open Question 2. |
+
+### Related Agents
+
+| Agent | Uses This DIP For |
+|-------|-------------------|
+| *(none registered yet)* | No entry in `.datacore/registry/agents.yaml` calls `materialize`/`act`/`guarded_append` today. Verified absent, not omitted: Phase 6 wiring (see Rollout Plan) is what gives `cos_approval_*` MCP tools and Telegram dismiss/approve handlers a real caller. |
+| `nightshift-orchestrator` | Named only as the plausible eventual consumer of materialized side-effecting tasks — the motivating winston-open-gaps quote ("queue those into nightshift?") points here — but no code path in this DIP or [DIP-0011](DIP-0011-nightshift-module.md) connects them yet; do not treat this as a live integration. |
+
+### Integration Points
+
+- [DIP-0034](DIP-0034-event-ledger-substrate.md) — hard dependency: event
+  schema, `approval.grant` type, Task 5.2b cross-actor HLC ordering fix.
+- [DIP-0037](DIP-0037-grounded-briefings.md) — soft/optional upstream
+  producer of the items `materialize` consumes.
+- [DIP-0032](DIP-0032-egress-enforcement.md) — structural precedent for
+  "policy file + fail-closed defaults," not a functional dependency.
+- [DIP-0009](DIP-0009-gtd-specification.md) — adjacent GTD task-state model;
+  disambiguated, never integrated (see Specification).
+- [DIP-0013](DIP-0013-meetings-module.md) §5.2 — escalation-detection
+  pattern cited (not reused verbatim) for Open Question 3, via
+  [DIP-0006](DIP-0006-open-questions-management.md) which it supersedes.
 
 ## Motivation
 
@@ -110,6 +180,47 @@ DIP's `item_id`), not at the prose layer.
   enforcement, where it exists at all, is ad hoc per call site.
 
 ## Specification
+
+### Relationship to GTD, org-mode, and the single capture point
+
+**Ledger tasks are a distinct object class from GTD tasks.** DIP-0034
+establishes the boundary this DIP inherits: org files remain the source of
+truth for GTD tasks, and the ledger tracks a *disjoint* class of objects —
+briefing/delegation/verification objects, per DIP-0034's Backwards
+Compatibility section and Open Questions #1 ("Org files remain the source of
+truth for GTD tasks; the ledger tracks briefing/delegation/verification
+objects, a distinct object class"). Concretely, for this DIP: a ledger
+task's states (`created`/`claimed`/`completed`/`verified`/`dismissed`, per
+`fold.py`) share no code path, no file, and no identifier space with
+org-mode's GTD states (TODO/NEXT/WAITING/DEFERRED/DONE/CANCELLED, per
+[DIP-0009](DIP-0009-gtd-specification.md)). `task.dismiss` never marks an
+org heading DONE or CANCELLED; `task.create` never appends a heading to
+`inbox.org` or `next_actions.org`; nothing in `briefing.actions` or
+`ledger.policy` opens, parses, or writes any `.org` file. The vocabulary is
+deliberately close (`task.create`/`task.claim`/`task.complete` echo
+TODO/NEXT/DONE, and the Motivation's "queue those into nightshift?" quote
+directly evokes DIP-0011's `nightshift.org`) — this section exists
+specifically so a reader of this DIP alone, without also having read
+DIP-0034's Open Questions, has a textual anchor for the fact that these are
+two independent systems that happen to share adjacent terminology, not one
+system with two names.
+
+**Why `materialize()` bypasses `inbox.org` — deliberately, not by oversight.**
+The single-capture-point principle (`inbox.org` as the sacred point of entry)
+is scoped to *human-initiated* capture: a person's own intentions, captured
+once, then triaged. A briefing item is not that — it is a system-generated
+candidate produced by a scheduled pipeline (per DIP-0037, when grounded) for
+a human to *review*, not something the human is asking the system to
+remember on their behalf. Routing every briefing item through `inbox.org`
+before it could become a ledger task would conflate two different kinds of
+"pending thing": a human's own captured intention, and a machine's proposal
+awaiting human judgment. This DIP keeps them in separate systems on purpose —
+`materialize()` turns a reviewed-or-reviewable candidate directly into a
+ledger task (gated, if side-effecting, by `approval.grant`), never into an
+inbox entry — and the never-resurface guarantee (below) gives a dismissed
+machine proposal the durability that "single capture point" gives a human
+capture: once rejected, either kind of pending item stops reappearing, each
+by its own system's mechanism.
 
 ### `item_id`: normalization and idempotence
 
@@ -534,7 +645,59 @@ prevent literal re-creation of the same task id.
    created, the never-resurface guard doesn't apply to it — only to created/
    dismissed ids). Whether a blocked item should eventually be surfaced
    differently (e.g. escalated, or auto-dismissed after N days of no
-   decision) is Phase 6 wiring's call, not this DIP's.
+   decision) is Phase 6 wiring's call, not this DIP's — but that call should
+   not re-derive an escalation mechanism from scratch. [DIP-0006](DIP-0006-open-questions-management.md)
+   (Open Questions Management System), superseded into
+   [DIP-0013](DIP-0013-meetings-module.md) §4, defines the system's one
+   canonical escalation heuristic at §5.2 (Escalation Detection): an item
+   appearing 3+ times across 7 days of daily standups escalates to the
+   weekly meeting. The *counting shape* of that heuristic transfers directly:
+   `result.blocked` already reappears, unaltered, on every re-materialize
+   call for as long as an item stays ungranted, which is the same
+   repeated-appearance signal DIP-0013 §5.2 counts. What does **not**
+   transfer is the escalation *target* — DIP-0013 escalates to a weekly
+   meeting attended by multiple stakeholders, while a blocked ledger item is
+   a single-owner approval request with no meeting to escalate to. Phase 6
+   should therefore reuse DIP-0013 §5.2's counting rule against
+   `result.blocked` recurrence and choose a target suited to a single
+   approver (e.g. more prominent Telegram resurfacing after N re-blocked
+   cycles, or an explicit stale-grant flag) rather than inventing a new
+   counting threshold. This DIP does not implement that; it is left open,
+   now anchored to the existing mechanism instead of independent of it.
+4. **Escape hatch for an accidental dismiss.** None exists today — verified
+   against the reference implementation, not assumed. `fold._handle_dismiss`
+   sets a task's status to `"dismissed"`, and `fold._dismissed` then turns
+   every later event addressed to that id into a history no-op, **including
+   the `owner.set` administrative override** (per `ledger/fold.py`'s module
+   docstring: `task.dismiss` is terminal, "nothing can revive a dismissed
+   task"). `materialize`'s never-resurface guarantee compounds this: because
+   `item_id` hashes the item's *normalized* text, re-submitting the
+   identical or cosmetically-reworded item is silently skipped forever (its
+   id is already known to the fold, any status), and a manually
+   hand-appended event addressed to that same id is a no-op for the same
+   reason — this is not merely hard to undo, the event vocabulary has no
+   operation that undoes it. The only way to get equivalent work back into
+   the ledger is to make it a genuinely *different* id: either `materialize`
+   naturally allocates a new one because the item's substantive wording
+   changed enough to change the normalized-text hash (a new content hash,
+   not a revival), or an operator hand-appends a fresh `task.create` under a
+   new id directly via `EventLog.append`, bypassing `materialize` entirely
+   (a new, unrelated event, not a corrective one in any mechanical sense —
+   nothing links it back to the id it is meant to replace). Both routes
+   produce an unrelated new task; the original stays permanently dismissed,
+   its history intact for audit, but nothing in the ledger marks the new
+   task as "this replaces that" — a human has to track that link themselves,
+   outside the system, if they want one. A fat-fingered Telegram dismiss of
+   an important item is therefore, today, an unrecoverable loss of that
+   specific task id. A proper undo — e.g. a new `task.undismiss` event type,
+   or an admin override explicitly scoped to clear (not merely attempt to
+   overwrite) a dismissed status with its own audit trail — does not exist
+   in the current event vocabulary and is not designed by this DIP. Recorded
+   here rather than built now, consistent with `act`'s dismiss path being
+   deliberately ungated at the current trust level: revisit at the earlier
+   of (a) an observed accidental dismissal in practice, or (b) the same
+   signing-rollout trigger (`ENG-2026-0729-030`) that upgrades the trust
+   boundary elsewhere in this DIP.
 
 ## References
 
@@ -552,5 +715,14 @@ prevent literal re-creation of the same task id.
 - DIP-0032 — Egress Enforcement (structural precedent reused here for
   "policy file + fail-closed defaults" reasoning: a present-but-malformed
   policy file errors loudly, a missing one falls back to a safe default).
+- DIP-0009 — GTD Specification (the org-mode TODO/NEXT/WAITING/DONE state
+  vocabulary this DIP's ledger task states are disjoint from; see
+  Specification's Relationship to GTD, org-mode, and the single capture
+  point).
+- DIP-0013 — Meetings Module (§5.2 Escalation Detection, the canonical
+  count-based escalation heuristic cited in Open Question 3).
+- DIP-0006 — Open Questions Management System (superseded into DIP-0013 §4;
+  cited alongside DIP-0013 for provenance of the escalation mechanism Open
+  Question 3 reuses rather than re-derives).
 - `ENG-2026-0729-030` — signing opt-in amendment (the ruling this DIP's
   TRUST BOUNDARY section is a direct consequence of).
