@@ -8,11 +8,11 @@
 | **Type** | Infrastructure |
 | **Status** | Draft |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-07-30 |
+| **Updated** | 2026-08-03 |
 | **Tags** | `ledger`, `events`, `hash-chain`, `hlc`, `signing`, `datacore-v2` |
 | **Affects** | `.datacore/lib/ledger/` (`hlc.py`, `events.py`, `log.py`, `verify.py`, `fold.py`, `index.py`), `.datacore/lib/ledger_cli.py`, `<space>/.datacore/events/`, `~/.datacore/keys/`, `.datacore/keys/registry.yaml` |
 | **Specs** | `.datacore/lib/ledger/*.py`, `.datacore/lib/ledger_cli.py` |
-| **Agents** | any agent that creates, claims, completes, or verifies a task; any process that spends budget on an agent's behalf |
+| **Agents** | any agent that creates, claims, completes, or verifies a ledger item; any process that spends budget on an agent's behalf |
 | **Depends** | — (foundation DIP; no dependencies. [DIP-0035](DIP-0035-job-contracts.md), [DIP-0038](DIP-0038-action-loop-cosign.md), and [DIP-0041](DIP-0041-executor-adapters.md) depend on this DIP — see Phase → DIP table in Specification) |
 | **Renumbered from** | DIP-0033 (claimed by a parallel session for "Delivery Verification & Smoke Scenarios" before this DIP landed) |
 | **Relates to** | ENG-2026-0729-016 (ledger-mindset direction), ENG-2026-0729-030 (signing opt-in amendment), ENG-2026-0727-004 (Mac↔box sync failure genre), ENG-2026-0423-001 (nightshift git-lock silent failure), DIP-0011 (Nightshift), DIP-0018 (Credential Management) |
@@ -20,7 +20,7 @@
 ## Summary
 
 Introduces an **append-only, per-writer, hash-chained event log** as the
-system-of-record substrate for task/ownership/spend state across Datacore
+system-of-record substrate for item/ownership/spend state across Datacore
 spaces — replacing ad-hoc mutation of shared files (org headings, JSON state
 files, git-as-lock) with events that are cheap to write, safe to write
 concurrently, mechanically verifiable, and deterministically foldable into
@@ -64,14 +64,14 @@ artifacts, agent consolidation, and executor adapters are follow-on DIPs
   existing class).
 - Considering migrating an existing coordination path (e.g. nightshift's
   `git push` task claim, [DIP-0011](DIP-0011-nightshift-module.md)) onto
-  ledger `task.*` events — this requires its own ratified DIP, not an implicit
+  ledger `item.*` events — this requires its own ratified DIP, not an implicit
   consequence of this substrate existing.
 
 ### Quick Reference for Agents
 
 | Question | Answer |
 |----------|--------|
-| Is a ledger `task.*` event a GTD task? | No. See Source of Truth Boundary above — org-mode ([DIP-0009](DIP-0009-gtd-specification.md)) remains the sole source of truth for GTD task state; see also the Naming note in Specification. |
+| Is a ledger `item.*` event a GTD task? | No. See Source of Truth Boundary above — org-mode ([DIP-0009](DIP-0009-gtd-specification.md)) remains the sole source of truth for GTD task state; see also the Naming note in Specification. |
 | Where do events live? | `<space>/.datacore/events/<actor>.jsonl` — one file per writer actor. |
 | How do I allocate a new `metric.attest` class? | Amend the discriminator table in Specification (Event schema). Consumers MUST ignore classes they don't recognise. |
 | Is signing required? | No. Opt-in via `DATACORE_LEDGER_SIGN=1`; unsigned (`sig=""`) is the MVP default (`ENG-2026-0729-030`). |
@@ -89,13 +89,13 @@ artifacts, agent consolidation, and executor adapters are follow-on DIPs
 
 ### Integration Points
 
-- [DIP-0009: GTD Specification](DIP-0009-gtd-specification.md) — owns GTD task identity, dedup, and the org-mode task-state vocabulary this DIP's `task.*` events are explicitly disjoint from.
+- [DIP-0009: GTD Specification](DIP-0009-gtd-specification.md) — owns GTD task identity, dedup, and the org-mode task-state vocabulary this DIP's `item.*` events are explicitly disjoint from.
 - [DIP-0010: External Sync Architecture](DIP-0010-external-sync-architecture.md) — owns the "org-mode is the coordination layer" claim this DIP's boundary statement is scoped against.
 - [DIP-0011: Nightshift Module](DIP-0011-nightshift-module.md) — the `git push`-as-lock claiming mechanism this ledger is designed to eventually replace (Phase 2+, its own ratified DIP).
 - [DIP-0018: Credential Management](DIP-0018-credential-management.md) — key-custody convention (private key outside repo, public registry tracked) this DIP's `keys.py` follows.
 - [DIP-0035: Job Contracts](DIP-0035-job-contracts.md) — Phase 2; allocates the `job.verify` class of `metric.attest`.
 - [DIP-0037: Grounded Briefings](DIP-0037-grounded-briefings.md) — allocates the `fact` class of `metric.attest`, not a new event type (see the discriminator table in Specification).
-- [DIP-0038: Action Loop & Co-Sign Policy](DIP-0038-action-loop-cosign.md) — Phase 5; consumes `policy.set` and `task.create.payload.effects[]`, and relies on the fold-level guarantee that `task.dismiss` is terminal.
+- [DIP-0038: Action Loop & Co-Sign Policy](DIP-0038-action-loop-cosign.md) — Phase 5; consumes `policy.set` and `item.create.payload.effects[]`, and relies on the fold-level guarantee that `item.dismiss` is terminal.
 
 ## Motivation
 
@@ -136,23 +136,23 @@ copy of what happened.
 
 ### Use cases
 
-1. **Concurrent, offline-tolerant task coordination** — Mac, box, and
-   nightshift workers can each append task lifecycle events (create, claim,
+1. **Concurrent, offline-tolerant item coordination** — Mac, box, and
+   nightshift workers can each append item lifecycle events (create, claim,
    release, complete, verify, dismiss) to their own file without contending
    for a shared write path; a deterministic fold reconciles ownership after
    the fact instead of requiring a live lock at write time.
-2. **Mechanical auditability** — "did the box actually attempt this task, and
+2. **Mechanical auditability** — "did the box actually attempt this item, and
    what happened?" is answerable by reading an append-only, hash-chained file
    — no dependence on a git ref having succeeded, a JSON file not having been
    clobbered by a concurrent writer, or a cron log line having survived.
-3. **Shadow accounting** — `spend.record` events let per-actor/per-task cost
+3. **Shadow accounting** — `spend.record` events let per-actor/per-item cost
    be metered against notional budgets (observe before enforcing), a
    prerequisite named directly in the ledger-mindset direction
    (`ENG-2026-0729-016`, item 3).
 4. **A substrate the later v2 phases build on** — job verification
    (`metric.attest`), content-addressed artifacts (`artifact.attest`), and
    human co-sign for side-effecting actions (`policy.set`,
-   `task.create.payload.effects[]`) all need an event log with these
+   `item.create.payload.effects[]`) all need an event log with these
    properties; building it once here, correctly, avoids six follow-on DIPs
    each re-solving append-only/attribution/idempotency from scratch.
 
@@ -181,9 +181,9 @@ a blockchain now** — adopt the ledger *mindset* in the current Datacore idiom,
 upgrade-ready for a real chain later. Six elements adopted now: (1) per-agent
 keypairs + signed, hash-chained, append-only per-writer event logs
 (attestation without consensus — this DIP); (2) verification contracts
-declared at task creation (Phase 2 / DIP-0035); (3) shadow accounting (spend
+declared at item creation (Phase 2 / DIP-0035); (3) shadow accounting (spend
 events defined here, metering enforced later); (4) human co-sign policy for
-side-effecting actions (Phase 5 / DIP-0038); (5) ownership-as-data for task
+side-effecting actions (Phase 5 / DIP-0038); (5) ownership-as-data for item
 coordination, no live coordinator (this DIP's fold semantics); (6)
 content-addressed artifacts by hash (`artifact.attest`, this DIP's schema;
 consumers in Phase 6 / DIP-0039).
@@ -217,12 +217,23 @@ registry) is built and tested but dormant until that trigger fires.
 > systems. A ledger event never completes an org task, and an org state
 > change never emits a ledger event.
 
-**Naming note.** The event family is spelled `task.*` (`task.create`,
-`task.claim`, …) although these objects are deliberately *not* GTD tasks (see
-the boundary statement above). The name is a legacy of the substrate's first
-consumer. Renaming the family to `item.*` is recorded as Open Question OQ-5;
-it is cheap while the ledger holds only briefing/approval/attest/spend events
-and becomes a schema migration once third parties run this system.
+**Naming note.** The event family is spelled `item.*` (`item.create`,
+`item.claim`, …). It was originally spelled `task.*`, a legacy of the
+substrate's first consumer being task-shaped, even though these objects were
+always deliberately *not* GTD tasks (see the boundary statement above) —
+carrying the same word as the org-mode GTD vocabulary this DIP takes pains to
+disjoint itself from was a standing hazard: every reference to "task" in this
+DIP's own text had to be disambiguated by context ("ledger task" vs. "GTD
+task"), and any future reader skimming the schema could plausibly mistake
+`task.create` for a GTD event. Open Question OQ-5 tracked the rename as
+future work and is now **RESOLVED (2026-08-03, commit `cba9279`)**: the
+family was renamed to `item.*` while the trigger conditions OQ-5 named
+(before any external installation adopts the ledger, or before any
+org-projection work begins) both still held. The rename was free — zero
+`task.*` events existed in any deployed `.jsonl` log at rename time, so this
+was a pure identifier rename with no data migration, no legacy alias, and no
+hash-chain rewrite; 800 tests passed unmodified in behavior (only pinned
+names changed). See OQ-5 below for the full resolution record.
 
 ### Phase → DIP mapping
 
@@ -232,11 +243,11 @@ inferring order from prose:
 
 | Phase | DIP | Deliverable | Ledger event types consumed/added |
 |---|---|---|---|
-| 1 | DIP-0034 (this DIP) | The substrate: `ledger` package + `ledger_cli.py` | All 11 `EVENT_TYPES` reserved; `task.*`, `owner.set`, `spend.record` folded |
+| 1 | DIP-0034 (this DIP) | The substrate: `ledger` package + `ledger_cli.py` | All 11 `EVENT_TYPES` reserved; `item.*`, `owner.set`, `spend.record` folded |
 | 2 | [DIP-0035](DIP-0035-job-contracts.md) | Job contracts + unified verifier (`job_verify.py`) | Allocates `metric.attest` class `job.verify` |
 | 3 | [DIP-0036](DIP-0036-config-plane.md) | Config plane | No new event types |
 | 4 | [DIP-0037](DIP-0037-grounded-briefings.md) | Grounded briefings | Allocates `metric.attest` class `fact` — **not** a new event type (see payload-extensibility invariant and the discriminator table below) |
-| 5 | [DIP-0038](DIP-0038-action-loop-cosign.md) | Action loop + co-sign policy | Consumes `policy.set`; extends `task.create.payload` with `effects[]` |
+| 5 | [DIP-0038](DIP-0038-action-loop-cosign.md) | Action loop + co-sign policy | Consumes `policy.set`; extends `item.create.payload` with `effects[]` |
 | 6 | [DIP-0039](DIP-0039-server-first-artifacts.md) | Server-first artifact sync | Consumes `artifact.attest` |
 | 7 | [DIP-0040](DIP-0040-agent-consolidation.md) | Agent-registry consolidation | No new event types |
 | 8 | [DIP-0041](DIP-0041-executor-adapters.md) | Executor adapters | `spend.record` goes live end-to-end |
@@ -278,12 +289,12 @@ needing a signature.
 
 | Event type | Purpose |
 |---|---|
-| `task.create` | Introduce a **ledger task** — a delegation/verification/briefing unit, **not** a GTD task (`id`, `title`, optional `owner`); see the Source-of-truth boundary and Naming note above |
-| `task.claim` | An actor takes ownership of a `created` ledger task |
-| `task.release` | An owner un-claims a `claimed` ledger task back to `created` |
-| `task.complete` | The claiming owner marks work done |
-| `task.verify` | A completed ledger task is confirmed (mechanical check or panel, [DIP-0035](DIP-0035-job-contracts.md)) |
-| `task.dismiss` | Terminally close a ledger task — no later event can revive it |
+| `item.create` | Introduce a **ledger item** — a delegation/verification/briefing unit, **not** a GTD task (`id`, `title`, optional `owner`); see the Source-of-truth boundary and Naming note above |
+| `item.claim` | An actor takes ownership of a `created` ledger item |
+| `item.release` | An owner un-claims a `claimed` ledger item back to `created` |
+| `item.complete` | The claiming owner marks work done |
+| `item.verify` | A completed ledger item is confirmed (mechanical check or panel, [DIP-0035](DIP-0035-job-contracts.md)) |
+| `item.dismiss` | Terminally close a ledger item — no later event can revive it |
 | `owner.set` | Administrative ownership override |
 | `spend.record` | Meter cost (`cents`) against an actor — shadow accounting |
 | `metric.attest` | A **namespaced family**. Every payload MUST carry a `metric` discriminator naming the measurement class; all other payload fields are defined by the DIP that allocates that class. See the discriminator table below. |
@@ -299,7 +310,7 @@ this table; consumers MUST ignore classes they do not recognise):
 | `fact` | [DIP-0037](DIP-0037-grounded-briefings.md) | `{id, value, unit, source}` |
 | `merge.review` | Chief-of-Staff merge gatekeeper | `{space, branch, verdict, reasons[]}` |
 
-Only `task.create` … `task.dismiss`, `owner.set`, and `spend.record` have
+Only `item.create` … `item.dismiss`, `owner.set`, and `spend.record` have
 fold-time handlers in Phase 1 (below); `metric.attest`, `artifact.attest`, and
 `policy.set` are accepted event types with reserved semantics for the DIPs
 that consume them ([DIP-0035](DIP-0035-job-contracts.md)/[DIP-0037](DIP-0037-grounded-briefings.md),
@@ -353,61 +364,61 @@ order the fold consumes. It is read-only: no lock, no mutation.
 `fold(events) -> LedgerState` is a **pure function**: no clock reads, no
 randomness, no I/O; the same input list always produces an equal
 `LedgerState`, and it never mutates its input. `LedgerState` holds
-`tasks: dict[id, TaskState]`, `spend: dict[actor, cents]`, and
+`items: dict[id, ItemState]`, `spend: dict[actor, cents]`, and
 `orphans: list[str]`.
 
 Because events arrive already `hlc`-sorted and `fold()` trusts that ordering
 completely (it does not re-sort), **"earliest HLC wins"** for competing
-operations — e.g. two actors racing to claim the same task — falls out for
+operations — e.g. two actors racing to claim the same item — falls out for
 free: the fold applies events strictly in list order, the first event to
 satisfy a transition's precondition wins, and every later one that no longer
-satisfies it becomes a recorded no-op in that task's `history`, not a raised
+satisfies it becomes a recorded no-op in that item's `history`, not a raised
 error and not a silently dropped event.
 
-Task lifecycle rules, each independently load-bearing:
+Item lifecycle rules, each independently load-bearing:
 
-- **`task.release` means "un-claim," never "un-complete."** It is legal only
-  when the *event's actor is the current owner* **and** the task's status is
+- **`item.release` means "un-claim," never "un-complete."** It is legal only
+  when the *event's actor is the current owner* **and** the item's status is
   exactly `claimed`. A release against a `created`, `completed`, or `verified`
-  task is a no-op naming the blocking status — it never silently regresses a
-  completed/verified task back to `created`. Ownership is checked before
+  item is a no-op naming the blocking status — it never silently regresses a
+  completed/verified item back to `created`. Ownership is checked before
   status: a non-owner's release is always "not owner," regardless of status.
-- **`task.dismiss` is terminal.** Once a task's status is `dismissed`, every
-  later event addressed to that task id — including the `owner.set`
+- **`item.dismiss` is terminal.** Once an item's status is `dismissed`, every
+  later event addressed to that item id — including the `owner.set`
   administrative override — is a history no-op. Nothing can revive a
-  dismissed task. (This is the fold-level guarantee Phase 5/DIP-0038's
+  dismissed item. (This is the fold-level guarantee Phase 5/DIP-0038's
   "a dismissed item never resurfaces" acceptance test relies on.)
-- **Orphans, not phantom tasks.** An event that references a task id with no
-  prior `task.create` (a claim that arrives before its create, or one whose
-  create never arrives) is never fabricated into a task entry. It is
+- **Orphans, not phantom items.** An event that references an item id with no
+  prior `item.create` (a claim that arrives before its create, or one whose
+  create never arrives) is never fabricated into an item entry. It is
   recorded in `LedgerState.orphans` instead, so diagnostics can see it
   without the fold ever inventing state that wasn't actually created.
 - **`spend.record`** simply accumulates `payload["cents"]` into
-  `state.spend[event.actor]` — no task association, pure per-actor
+  `state.spend[event.actor]` — no item association, pure per-actor
   accounting (the shadow-accounting substrate, `ENG-2026-0729-016` item 3).
 
 `ledger.index` builds a disposable SQLite projection
 (`<space>/.datacore/state/ledger/index.db`, gitignored) over a folded
-`LedgerState` purely for cheap ad-hoc querying (`tasks_by(status=, owner=)`,
+`LedgerState` purely for cheap ad-hoc querying (`items_by(status=, owner=)`,
 `spend_by_actor()`); it is never a source of truth and is always safe to
 delete and rebuild from the event log by re-running `fold()` + `build_index()`.
 
 ### Amendment: Poison-Event Defense (final-review wave, 2026-07-30)
 
 `fold()` KeyError'd on two payload shapes, both empirically confirmed via
-`ledger_cli`: a `task.*`-family event missing `"id"` (or carrying a
+`ledger_cli`: an `item.*`-family event missing `"id"` (or carrying a
 non-string/empty one), and `spend.record` with a missing, non-`int`,
 `bool`, or negative `"cents"`. Because `fold()` is a substrate primitive
 every space depends on, a single poisoned event line was enough to brick
-`ledger_cli tasks`/`balances` for the whole space with an unhandled
+`ledger_cli items`/`balances` for the whole space with an unhandled
 traceback — the opposite of the "mechanically auditable, never silently
 corrupting" posture this DIP commits to.
 
 Landed this wave:
 
-- A `task.*` event without a non-empty string `"id"` is routed to
+- An `item.*` event without a non-empty string `"id"` is routed to
   `LedgerState.orphans` as `"{hlc} {type} -"` instead of being looked up
-  (`KeyError`) or fabricated into task state — this makes the pre-existing
+  (`KeyError`) or fabricated into item state — this makes the pre-existing
   `.get("id", "?")` fallback in `_orphan` actually reachable for the first
   time (a missing/invalid id used to `KeyError` before ever reaching it).
 - `spend.record` with an invalid `"cents"` (missing, non-`int`, `bool` —
@@ -425,7 +436,7 @@ Landed this wave:
 Substrate-level robustness amendment, not a behavior change for any
 well-formed event: every pre-existing test in `tests/test_ledger_fold.py`
 continues to pass unmodified; the new poison-shape tests (per event type,
-plus a `ledger_cli tasks`/`balances`-on-a-poisoned-space subprocess check)
+plus a `ledger_cli items`/`balances`-on-a-poisoned-space subprocess check)
 are additive.
 
 ### Key custody
@@ -484,13 +495,13 @@ turned on system-wide and every event is expected to carry one.
 ```
 ledger_cli.py append   --space <dir> --type <t> --payload '<json>' [--actor <a>]
 ledger_cli.py verify   --space <dir> [--strict]
-ledger_cli.py tasks    --space <dir> [--status <s>] [--owner <o>]
+ledger_cli.py items    --space <dir> [--status <s>] [--owner <o>]
 ledger_cli.py balances --space <dir>
 ```
 
 Actor resolution for `append`: `--actor`, else `$DATACORE_ACTOR`, else
 `socket.gethostname()`. Stdout/stderr discipline: every command's *data*
-(hash/hlc, the `OK <n> files <n> events` summary, task JSON lines, the
+(hash/hlc, the `OK <n> files <n> events` summary, item JSON lines, the
 balances object) goes to stdout; every *diagnostic* (verify error lines,
 clean failure messages) goes to stderr. Expected failures (bad payload JSON,
 unknown event type, a missing `--space` directory, a broken chain) are
@@ -500,19 +511,19 @@ propagate, since hiding those is not this script's job.
 
 ### Worked example
 
-A single actor (`box`) creating, claiming, and completing one ledger task —
+A single actor (`box`) creating, claiming, and completing one ledger item —
 three lines appended to `<space>/.datacore/events/box.jsonl` (whitespace
 added for readability; the real file has one canonical-encoded line per
 event, `sig` empty because signing is off, the MVP default):
 
 ```jsonc
-{"seq":0,"hlc":"1785400000000.0000.box","actor":"box","type":"task.create",
+{"seq":0,"hlc":"1785400000000.0000.box","actor":"box","type":"item.create",
  "payload":{"id":"t-042","title":"Verify DIP-0035 job_verify.py output schema"},
  "prev":"GENESIS","hash":"9f2c...a1","sig":""}
-{"seq":1,"hlc":"1785400015000.0000.box","actor":"box","type":"task.claim",
+{"seq":1,"hlc":"1785400015000.0000.box","actor":"box","type":"item.claim",
  "payload":{"id":"t-042"},
  "prev":"9f2c...a1","hash":"3b7e...d4","sig":""}
-{"seq":2,"hlc":"1785400600000.0000.box","actor":"box","type":"task.complete",
+{"seq":2,"hlc":"1785400600000.0000.box","actor":"box","type":"item.complete",
  "payload":{"id":"t-042"},
  "prev":"3b7e...d4","hash":"c081...9e","sig":""}
 ```
@@ -523,7 +534,7 @@ these three events produces:
 
 ```python
 LedgerState(
-    tasks={"t-042": TaskState(id="t-042", status="completed", owner="box",
+    items={"t-042": ItemState(id="t-042", status="completed", owner="box",
                                title="Verify DIP-0035 job_verify.py output schema",
                                history=[...])},
     spend={},
@@ -531,9 +542,9 @@ LedgerState(
 )
 ```
 
-`ledger_cli.py tasks --space <space> --status completed` reads this same
-folded state through the disposable SQLite projection and prints the task as
-one JSON line to stdout. Note `t-042` is a **ledger task** per the Source of
+`ledger_cli.py items --space <space> --status completed` reads this same
+folded state through the disposable SQLite projection and prints the item as
+one JSON line to stdout. Note `t-042` is a **ledger item** per the Source of
 Truth Boundary above — it is never rendered as an org TODO heading and is
 never read by any GTD tool as authoritative task state; it exists only in
 `.datacore/events/` and whatever `LedgerState`/index is folded from it.
@@ -556,8 +567,8 @@ never read by any GTD tool as authoritative task state; it exists only in
 - `ledger.log` — `EventLog` (locked append, per-writer files), `read_events`
   (merged, hlc-sorted read), `CorruptLogError`.
 - `ledger.verify` — `verify_chain` (hash/prev/seq/signature diagnostic).
-- `ledger.fold` — `fold` (pure reduction), `TaskState`, `LedgerState`.
-- `ledger.index` — disposable SQLite projection (`build_index`, `tasks_by`,
+- `ledger.fold` — `fold` (pure reduction), `ItemState`, `LedgerState`.
+- `ledger.index` — disposable SQLite projection (`build_index`, `items_by`,
   `spend_by_actor`).
 - `ledger.keys` — Ed25519 keypair management, sign/verify, public registry
   (built and tested, dormant until the signing trigger fires).
@@ -566,7 +577,7 @@ never read by any GTD tool as authoritative task state; it exists only in
 ### Interface Changes
 
 - New per-space directory `.datacore/events/` (event source of truth).
-- New operator CLI `ledger_cli.py` (append/verify/tasks/balances).
+- New operator CLI `ledger_cli.py` (append/verify/items/balances).
 - New owner-editable-by-convention (not by this DIP) key locations:
   `~/.datacore/keys/` (private, never committed) and
   `.datacore/keys/registry.yaml` (public, tracked).
@@ -615,7 +626,7 @@ pass — that this substrate must never violate, because every later phase
    stamps, not of write-time arbitration by a single process.
 6. **Payload dicts are additive, never closed.** A payload for a given event
    type may gain new keys in a later phase without that being a schema
-   change to this DIP — e.g. `task.create.payload.effects[]` is a
+   change to this DIP — e.g. `item.create.payload.effects[]` is a
    [DIP-0038](DIP-0038-action-loop-cosign.md) addition to an existing event
    type's payload, and the `metric` discriminator inside `metric.attest`'s
    payload (see Event schema) is exactly this pattern applied to an entire
@@ -696,7 +707,7 @@ revisited as v2.1 — see Open Questions). A space with no `.datacore/events/`
 directory behaves exactly as before: `read_events` on a missing directory
 returns `[]`, and no ledger command errors on an as-yet-unused space.
 Adopting the ledger for a given coordination path (e.g. routing a nightshift
-claim through `task.claim` instead of `git push`) is a follow-on integration
+claim through `item.claim` instead of `git push`) is a follow-on integration
 task in later phases, requiring its own ratified DIP per the boundary
 statement — not part of this DIP.
 
@@ -741,7 +752,7 @@ statement — not part of this DIP.
   process signs with the other.
 - **Not an access-control system.** This substrate detects tampering and (once
   signing is on) attributes authorship; it does not, by itself, restrict
-  *who may write* `task.claim` or `task.complete` for a given task — that is
+  *who may write* `item.claim` or `item.complete` for a given item — that is
   a fold-semantics concern (ownership checks in `_handle_release`, etc.), and
   richer authorization (co-sign for side-effecting actions) is Phase 5's
   `ledger/policy.py` (DIP-0038), layered on top of this substrate rather than
@@ -794,13 +805,13 @@ substrate for briefing/approval/attestation/spend objects.
 
 ## Open Questions
 
-1. **Org-file projection of ledger tasks** — deliberately **out of v2 scope**.
+1. **Org-file projection of ledger items** — deliberately **out of v2 scope**.
    Org files remain the source of truth for GTD tasks per
    [DIP-0009](DIP-0009-gtd-specification.md), and org-mode remains the
    coordination layer per [DIP-0010](DIP-0010-external-sync-architecture.md);
    the ledger tracks briefing/delegation/verification/spend objects, a
    distinct, disjoint object class (see Source of Truth Boundary in Summary).
-   Whether/how ledger tasks eventually project into or replace org-mode task
+   Whether/how ledger items eventually project into or replace org-mode task
    headings is deferred to v2.1, and would itself require its own ratified
    DIP per that boundary statement.
 2. **Signing rollout mechanics** — when the trigger fires (foreign agent, or
@@ -819,13 +830,26 @@ substrate for briefing/approval/attestation/spend objects.
    defines pure accumulation; whether overspend hard-blocks vs. escalates is
    future work once shadow accounting has been observed for long enough to
    set a sane threshold.
-5. **Rename `task.*` to `item.*`.** The event family is named `task.*` even
-   though these objects are deliberately not GTD tasks (see the Naming note
-   in Specification) — a legacy of the substrate's first consumer being
-   task-shaped. Renaming is cheap now (Phase 1 only, no third-party
-   installations) and becomes a schema migration later. **Trigger: rename
-   before any external installation adopts the ledger, or before any org-
-   projection work (Open Question 1) begins — whichever comes first.**
+5. **Rename `task.*` to `item.*` — RESOLVED (2026-08-03, commit `cba9279`).**
+   The event family was renamed while both trigger conditions below still
+   held — no external installation had adopted the ledger, and no
+   org-projection work (Open Question 1) had begun. It was free: zero
+   `task.*` events existed in any deployed `.jsonl` log at the time of the
+   rename, so it required no data migration, no legacy alias, and no
+   hash-chain rewrite — a pure identifier rename across `EVENT_TYPES`,
+   `fold.py` (`TaskState` → `ItemState`, `LedgerState.tasks` →
+   `LedgerState.items`), `policy.py` (the gated event and the
+   `approval.grant` payload's `"task"` key), `index.py` (the `tasks` SQLite
+   table and `tasks_by()` → `items_by()`), `ledger_cli.py` (the `tasks`
+   subcommand → `items`), and every consumer built on this substrate in the
+   same wave ([DIP-0037](DIP-0037-grounded-briefings.md)'s
+   `ledger_task_counts` fact adapter and `tasks.*` fact ids,
+   [DIP-0038](DIP-0038-action-loop-cosign.md)'s `materialize`/`act`). All
+   800 tests in the v2 suite passed with only pinned names changed, zero
+   new or pre-existing failures. Original trigger condition (superseded by
+   this resolution): rename before any external installation adopts the
+   ledger, or before any org-projection work (Open Question 1) begins —
+   whichever comes first.
 
 ## References
 
@@ -848,7 +872,7 @@ substrate for briefing/approval/attestation/spend objects.
   task identity (`:ID:` UUID v4), the `gtd.duplicate_check` dedup mechanism,
   and the canonical org-mode task-state vocabulary
   (`TODO/NEXT/WAITING/DEFERRED/QUEUED/WORKING/REVIEW/DONE/FAILED/CANCELLED`).
-  This DIP's `task.*` event vocabulary is disjoint from that state machine —
+  This DIP's `item.*` event vocabulary is disjoint from that state machine —
   see the Source of Truth Boundary in Summary and the Naming note in
   Specification.
 - [DIP-0010](DIP-0010-external-sync-architecture.md) — External Sync

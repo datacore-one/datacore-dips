@@ -8,33 +8,33 @@
 | **Type** | Infrastructure |
 | **Status** | Draft |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-07-30 |
+| **Updated** | 2026-08-03 |
 | **Tags** | `action-loop`, `co-sign`, `approvals`, `briefing`, `policy`, `datacore-v2` |
 | **Affects** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py`, `.datacore/keys/approvals_policy.yaml`, future `cos_approval_*` MCP wiring, Telegram dismiss/approve handlers |
 | **Specs** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py` |
-| **Agents** | any process that materializes briefing items into ledger tasks (`briefing.actions.materialize`); any human approver granting cosign for a side-effecting task |
-| **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate. Non-functional without it: the `task.create`/`approval.grant` event schema, `EVENT_TYPES`, and the Task 5.2b cross-actor HLC ordering fix this DIP's grant→create causality relies on. |
+| **Agents** | any process that materializes briefing items into ledger items (`briefing.actions.materialize`); any human approver granting cosign for a side-effecting item |
+| **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate. Non-functional without it: the `item.create`/`approval.grant` event schema, `EVENT_TYPES`, and the Task 5.2b cross-actor HLC ordering fix this DIP's grant→create causality relies on. |
 | **Relates to** | winston-open-gaps item 7 (approvals loop built but never wired), DIP-0037 (Grounded Briefings — the upstream producer of the items this DIP materializes, soft/optional), DIP-0032 (Egress Enforcement — structural precedent for "policy file + fail-closed defaults"), DIP-0009 (GTD Specification — adjacent, disambiguated GTD task-state model, see Specification), DIP-0013 (Meetings Module §5.2 — escalation-detection pattern cited in Open Questions), DIP-0006 (Open Questions Management — superseded into DIP-0013 §4, cited for the same reason), `ENG-2026-0729-030` (signing opt-in amendment — the trust boundary this DIP's co-sign gate operates under) |
 
 ## Summary
 
 Introduces the **action loop**: the mechanism that turns a briefing item
 (grounded prose describing something that needs doing, per DIP-0037) into a
-ledger task (`task.create`, per DIP-0034) exactly once, ever — and gates the
-creation of any task whose declared `effects` are side-effecting (sending an
+ledger item (`item.create`, per DIP-0034) exactly once, ever — and gates the
+creation of any item whose declared `effects` are side-effecting (sending an
 email, moving money, deploying to prod) behind a recorded human grant
 (`approval.grant`) before it may be appended at all. Two modules do this:
-`briefing.actions` (`item_id`, `materialize`, `act`) turns items into tasks
-and never lets a dismissed item come back, no matter how many more times a
-briefing pipeline re-derives the same underlying text; `ledger.policy`
+`briefing.actions` (`item_id`, `materialize`, `act`) turns items into ledger
+items and never lets a dismissed item come back, no matter how many more
+times a briefing pipeline re-derives the same underlying text; `ledger.policy`
 (`Policy`, `guarded_append`) is the single sanctioned gate through which any
-side-effecting `task.create` must pass. This closes the specific,
+side-effecting `item.create` must pass. This closes the specific,
 long-standing gap named in the Winston deep-audit's open-gaps list: approval
 machinery (`cos_approval_*` MCP tools) that existed, unwired, for months,
 while cron-generated briefings kept ending in questions ("queue those into
 nightshift?") nobody had a mechanical way to act on.
 
-**Ledger tasks are not GTD tasks.** Ledger task states are disjoint from
+**Ledger items are not GTD tasks.** Ledger item states are disjoint from
 org-mode's TODO/NEXT/WAITING/DONE; dismissing a briefing item never completes
 an org task. `materialize()` never writes to `inbox.org` or
 `next_actions.org` — briefing items are system-generated candidates for
@@ -57,16 +57,16 @@ see TRUST BOUNDARY below for the exact scope.
 ### When to Reference This DIP
 
 **Always reference when:**
-- Turning a briefing/candidate item into a durable ledger task — calling,
+- Turning a briefing/candidate item into a durable ledger item — calling,
   wrapping, or reasoning about `briefing.actions.materialize`.
-- Appending or evaluating a `task.create` whose declared `effects` intersect
+- Appending or evaluating an `item.create` whose declared `effects` intersect
   a cosign-gated set (`email.send`, `payment`, `prod.deploy` by default) —
   anything that must pass `ledger.policy.guarded_append`.
 - Building or reasoning about Phase 6 wiring: `cos_approval_*` MCP tools,
   Telegram dismiss/approve handlers, or any new caller of
   `materialize`/`act`.
 - Answering whether a dismissed briefing item can be recovered, or whether
-  ledger task state overlaps `inbox.org`/`next_actions.org` GTD state.
+  ledger item state overlaps `inbox.org`/`next_actions.org` GTD state.
 - Adding a new event type or payload shape whose id might collide with
   `briefing.actions.item_id`'s dedupe key, or reasoning about the escalation
   path for a permanently-blocked (ungranted) item.
@@ -75,19 +75,19 @@ see TRUST BOUNDARY below for the exact scope.
 
 | Question | Answer |
 |----------|--------|
-| Does dismissing a briefing item touch `inbox.org` or `next_actions.org`? | No. Ledger tasks are a disjoint object class from org-mode GTD tasks ([DIP-0034](DIP-0034-event-ledger-substrate.md), [DIP-0009](DIP-0009-gtd-specification.md)); `materialize()`/`act()` never write to org files. |
+| Does dismissing a briefing item touch `inbox.org` or `next_actions.org`? | No. Ledger items are a disjoint object class from org-mode GTD tasks ([DIP-0034](DIP-0034-event-ledger-substrate.md), [DIP-0009](DIP-0009-gtd-specification.md)); `materialize()`/`act()` never write to org files. |
 | Is a co-sign grant cryptographically verified today? | No. Actor identity is self-declared, process-boundary trust only, until `DATACORE_LEDGER_SIGN=1` — see TRUST BOUNDARY. |
-| Can a dismissed item be un-dismissed? | No mechanism exists in the current event vocabulary. Dismissal is fold-level terminal; the only recovery is creating an unrelated new task under a new id — see Open Question 4. |
-| Which event authorizes a gated `task.create`? | `approval.grant`, validated by `guarded_append`'s 8 ordered checks (actor-bound, id-bound, replay-blocked). |
+| Can a dismissed item be un-dismissed? | No mechanism exists in the current event vocabulary. Dismissal is fold-level terminal; the only recovery is creating an unrelated new ledger item under a new id — see Open Question 4. |
+| Which event authorizes a gated `item.create`? | `approval.grant`, validated by `guarded_append`'s 8 ordered checks (actor-bound, id-bound, replay-blocked). |
 | Where does an ungranted side-effecting item go? | `MaterializeResult.blocked`; nothing is written to the log, and it reappears on every re-materialize call until granted — see Open Question 3 for the (deferred) escalation path. |
-| Who can gate a `task.create`? | Only the single `policy.approver` named in `.datacore/keys/approvals_policy.yaml`; per-effect approvers are Open Question 2. |
+| Who can gate an `item.create`? | Only the single `policy.approver` named in `.datacore/keys/approvals_policy.yaml`; per-effect approvers are Open Question 2. |
 
 ### Related Agents
 
 | Agent | Uses This DIP For |
 |-------|-------------------|
 | *(none registered yet)* | No entry in `.datacore/registry/agents.yaml` calls `materialize`/`act`/`guarded_append` today. Verified absent, not omitted: Phase 6 wiring (see Rollout Plan) is what gives `cos_approval_*` MCP tools and Telegram dismiss/approve handlers a real caller. |
-| `nightshift-orchestrator` | Named only as the plausible eventual consumer of materialized side-effecting tasks — the motivating winston-open-gaps quote ("queue those into nightshift?") points here — but no code path in this DIP or [DIP-0011](DIP-0011-nightshift-module.md) connects them yet; do not treat this as a live integration. |
+| `nightshift-orchestrator` | Named only as the plausible eventual consumer of materialized side-effecting items — the motivating winston-open-gaps quote ("queue those into nightshift?") points here — but no code path in this DIP or [DIP-0011](DIP-0011-nightshift-module.md) connects them yet; do not treat this as a live integration. |
 
 ### Integration Points
 
@@ -142,24 +142,25 @@ DIP's `item_id`), not at the prose layer.
 
 ### Use cases
 
-1. **A briefing item becomes a durable, actionable task exactly once.** A
-   human (or an agent acting for them) can `materialize` a batch of briefing
-   items every day, and the same underlying item — however the wording
-   drifts — never creates a second task once the first has been handled.
+1. **A briefing item becomes a durable, actionable ledger item exactly once.**
+   A human (or an agent acting for them) can `materialize` a batch of
+   briefing items every day, and the same underlying item — however the
+   wording drifts — never creates a second ledger item once the first has
+   been handled.
 2. **Dismissal is permanent, mechanically, not by convention.** Dismissing a
    briefing item removes it from every future briefing run's candidate set,
    forever, without requiring the dismissal logic to live in the briefing
    generator itself (it lives in the fold, per DIP-0034).
 3. **Side-effecting actions require a recorded human grant before they can
-   exist at all**, not just before they *run*. The gate is at `task.create`
-   time — a task with `effects: [email.send]` cannot even be created without
+   exist at all**, not just before they *run*. The gate is at `item.create`
+   time — an item with `effects: [email.send]` cannot even be created without
    an `approval.grant`, closing the gap between "an agent decided to do
    something consequential" and "a human is on record having agreed to it."
 4. **The wiring contract the audit found missing gets a concrete shape.**
    `cos_approval_*` MCP tools, Telegram dismiss/approve actions, and
    `plur_learn` capture of dismissals (Phase 6, see Integration below) all
    have a stable event-log substrate to attach to, instead of needing to
-   invent their own notion of task identity.
+   invent their own notion of item identity.
 
 ## Current Workaround (pre-DIP)
 
@@ -183,27 +184,36 @@ DIP's `item_id`), not at the prose layer.
 
 ### Relationship to GTD, org-mode, and the single capture point
 
-**Ledger tasks are a distinct object class from GTD tasks.** DIP-0034
+**Ledger items are a distinct object class from GTD tasks.** DIP-0034
 establishes the boundary this DIP inherits: org files remain the source of
 truth for GTD tasks, and the ledger tracks a *disjoint* class of objects —
 briefing/delegation/verification objects, per DIP-0034's Backwards
 Compatibility section and Open Questions #1 ("Org files remain the source of
 truth for GTD tasks; the ledger tracks briefing/delegation/verification
 objects, a distinct object class"). Concretely, for this DIP: a ledger
-task's states (`created`/`claimed`/`completed`/`verified`/`dismissed`, per
+item's states (`created`/`claimed`/`completed`/`verified`/`dismissed`, per
 `fold.py`) share no code path, no file, and no identifier space with
 org-mode's GTD states (TODO/NEXT/WAITING/DEFERRED/DONE/CANCELLED, per
-[DIP-0009](DIP-0009-gtd-specification.md)). `task.dismiss` never marks an
-org heading DONE or CANCELLED; `task.create` never appends a heading to
+[DIP-0009](DIP-0009-gtd-specification.md)). `item.dismiss` never marks an
+org heading DONE or CANCELLED; `item.create` never appends a heading to
 `inbox.org` or `next_actions.org`; nothing in `briefing.actions` or
-`ledger.policy` opens, parses, or writes any `.org` file. The vocabulary is
-deliberately close (`task.create`/`task.claim`/`task.complete` echo
-TODO/NEXT/DONE, and the Motivation's "queue those into nightshift?" quote
-directly evokes DIP-0011's `nightshift.org`) — this section exists
+`ledger.policy` opens, parses, or writes any `.org` file. The vocabulary was
+originally close by accident, not design — `task.create`/`task.claim`/
+`task.complete` echoed TODO/NEXT/DONE, a legacy of the substrate's first
+consumer being task-shaped rather than a deliberate choice (see DIP-0034's
+Naming note) — and DIP-0034 OQ-5 renamed the family to `item.*` specifically
+because that echo was a standing hazard, not a feature: this DIP's own text
+had to disambiguate "ledger task" from "GTD task" on every use, and a reader
+skimming the schema could plausibly mistake `task.create` for a GTD event.
+The rename strengthens this boundary rather than merely stating it — the
+ledger's event vocabulary (`item.create`/`item.claim`/`item.complete`) no
+longer collides with, or reads as an alias of, org-mode's TODO/NEXT/DONE
+state machine. The Motivation's "queue those into nightshift?" quote still
+directly evokes DIP-0011's `nightshift.org`; this section exists
 specifically so a reader of this DIP alone, without also having read
 DIP-0034's Open Questions, has a textual anchor for the fact that these are
-two independent systems that happen to share adjacent terminology, not one
-system with two names.
+two independent systems that share adjacent subject matter, not one system
+with two names.
 
 **Why `materialize()` bypasses `inbox.org` — deliberately, not by oversight.**
 The single-capture-point principle (`inbox.org` as the sacred point of entry)
@@ -212,11 +222,11 @@ once, then triaged. A briefing item is not that — it is a system-generated
 candidate produced by a scheduled pipeline (per DIP-0037, when grounded) for
 a human to *review*, not something the human is asking the system to
 remember on their behalf. Routing every briefing item through `inbox.org`
-before it could become a ledger task would conflate two different kinds of
+before it could become a ledger item would conflate two different kinds of
 "pending thing": a human's own captured intention, and a machine's proposal
 awaiting human judgment. This DIP keeps them in separate systems on purpose —
 `materialize()` turns a reviewed-or-reviewable candidate directly into a
-ledger task (gated, if side-effecting, by `approval.grant`), never into an
+ledger item (gated, if side-effecting, by `approval.grant`), never into an
 inbox entry — and the never-resurface guarantee (below) gives a dismissed
 machine proposal the durability that "single capture point" gives a human
 capture: once rejected, either kind of pending item stops reappearing, each
@@ -241,17 +251,17 @@ from the string alone.
 
 `materialize(items, space_dir, actor, policy=None) -> MaterializeResult`
 folds `read_events(space_dir)` **exactly once**, up front, for the whole
-call — not once per item — producing one consistent snapshot of every task
-id the space's ledger already knows about, regardless of that task's current
+call — not once per item — producing one consistent snapshot of every item
+id the space's ledger already knows about, regardless of that item's current
 `status`. For each item, `tid = item_id(item["text"])`; if `tid` is already a
-key in that snapshot's `state.tasks` — **created, claimed, completed,
+key in that snapshot's `state.items` — **created, claimed, completed,
 verified, or dismissed, any status at all** — the item is skipped and
 recorded in `result.skipped`, and no event is appended for it. This is the
 entire mechanism behind "dismissed means gone forever": once a human
-dismisses a task, its id is permanently present in every future fold, so no
+dismisses an item, its id is permanently present in every future fold, so no
 future `materialize` call — no matter how many days later, no matter how the
 briefing pipeline rewords the underlying text — can ever re-append its
-`task.create`. The skip happens **before** `guarded_append` is even reached;
+`item.create`. The skip happens **before** `guarded_append` is even reached;
 a dismissed item's re-creation is prevented at the identity-lookup layer, not
 by the policy gate having some special case for "was this ever dismissed."
 
@@ -273,15 +283,15 @@ from materializing.
 `ledger.policy.Policy` names one `approver` (an actor string) and a
 `cosign_effects` set (effect tags — `email.send`, `payment`, `prod.deploy` by
 default). `requires_cosign(policy, event_type, payload)` is `True` iff
-`event_type == "task.create"` and `payload["effects"]` intersects
-`cosign_effects` — **only `task.create` is ever gated**; once a side-effecting
-task exists with a valid grant, its downstream lifecycle events (`task.claim`,
-`task.complete`, ...) are never re-checked, keeping the gate singular
+`event_type == "item.create"` and `payload["effects"]` intersects
+`cosign_effects` — **only `item.create` is ever gated**; once a side-effecting
+item exists with a valid grant, its downstream lifecycle events (`item.claim`,
+`item.complete`, ...) are never re-checked, keeping the gate singular
 (one grant, checked once, at creation) rather than requiring a fresh grant
-for every event a long-running task ever emits.
+for every event a long-running item ever emits.
 
 `guarded_append(log, type, payload, policy=None, space_dir=None)` is the
-**only sanctioned way** for gated code to append a `task.create` — calling
+**only sanctioned way** for gated code to append an `item.create` — calling
 `EventLog.append` directly bypasses the gate entirely. Before `requires_cosign`
 is even consulted, a present `effects` field is type-checked: it must be a
 `list`, or `guarded_append` fails closed with `PolicyError` rather than
@@ -305,15 +315,15 @@ later evaluated once one fails:
    id at all can never slip through by coincidentally matching an equally
    id-less grant (two missing fields must never compare equal to each
    other). This is the **id-binding** half of the contract.
-6. The matched grant's `payload["task"]` is likewise checked to be a
-   non-empty string *before* being compared — a grant with no task binding
+6. The matched grant's `payload["item"]` is likewise checked to be a
+   non-empty string *before* being compared — a grant with no item binding
    must never validate any create, whatever that create's id is or isn't.
-7. `payload["id"] == grant.payload["task"]` — the grant names *this specific*
-   task id, not "any task this approver has ever blessed."
-8. No event in the space is already a `task.create` for this same id — a
+7. `payload["id"] == grant.payload["item"]` — the grant names *this specific*
+   item id, not "any item this approver has ever blessed."
+8. No event in the space is already an `item.create` for this same id — a
    granted `approval_ref` authorizes creation **exactly once**; replaying the
    same ref against a second create attempt at the same id is rejected as
-   "task already created," not silently re-validated. This is the
+   "item already created," not silently re-validated. This is the
    **replay-block**.
 
 All eight checks run before `log.append` is ever called, so a rejected event
@@ -327,11 +337,11 @@ Before this amendment, an effect tag that didn't match anything in
 effect (`emial.send` instead of `email.send`). That is a silent-bypass
 gap: the whole point of `cosign_effects` is to force a human grant onto
 specific side-effecting operations, and a misspelled effect string would
-sail a `task.create` straight through ungated with no error of any kind.
+sail an `item.create` straight through ungated with no error of any kind.
 Landed this wave, ahead of Phase 6 wiring (real `cos_approval_*` MCP tools
 and Telegram handlers acting on `guarded_append`'s decisions): the policy
 gains an optional `known_effects` list — the complete, closed vocabulary
-of valid effect tags a `task.create` may declare, defaulting to
+of valid effect tags an `item.create` may declare, defaulting to
 `cosign_effects` when the policy file omits it. `guarded_append` now
 checks every effect named in a create's `effects` list against
 `policy.effective_known_effects` and **fails closed** with `PolicyError`
@@ -360,7 +370,7 @@ paraphrased:
 > cryptography. It becomes cryptographic only when `DATACORE_LEDGER_SIGN=1`
 > gives the approver a keypair (see `ledger.log.EventLog`'s `sign` parameter
 > and `ledger.keys`). Until then, this gate prevents ACCIDENTAL ungated side
-> effects (a task.create slipping into existence with no human ever having
+> effects (an item.create slipping into existence with no human ever having
 > looked at it) — it does NOT defend against adversarial forgery: any
 > process able to write to `policy.approver`'s actor file in this space can
 > forge a self-declared grant. Do not present this gate as tamper-proof
@@ -368,7 +378,7 @@ paraphrased:
 
 Concretely: this DIP's gate is a **process-integrity control**, not (yet) a
 **cryptographic-authenticity control**. It reliably prevents the failure mode
-that actually motivated it — an agent's side-effecting `task.create` slipping
+that actually motivated it — an agent's side-effecting `item.create` slipping
 into existence with nobody having recorded a decision about it — because the
 normal, non-adversarial path to writing `human.jsonl` is a human (or a
 process acting under their direct control) doing so. It does not, today,
@@ -382,8 +392,8 @@ trust domain the marginal security is small relative to key-management cost.
 ### `approval.grant` event flow
 
 `approval.grant` is one of DIP-0034's `EVENT_TYPES`. It is **never itself
-policy-gated** — only `task.create` is — so an approver appends it via a
-plain `EventLog.append("approval.grant", {"task": <item_id>})`, no
+policy-gated** — only `item.create` is — so an approver appends it via a
+plain `EventLog.append("approval.grant", {"item": <item_id>})`, no
 `guarded_append` involved. The flow, end to end:
 
 1. A briefing item with side-effecting `effects` is submitted to
@@ -394,12 +404,12 @@ plain `EventLog.append("approval.grant", {"task": <item_id>})`, no
 2. The policy's named `approver` — a human, per the default policy — reviews
    the blocked item (surfaced via whatever the Phase 6 wiring exposes it as;
    see Integration) and appends `approval.grant` with
-   `payload = {"task": item_id(item_text)}` via their own actor's
+   `payload = {"item": item_id(item_text)}` via their own actor's
    `EventLog`.
 3. The SAME item is re-submitted to `materialize`, this time carrying
    `approval_ref` set to the grant event's `hash`. `guarded_append` walks the
-   eight checks above; all pass; `task.create` is appended, with
-   `approval_ref` forwarded into its payload (so the created task carries a
+   eight checks above; all pass; `item.create` is appended, with
+   `approval_ref` forwarded into its payload (so the created item carries a
    durable pointer to the grant that authorized it).
 4. A third submission of the same item (or the same `approval_ref` against a
    different item id) is rejected: either the never-resurface guarantee
@@ -433,13 +443,13 @@ same-actor case, which the fix was never needed for.
 
 ### `act`: lifecycle transitions are never re-gated
 
-`act(space_dir, task_id, action, actor)` appends the `task.*` event for
+`act(space_dir, item_id, action, actor)` appends the `item.*` event for
 `claim`, `complete`, or `dismiss` via a **plain** `EventLog.append` — no
 `guarded_append`, no policy check. This is intentional and matches
 `requires_cosign`'s scope exactly: the create is the single enforcement
-point; a task's subsequent lifecycle is ungated by design, so a long-running
-side-effecting task's `complete` event doesn't require a second grant, and a
-plain (non-side-effecting) task's `dismiss` was never going to be gated in
+point; an item's subsequent lifecycle is ungated by design, so a long-running
+side-effecting item's `complete` event doesn't require a second grant, and a
+plain (non-side-effecting) item's `dismiss` was never going to be gated in
 the first place.
 
 ### Changes Required
@@ -458,20 +468,20 @@ the first place.
 ### New Components
 
 - `briefing.actions.item_id` — normalized-text identity function.
-- `briefing.actions.materialize` — items → ledger tasks, with the
+- `briefing.actions.materialize` — items → ledger items, with the
   never-resurface guarantee and in-call dedupe.
 - `briefing.actions.act` — plain lifecycle transitions (`claim`, `complete`,
   `dismiss`).
 - `ledger.policy.Policy` / `load_policy` — the approvals policy model and its
   YAML loader (fail-closed on a malformed file, defaults on a missing one).
 - `ledger.policy.guarded_append` — the sole enforcement point for
-  cosign-gated `task.create`.
+  cosign-gated `item.create`.
 
 ### Interface Changes
 
-- Any caller creating tasks from side-effecting work must now go through
+- Any caller creating items from side-effecting work must now go through
   `briefing.actions.materialize` (or call `guarded_append` directly) rather
-  than an ungated `EventLog.append("task.create", ...)` — direct `append`
+  than an ungated `EventLog.append("item.create", ...)` — direct `append`
   calls bypass the gate silently, by construction of `EventLog` itself
   (`EventLog` has no opinion about policy; that opinion lives only in this
   DIP's module).
@@ -485,24 +495,24 @@ the first place.
 `materialize`?** Putting the never-resurface rule at the fold layer (any
 status counts as "known") rather than special-casing `status == "dismissed"`
 in `materialize` means the guarantee also covers completed and verified
-tasks for free — a briefing item that already became a completed task is
+items for free — a briefing item that already became a completed item is
 just as immune to re-creation as a dismissed one, with no separate code path
 required. It also means the guarantee is exactly as strong as `fold`'s own
-terminal-dismissal rule (DIP-0034: "once a task's status is dismissed, every
-later event addressed to that task id is a history no-op") — the two layers
+terminal-dismissal rule (DIP-0034: "once an item's status is dismissed, every
+later event addressed to that item id is a history no-op") — the two layers
 reinforce each other by construction rather than by two independently
 maintained pieces of logic agreeing by convention.
 
-**Why gate only `task.create`, not every event a side-effecting task ever
+**Why gate only `item.create`, not every event a side-effecting item ever
 emits?** A single, unambiguous enforcement point (creation) is easier to
-reason about and to audit than "was every event in this task's lifecycle
-individually authorized" — and re-checking cosign at, say, `task.complete`
+reason about and to audit than "was every event in this item's lifecycle
+individually authorized" — and re-checking cosign at, say, `item.complete`
 would either require a *second* grant (extra friction for no real safety
 gain, since the create already required a human to have looked at the
-declared effects) or would need to re-derive "was this task ever properly
+declared effects) or would need to re-derive "was this item ever properly
 created" anyway, which is exactly what the create-time check already
 established once. Per-event re-checking also does not compose well with
-long-running tasks whose lifecycle spans days — a single grant at creation
+long-running items whose lifecycle spans days — a single grant at creation
 is the natural unit of "a human agreed to this specific piece of work."
 
 **Why is the grant mechanism a plain, ungated event rather than itself
@@ -532,9 +542,9 @@ never silently stop everything else.
   stay consistent with `fold`'s own state, exactly the shared-mutable-state
   problem DIP-0034 already solved once. The fold already has this
   information; `materialize` reuses it rather than re-deriving it.
-- **Gate every lifecycle event on a side-effecting task, not just create** —
+- **Gate every lifecycle event on a side-effecting item, not just create** —
   rejected; see Rationale above (extra friction, no proportional safety
-  gain, poor fit for long-running tasks).
+  gain, poor fit for long-running items).
 - **A synchronous approval prompt at materialize time (block until a human
   answers)** — rejected; `materialize` is meant to run unattended (e.g. from
   a cron-triggered briefing pipeline) and cannot block on a human being
@@ -553,7 +563,7 @@ space with no `.datacore/keys/approvals_policy.yaml` file behaves under the
 documented default policy (`approver=human`,
 `cosign_effects={email.send, payment, prod.deploy}`) rather than erroring —
 adopting this DIP requires no migration for spaces that have never used
-side-effecting `effects` on a task. `briefing.actions.materialize` and `act`
+side-effecting `effects` on an item. `briefing.actions.materialize` and `act`
 are new functions with no prior callers to break.
 
 ## Security Considerations
@@ -573,19 +583,19 @@ are new functions with no prior callers to break.
 - **Fail-closed on malformed policy or malformed effects.** A present-but-
   broken `approvals_policy.yaml` raises `PolicyError` listing every problem
   found (never just the first), rather than silently falling back to
-  permissive defaults or a partially-applied policy. Likewise, a `task.create`
+  permissive defaults or a partially-applied policy. Likewise, an `item.create`
   whose `effects` field is present but not a list fails closed with
   `PolicyError` rather than deciding gating from a value `requires_cosign`
   was never designed to interpret (e.g. iterating a bare string
   character-by-character).
 - **Replay is explicitly rejected, not silently re-validated.** Check 8
-  (no existing `task.create` for this id) means a captured, valid
-  `approval_ref` cannot be reused to create a second task under the same id
+  (no existing `item.create` for this id) means a captured, valid
+  `approval_ref` cannot be reused to create a second item under the same id
   — it authorizes exactly one creation, closing an otherwise-obvious replay
   vector for anyone who can read the ledger (which, per DIP-0034, is not
   itself access-controlled).
-- **Not an authorization system beyond task creation.** This gate answers "may
-  this side-effecting task come into existence" — it says nothing about who
+- **Not an authorization system beyond item creation.** This gate answers "may
+  this side-effecting item come into existence" — it says nothing about who
   may later `claim` or `complete` it, which remains ungated per `act`'s
   design (see Rationale). Broader authorization, if ever needed, is future
   work layered on top, not something this DIP retrofits.
@@ -623,7 +633,7 @@ dismiss) and append `approval.grant` (for approve) against a specific
 `plur_learn` capture — the human's rejection of a recurring suggestion
 becomes a durable engram, not just a ledger-level dismissal, so the *pattern*
 of "stop suggesting this" can inform future briefing generation, not only
-prevent literal re-creation of the same task id.
+prevent literal re-creation of the same item id.
 
 ## Open Questions
 
@@ -640,7 +650,7 @@ prevent literal re-creation of the same task id.
    easy to add later (widening `Policy.approver` to a mapping) without
    breaking the existing schema.
 3. **What happens to a blocked item that never gets a grant?** Currently it
-   simply stays out of `state.tasks` forever and reappears in every
+   simply stays out of `state.items` forever and reappears in every
    `result.blocked` on every re-materialize call (since it's never actually
    created, the never-resurface guard doesn't apply to it — only to created/
    dismissed ids). Whether a blocked item should eventually be surfaced
@@ -666,11 +676,11 @@ prevent literal re-creation of the same task id.
    now anchored to the existing mechanism instead of independent of it.
 4. **Escape hatch for an accidental dismiss.** None exists today — verified
    against the reference implementation, not assumed. `fold._handle_dismiss`
-   sets a task's status to `"dismissed"`, and `fold._dismissed` then turns
+   sets an item's status to `"dismissed"`, and `fold._dismissed` then turns
    every later event addressed to that id into a history no-op, **including
    the `owner.set` administrative override** (per `ledger/fold.py`'s module
-   docstring: `task.dismiss` is terminal, "nothing can revive a dismissed
-   task"). `materialize`'s never-resurface guarantee compounds this: because
+   docstring: `item.dismiss` is terminal, "nothing can revive a dismissed
+   item"). `materialize`'s never-resurface guarantee compounds this: because
    `item_id` hashes the item's *normalized* text, re-submitting the
    identical or cosmetically-reworded item is silently skipped forever (its
    id is already known to the fold, any status), and a manually
@@ -680,18 +690,18 @@ prevent literal re-creation of the same task id.
    the ledger is to make it a genuinely *different* id: either `materialize`
    naturally allocates a new one because the item's substantive wording
    changed enough to change the normalized-text hash (a new content hash,
-   not a revival), or an operator hand-appends a fresh `task.create` under a
+   not a revival), or an operator hand-appends a fresh `item.create` under a
    new id directly via `EventLog.append`, bypassing `materialize` entirely
    (a new, unrelated event, not a corrective one in any mechanical sense —
    nothing links it back to the id it is meant to replace). Both routes
-   produce an unrelated new task; the original stays permanently dismissed,
-   its history intact for audit, but nothing in the ledger marks the new
-   task as "this replaces that" — a human has to track that link themselves,
-   outside the system, if they want one. A fat-fingered Telegram dismiss of
-   an important item is therefore, today, an unrecoverable loss of that
-   specific task id. A proper undo — e.g. a new `task.undismiss` event type,
-   or an admin override explicitly scoped to clear (not merely attempt to
-   overwrite) a dismissed status with its own audit trail — does not exist
+   produce an unrelated new ledger item; the original stays permanently
+   dismissed, its history intact for audit, but nothing in the ledger marks
+   the new item as "this replaces that" — a human has to track that link
+   themselves, outside the system, if they want one. A fat-fingered Telegram
+   dismiss of an important item is therefore, today, an unrecoverable loss of
+   that specific item id. A proper undo — e.g. a new `item.undismiss` event
+   type, or an admin override explicitly scoped to clear (not merely attempt
+   to overwrite) a dismissed status with its own audit trail — does not exist
    in the current event vocabulary and is not designed by this DIP. Recorded
    here rather than built now, consistent with `act`'s dismiss path being
    deliberately ungated at the current trust level: revisit at the earlier
@@ -704,7 +714,7 @@ prevent literal re-creation of the same task id.
 - winston-open-gaps item 7 — "Approvals loop unused... The `cos_approval_*`
   MCP tools (datacore-app) exist but aren't wired into inbox/tomorrow
   flows." The direct motivating gap this DIP closes the mechanism side of.
-- DIP-0034 — Event Ledger Substrate (the `task.create`/`approval.grant` event
+- DIP-0034 — Event Ledger Substrate (the `item.create`/`approval.grant` event
   schema this DIP's gate operates on; the Task 5.2b cross-actor HLC causal
   floor this DIP's grant→create ordering depends on; the opt-in-signing
   trust-boundary stance this DIP's TRUST BOUNDARY section inherits).
@@ -716,7 +726,7 @@ prevent literal re-creation of the same task id.
   "policy file + fail-closed defaults" reasoning: a present-but-malformed
   policy file errors loudly, a missing one falls back to a safe default).
 - DIP-0009 — GTD Specification (the org-mode TODO/NEXT/WAITING/DONE state
-  vocabulary this DIP's ledger task states are disjoint from; see
+  vocabulary this DIP's ledger item states are disjoint from; see
   Specification's Relationship to GTD, org-mode, and the single capture
   point).
 - DIP-0013 — Meetings Module (§5.2 Escalation Detection, the canonical

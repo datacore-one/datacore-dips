@@ -14,7 +14,7 @@
 | **Affects** | `.datacore/lib/briefing/` (`fact_table.py`, `render.py`), `.datacore/lib/briefing_grounded.py`, future `cos_generate.py`/`cos_reasoning.py` call sites |
 | **Specs** | `.datacore/lib/briefing/fact_table.py`, `.datacore/lib/briefing/render.py`, `.datacore/lib/briefing_grounded.py` |
 | **Agents** | any process that generates briefing prose via an LLM (`/today`, `cos_generate.py`, `cos_reasoning.py`, nightshift briefing jobs) — see Agent Context below |
-| **Relates to** | `ENG-2026-0728-002` (the motivating incident), [DIP-0035](DIP-0035-job-contracts.md) (Job Contracts — fact-freshness verification), [DIP-0038](DIP-0038-action-loop-cosign.md) (Action Loop + Co-sign — briefing items become ledger tasks downstream of this DIP's output) |
+| **Relates to** | `ENG-2026-0728-002` (the motivating incident), [DIP-0035](DIP-0035-job-contracts.md) (Job Contracts — fact-freshness verification), [DIP-0038](DIP-0038-action-loop-cosign.md) (Action Loop + Co-sign — briefing items become ledger items downstream of this DIP's output) |
 
 ## Summary
 
@@ -37,7 +37,7 @@ DIP-0034 names in its Rollout Plan; its `emit_facts` writes into
 DIP-0034's `metric.attest` **namespaced family**, owning the `fact` class
 only (see Relationship to DIP-0034 in Integration, and R2 of the
 2026-08-03 amendment rulings) for fact durability, and it is itself
-consumed by DIP-0038 (briefing items becoming ledger tasks).
+consumed by DIP-0038 (briefing items becoming ledger items).
 
 ## Agent Context
 
@@ -66,7 +66,7 @@ consumed by DIP-0038 (briefing items becoming ledger tasks).
 | What happens if the LLM types a number directly? | `validate()` flags any digit sequence that doesn't trace to a fact value or an allowlisted date/year/caller-supplied pattern; `finalize()` discards the whole LLM text on any such error |
 | What does a caller get back on failure? | `_fallback_text(facts)` — every real fact, plainly listed, with **zero** LLM-authored prose — plus a nonempty `errors` list |
 | Is a fallback ever silent? | No — Invariant 5 requires a caller to alert loudly, and (per this amendment) to log the discarded `llm_text` alongside the alert |
-| Where do facts get built? | `briefing.fact_table.build_facts(root, adapters=None, now=None)`, default fact adapters `git_status_counts` + `ledger_task_counts` |
+| Where do facts get built? | `briefing.fact_table.build_facts(root, adapters=None, now=None)`, default fact adapters `git_status_counts` + `ledger_item_counts` |
 | How does a fact become durable/auditable? | `emit_facts` writes one `metric.attest` event per fact with `payload.metric == "fact"` (DIP-0034) |
 | Does this DIP touch org-mode? | No — facts are read from git/ledger state, never from `.org` files; no conflict with DIP-0009's org-mode-as-source-of-truth |
 | Is "adapter" here the same as a DIP-0010 sync adapter? | No — a **fact adapter** is a pure, unauthenticated, read-only local function; DIP-0010/DIP-0026's `SyncAdapter` talks to an external service. See Specification's terminology note |
@@ -85,7 +85,7 @@ No agent in `.datacore/registry/agents.yaml` is registered for this DIP yet — 
 
 - [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate: `emit_facts` writes the `fact` class of the `metric.attest` namespaced family this DIP does not exclusively own (see Relationship to DIP-0034)
 - [DIP-0035](DIP-0035-job-contracts.md) — Job Contracts: fact-freshness verification is a job-contract concern, deliberately not reinvented here; also owns the `job.verify` class of the same `metric.attest` family
-- [DIP-0038](DIP-0038-action-loop-cosign.md) — Action Loop + Co-sign: downstream consumer of grounded briefing output as candidate ledger tasks
+- [DIP-0038](DIP-0038-action-loop-cosign.md) — Action Loop + Co-sign: downstream consumer of grounded briefing output as candidate ledger items
 - [DIP-0009](DIP-0009-gtd-specification.md) — GTD Specification: Part 3.7's "do not fabricate, leave empty rather than invent" is the same anti-fabrication discipline this DIP applies to briefing figures instead of task properties
 
 ## Motivation
@@ -152,7 +152,7 @@ LLM-authored sentence containing a number that hasn't passed both checks.
 ### Use cases
 
 1. **`/today` and any CoS briefing** — the direct fix for the motivating
-   incident: numeric claims about git state, task counts, cadence health,
+   incident: numeric claims about git state, item counts, cadence health,
    or anything else built from a `Fact` adapter can no longer be silently
    fabricated by the generation step.
 2. **Any future LLM-authored artifact with numeric claims** — the
@@ -187,7 +187,7 @@ LLM-authored sentence containing a number that hasn't passed both checks.
 > "Adapter Pattern" primitive) establishes "adapter" as the class
 > implementing `SyncAdapter(ABC)`: it authenticates, fetches, and pushes to
 > an *external service*, credentialed per DIP-0018. A **fact adapter**
-> (`git_status_counts`, `ledger_task_counts`, and any future one) is
+> (`git_status_counts`, `ledger_item_counts`, and any future one) is
 > structurally different: a pure, read-only, local function — no auth, no
 > external service, no push direction, no credentials. The two share a
 > word, not a mechanism; this DIP always says "fact adapter" when the
@@ -206,7 +206,7 @@ class Fact:
 ```
 
 `build_facts(root, adapters=None, now=None) -> dict[str, Fact]` runs a list
-of fact adapters (default: `git_status_counts`, `ledger_task_counts`)
+of fact adapters (default: `git_status_counts`, `ledger_item_counts`)
 against one `root` directory and merges their `Fact` dicts. Fact-adapter
 isolation is load bearing: one fact adapter raising (or returning a
 malformed value) never aborts the others — it is folded into a synthetic
@@ -242,7 +242,7 @@ dict[str, Fact]]`, where `AdapterCtx` carries exactly `root: Path` and
 - **Registering a new fact source today.** There is currently no
   DIP-0022-style module-declared registration mechanism for fact
   adapters. `DEFAULT_ADAPTERS` is a fixed two-item list
-  (`git_status_counts`, `ledger_task_counts`) inside `fact_table.py`
+  (`git_status_counts`, `ledger_item_counts`) inside `fact_table.py`
   itself. A module wanting to contribute a fact source has exactly two
   options today, neither of which is a registry hook: edit
   `DEFAULT_ADAPTERS` directly, or pass an explicit `adapters=[...]` list
@@ -366,7 +366,7 @@ that looseness has a direct, unavoidable cost: **a short fabricated number
 — especially a single digit, and quite often two digits — will frequently
 substring-match some unrelated fact's value purely by chance, with zero
 adversarial effort and no special formatting required.** In any nontrivial
-fact table (several counts, a branch name containing digits, a task total),
+fact table (several counts, a branch name containing digits, an item total),
 most single digits 0–9 appear *somewhere* as a substring of *some* value.
 State this plainly, not as a hedge: **the gate reliably catches distinctive
 fabrications — the "639 uncommitted changes" class, where the number is
@@ -400,7 +400,7 @@ one fact's own claim, but for *any* rendered text checked against a fact
 table containing it, since rule 1 checks substring membership across every
 fact's value, not just the one a sentence is nominally about. This is why
 `computed_at` is kept out of `value` in both existing adapters
-(`git_status_counts`, `ledger_task_counts`) and must be kept out by every
+(`git_status_counts`, `ledger_item_counts`) and must be kept out by every
 future adapter: the discipline of "value is a short, meaningful figure;
 computed_at is metadata" is not a style preference here, it is what keeps
 the substring-grounding check meaningful at all.
@@ -466,7 +466,7 @@ table, not by this DIP unilaterally widening its own claim. A fact table
 is therefore durable and mechanically auditable ("what did the briefing
 pipeline actually see, and when") independent of whatever briefing text
 was generated from it, the same durability property DIP-0034 provides for
-task/ownership state — this holds regardless of how many other classes
+item/ownership state — this holds regardless of how many other classes
 share the `metric.attest` type, since consumers reading the ledger MUST
 ignore `metric.attest` events whose `metric` discriminator they don't
 recognize.
@@ -580,7 +580,7 @@ case token-checking cannot reach.
 **Why substring grounding instead of exact-value grounding?** Exact-value
 grounding (the extracted text must *equal* some fact's value) would be
 tighter, but numbers legitimately appear as parts of larger constructs in
-prose (e.g. "3 of the 12 tasks" both deriving from real facts "3" and
+prose (e.g. "3 of the 12 items" both deriving from real facts "3" and
 "12", vs. a sentence quoting a fact value embedded in a larger formatted
 number like "$1,234.56" from a fact value "1,234.56"). Substring grounding
 was chosen as the specified behavior for this reason; the Threat Model
@@ -655,7 +655,7 @@ a migration of existing data.
   (or public-adjacent). Nothing in this DIP's content, nor in
   `briefing_grounded.py`'s CLI demo output, carries secrets — facts built
   by the two shipped adapters are dirty-file counts, a branch name, and
-  task counts by status; none of that is sensitive.
+  item counts by status; none of that is sensitive.
 - **The Threat Model above is the substantive security content of this
   DIP** — a validator that can be defeated by short numbers or
   whitespace-split digits is a real, disclosed limitation of a mechanism
@@ -698,7 +698,7 @@ fallback + alert semantics on any `finalize()` failure. Unwiring/rollback
 is simply unsetting the flag.
 
 **Later (DIP-0038, follow-on).** Once grounded briefing output exists,
-Phase 5's action loop treats briefing items as candidate ledger tasks
+Phase 5's action loop treats briefing items as candidate ledger items
 (`materialize()`); a grounded briefing is a better input to that
 materialization step than an ungrounded one, but this DIP does not itself
 define or depend on that integration.
@@ -758,7 +758,7 @@ define or depend on that integration.
   class of the same `metric.attest` family this DIP's `fact` class
   shares).
 - [DIP-0038](DIP-0038-action-loop-cosign.md) — Action Loop + Co-sign
-  (consumes grounded briefing output as candidate ledger tasks; follow-on,
+  (consumes grounded briefing output as candidate ledger items; follow-on,
   out of this DIP's scope).
 - [DIP-0009](DIP-0009-gtd-specification.md) — GTD Specification, Part
   3.7's "do not fabricate, leave empty rather than invent" — the same
