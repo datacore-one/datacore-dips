@@ -550,6 +550,51 @@ blocks are hash-linked: the fallback only has to correctly identify "the
 last block" from the git-synced `ledger/blocks/` directory, which is
 exactly the same operation it would perform to produce any other block.
 
+### Fallback drills (owner ruling, 2026-08-04)
+
+A fallback that has never taken over is an untested code path, and the
+arbiter's failure mode — work stops — is the one where discovering that at
+the wrong moment is expensive. **Fallback capability MUST therefore be
+rehearsed, not merely declared.**
+
+The rehearsal is a **read-only drill**, not a real takeover. The fallback
+actor does exactly what it would do in a genuine takeover, and then compares
+its answer against what the primary actually produced, instead of writing a
+block:
+
+- **Sequencer drill.** The fallback independently identifies the last block
+  from its own `ledger/blocks/` copy, recomputes the block it *would* cut at
+  that height from its own pool copy, and compares to the primary's actual
+  block. Equal blocks prove the fallback can produce a valid, chain-continuing
+  block from its own data. A mismatch is the finding — it means the two actors
+  disagree about pool contents or ordering, which is exactly the condition that
+  would produce a fork during a real takeover.
+- **Arbiter drill.** The fallback folds the pool and enumerates the items
+  currently awaiting a grant, confirming it can identify the same set the
+  primary would. This is the arbiter's entire decision input; being able to
+  compute it is being able to take over.
+
+Neither drill writes to `events/` on behalf of the primary, cuts a block, or
+requires the primary to be unavailable. Both are safe to run against a healthy
+system on a schedule.
+
+**Result reporting reuses existing mechanisms rather than adding any.** The
+drill emits `metric.attest` with `metric: "ledger.fallback_drill"` — a class
+allocated in [DIP-0034](DIP-0034-event-ledger-substrate.md)'s discriminator
+table, not a new event type — carrying
+`{space, role, primary, fallback, height, ok, mismatch?}`. The drill itself is
+declared as a job contract under [DIP-0035](DIP-0035-job-contracts.md), so a
+drill that silently stops running is caught by the same verifier that catches
+any other silent job failure, and its `on_fail` routing is the existing one.
+This is deliberate: a rehearsal mechanism that needs its own monitoring has
+merely moved the problem.
+
+**Cadence.** Weekly is sufficient for a steady-state installation. Two
+additional triggers are normative: a drill MUST pass **before the first time a
+space relies on arbitrated-pool work for anything time-sensitive**, and after
+any change to the roster, the sequencer/arbiter assignment, or the ledger
+code on either actor.
+
 ### Fork detection
 
 Because the sequencer role is singular in data (exactly one actor is named
@@ -1006,14 +1051,16 @@ trigger fires.
    given deployment, and what does "review" concretely mean operationally,
    is not decided here.
 
-9. **Arbiter fallback must be exercised, not just declared.** The ruling in
-   "Three roles, separately assigned" requires an explicit `fallback` on both
-   `policy.set` assignments, but a fallback that has never taken over is an
-   untested code path — and the arbiter's failure mode (work stops) is the one
-   where discovering that at the wrong moment is expensive. Open: whether
-   takeover should be periodically rehearsed, and by what mechanism. **Trigger:**
-   before the first space relies on arbitrated-pool work for anything
-   time-sensitive.
+9. **Arbiter fallback must be exercised, not just declared — RESOLVED
+   (2026-08-04, owner ruling: yes).** Takeover capability MUST be rehearsed.
+   The mechanism is specified in "Fallback drills" above: a read-only drill in
+   which the fallback computes what it would produce and compares against what
+   the primary actually produced, reported as `metric.attest` with
+   `metric: "ledger.fallback_drill"` and scheduled as a DIP-0035 job contract
+   so a drill that stops running is itself caught. Weekly cadence, plus two
+   normative triggers — before any space relies on arbitrated work for
+   something time-sensitive, and after any change to the roster, the role
+   assignment, or the ledger code on either actor.
 10. **Does the arbiter need its own finality?** A grant is an ordinary pool
    event and is therefore subject to the same provisional-until-settled status
    as everything else. Open: whether an executor should require its grant to be
