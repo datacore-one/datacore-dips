@@ -14,7 +14,7 @@
 | **Specs** | None yet — this DIP is the spec; no code exists (see Implementation) |
 | **Agents** | any process that needs to distinguish settled from provisional ledger state; the actor currently named sequencer via `policy.set`; any process auditing or verifying the chain locally |
 | **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate. Non-functional without it: the per-writer pool, the `hlc` field and its ordering guarantee, `fold()`'s left-to-right reduction semantics, and the `policy.set`/`EVENT_TYPES` schema this DIP reuses without modification. |
-| **Relates to** | [DIP-0038](DIP-0038-action-loop-cosign.md) (the other consumer of `policy.set`; this DIP proposes the same payload-discriminator pattern DIP-0038 uses nowhere but that DIP-0034 already established for `metric.attest`), [DIP-0043](DIP-0043-org-projection-genesis-import.md) (drafted alongside this DIP; its genesis import is the first workload likely to exercise the `late` flag in practice), `ENG-2026-0729-016` (the original "do NOT build a blockchain now" owner direction this DIP stays inside the spirit of — see Owner Decision), `.datacore/dip-review/DESIGN-BRIEF-v2.1.md` §B/§C (binding design brief, conversation ratified 2026-08-03/04 — authoritative wording where this DIP and the brief must agree) |
+| **Relates to** | [DIP-0038](DIP-0038-action-loop-cosign.md) (the other consumer of `policy.set`; this DIP proposes the same payload-discriminator pattern DIP-0038 uses nowhere but that DIP-0034 already established for `metric.attest`), [DIP-0043](DIP-0043-org-projection.md) (drafted alongside this DIP; its genesis import is the first workload likely to exercise the `late` flag in practice), `ENG-2026-0729-016` (the original "do NOT build a blockchain now" owner direction this DIP stays inside the spirit of — see Owner Decision), `.datacore/dip-review/DESIGN-BRIEF-v2.1.md` §B/§C (binding design brief, conversation ratified 2026-08-03/04 — authoritative wording where this DIP and the brief must agree) |
 
 ## Summary
 
@@ -77,6 +77,9 @@ pool and rejects anything that doesn't check out.
 | What does a block contain? | References to pool events — `{writer, file, seq, event_hash, hlc, observed_at, late}` per entry — never copies of event payloads. |
 | How does fold cost stay bounded as the pool grows forever? | Snapshots at settled heights give O(tail) fold instead of O(all events) — see Specification, "Snapshots." |
 | Who is the sequencer? | Whoever the most recent `policy.set` event (payload `policy: "ledger.sequencer"`) names. Role assignment is data, not code. |
+| Are the sequencer and the arbiter the same role? | No — three roles exist (sequencer, arbiter, hub) and they are separately assigned. They may be held by the same actor and by default should be, but merging them into one concept costs you the ability to fail over or diagnose one independently. See "Three roles, separately assigned." |
+| Which actor should hold them? | Apply the three selection criteria (highest availability, single writer, freshest view). An installation's Chief-of-Staff actor typically satisfies all three and is the recommended default — but this spec assigns nothing. |
+| Is there a message bus / gossip hub between actors? | No, and it is deliberately deferred. Per-writer files already sync conflict-free over git; a hub is push-based and would make progress depend on a live path to one machine. It buys latency, not correctness — see the trigger in "Three roles, separately assigned." |
 | What if two sequencers write at once? | A second block at the same height with a different hash is a fork — a hard, loud error, never silently reconciled. See "Fork detection." |
 | Can a consumer trust a block just because the sequencer produced it? | No. Verify, don't trust: recompute event hashes from your own pool copy and check `root_hash`/`prev_block_hash` before treating a block as valid. A block that fails this is rejected locally and reported. |
 | Does this change DIP-0034's event schema? | No new `EVENT_TYPES`, no new required payload field on any existing type. `policy.set` gains a second recognized payload family (`policy: "ledger.sequencer"`) under DIP-0034's existing payload-additive invariant — the same pattern already used for `metric.attest`'s `metric` discriminator. |
@@ -87,9 +90,9 @@ pool and rejects anything that doesn't check out.
 
 | Agent | Uses This DIP For |
 |-------|-------------------|
-| `dip-preparer` | Treats this DIP, alongside [DIP-0034](DIP-0034-event-ledger-substrate.md), as the dependency anchor when authoring or amending [DIP-0043](DIP-0043-org-projection-genesis-import.md) — genesis import's valid-time fallback ladder and any read-time verification design assume this DIP's block/snapshot shape and the `late` flag defined here. |
+| `dip-preparer` | Treats this DIP, alongside [DIP-0034](DIP-0034-event-ledger-substrate.md), as the dependency anchor when authoring or amending [DIP-0043](DIP-0043-org-projection.md) — genesis import's valid-time fallback ladder and any read-time verification design assume this DIP's block/snapshot shape and the `late` flag defined here. |
 | `context-maintainer` | Owns the same class of doctrine follow-up DIP-0034 named for itself (Implementation, Rollout Plan): once this DIP ratifies, any corpus text that describes "the ledger" as a single flat event log should be qualified to note the derived chain/snapshot layer exists alongside the pool — same bifurcation pattern, one layer deeper. |
-| `nightshift-orchestrator` | Named only as a plausible host for the sequencer role — it already runs continuously across Mac/box per [DIP-0011](DIP-0011-nightshift-module.md) and is the kind of long-lived process a `policy.set`-named sequencer or fallback would realistically be. No code path in this DIP or DIP-0011 wires them together; this is not a live integration. |
+| `nightshift-orchestrator` | Named only as a plausible host for the sequencer role — it already runs continuously on always-on hosts per [DIP-0011](DIP-0011-nightshift-module.md) and is the kind of long-lived process a `policy.set`-named sequencer or fallback would realistically be. No code path in this DIP or DIP-0011 wires them together; this is not a live integration. |
 
 ### Integration Points
 
@@ -107,7 +110,7 @@ pool and rejects anything that doesn't check out.
   `policy` discriminator field — the identical pattern DIP-0034 already
   established for `metric.attest`'s `metric` field, applied here to
   `policy.set` for the first time.
-- [DIP-0043](DIP-0043-org-projection-genesis-import.md) — drafted alongside
+- [DIP-0043](DIP-0043-org-projection.md) — drafted alongside
   this DIP from the same design-brief conversation. Its genesis import
   (bulk-importing historical org tasks with a valid-time fallback ladder
   reaching back through git history) is the first workload plausibly
@@ -130,7 +133,7 @@ Phase 1, as shipped, leaves open by design.
 
 Consider a laptop that goes offline for a week — an already-documented
 topology in Datacore (`ENG-2026-0727-004`, cited in DIP-0034 Motivation as
-the Mac↔box sync gap) — and then reconnects. Under DIP-0034 alone,
+the workstation-to-server sync gap) — and then reconnects. Under DIP-0034 alone,
 `read_events()` merges every writer's `.jsonl` file and sorts by `hlc`:
 global, deterministic, valid-time order (DIP-0034 Specification, "Hybrid
 logical clock"). That part is *correct* — the newly-synced week-old events
@@ -182,7 +185,7 @@ sequencer concept as trigger-based future work, not a Phase 1 concern.
    recorded fact (`late: true` in the block index) instead of an invisible
    silent reorder — an operator, or DIP-0043's future org reconciler, can
    audit exactly which events were late and when.
-4. **A substrate for genesis import.** [DIP-0043](DIP-0043-org-projection-genesis-import.md)'s
+4. **A substrate for genesis import.** [DIP-0043](DIP-0043-org-projection.md)'s
    bulk import of historical org tasks (design brief §D) is exactly the
    kind of workload likely to produce systematically late events — valid
    times reaching back through git history, arriving all at once. This DIP
@@ -264,11 +267,11 @@ Two layers, with different write models:
   "cut_at": "2026-08-04T09:00:00Z",
   "entries": [
     {
-      "writer": "box",
-      "file": "0-personal/.datacore/events/box.jsonl",
+      "writer": "node1",
+      "file": "0-personal/.datacore/events/node1.jsonl",
       "seq": 0,
       "event_hash": "9f2c...a1",
-      "hlc": "1785400000000.0000.box",
+      "hlc": "1785400000000.0000.node1",
       "observed_at": "2026-08-04T09:00:00Z",
       "late": false
     }
@@ -433,7 +436,82 @@ A space that has never run a sequencer at all is in this exact state
 permanently, and behaves in every functional respect like a DIP-0034-only
 installation (Backwards Compatibility).
 
+### Three roles, separately assigned (owner ruling, 2026-08-04)
+
+Coordination in this design is **three distinct roles**, not one. They may —
+and by default should — be held by the same actor, but they MUST remain
+separately named and separately failed-over.
+
+| Role | What it does | If it is unavailable |
+|---|---|---|
+| **Sequencer** | Cuts blocks, records `observed_at`, orders the pool into the canonical chain | **Finality pauses.** Appends, folds, reads and projections all continue on the pool. Benign, and the property this DIP's Degradation section already guarantees. |
+| **Arbiter** | Grants claims ([DIP-0034](DIP-0034-event-ledger-substrate.md) `item.grant`) for arbitrated-pool items | **Arbitrated work stops** until the fallback takes over — nothing may execute without a grant. This is an availability dependency, not a delay. |
+| **Hub** (transport) | Relays events between actors ahead of git sync | **Not adopted.** See "Transport hub: deferred" below. |
+
+**Why they must not be collapsed into one concept.** The failure modes above
+are not merely different in degree; a sequencer outage is invisible to a
+working system, while an arbiter outage halts execution. Collapsed, you cannot
+fail over one without the other, and — the sharper cost — you cannot tell
+which one is broken from the symptom. Keeping them named separately costs one
+extra `policy.set` payload and buys diagnosability.
+
+**Selection criteria** (installation-agnostic; this spec assigns nothing):
+
+1. **Highest availability in the roster.** The holder must be reachable
+   whenever any other actor is doing work — an intermittently-connected
+   workstation is the wrong choice.
+2. **Single writer.** The holder's decisions must be totally ordered by
+   construction, which per-writer files already guarantee. This is why an
+   arbiter needs no consensus: its grants are ordered by the file they land
+   in, and a second grant for an already-granted item is a recorded no-op.
+3. **Freshest view of the pool.** The holder should be the actor that syncs
+   most often, so its ordering decisions are made on the most complete input.
+
+**Recommended default.** An installation's **Chief-of-Staff actor** typically
+satisfies all three — it is always-on, it already holds adjacent
+responsibilities (merge gatekeeping, the approvals policy of
+[DIP-0038](DIP-0038-action-loop-cosign.md)), and it syncs on the tightest
+cadence. Assigning both sequencer and arbiter to it is therefore the
+recommended default, and it requires **no new component**: the daemon already
+runs, and both roles are assigned by data (below), not by code. This is a
+recommendation, not a requirement — an installation with a different
+availability profile should apply the criteria and choose differently.
+
+**Concentration risk, named.** Assigning both roles to the actor that already
+holds merge gatekeeping, approvals and briefing production means one machine
+carries five responsibilities. Each degrades gracefully or has a fallback *in
+principle*; in practice a fallback that is specified but unset is not a
+fallback. Both `policy.set` assignments below MUST carry an explicit
+`fallback`, and an installation SHOULD verify the fallback can actually take
+over rather than assuming it.
+
+**Transport hub: deferred, with a trigger.** A hub — a daemon receiving and
+relaying events between actors ahead of git sync — was evaluated and is **not
+adopted**. Sequencing and block-serving are **pull-based**: an actor requests
+blocks when it syncs, and an unavailable answer costs it nothing. A hub is
+**push-based**: it makes an actor's progress depend on a live network path to
+one machine. Since per-writer files are append-only and single-writer, they
+already sync without conflict over the existing git transport, so a hub adds a
+new dependency to a system that has no correctness problem — it buys latency,
+not correctness.
+
+The honest counter-argument is that latency is real: a claim→grant round trip
+costs one sync interval per hop. But cheaper remedies come first, and they
+already exist in DIP-0034's claim-safety policy — set `owner` at create
+(partitioned; no handshake at all) or mark idempotent, cheap work `open: true`
+(self-granting). **Trigger for revisiting:** once most work is partitioned or
+open, if grant latency is still a *measured* complaint rather than an
+anticipated one. See [DIP-0045](DIP-0045-node-protocol.md), which specifies
+the protocol shape should that trigger ever fire; its `notify` endpoint is
+precisely the hub capability deferred here.
+
 ### Sequencer role as data
+
+Both roles are assigned by `policy.set`, discriminated by the `policy` field:
+`ledger.sequencer` (below) and `ledger.arbiter.default` (same shape, naming
+the standing arbiter used when an `item.create` does not specify its own).
+An `item.create` that names its own `arbiter` overrides the standing default
+for that item, per DIP-0034.
 
 A `policy.set` event names the sequencer, using the same event type
 [DIP-0038](DIP-0038-action-loop-cosign.md) uses for co-sign thresholds,
@@ -444,8 +522,8 @@ DIP-0034 already established for `metric.attest`'s `metric` field
 ```jsonc
 {
   "policy": "ledger.sequencer",
-  "actor": "box",
-  "fallback": "mac",
+  "actor": "<always-on actor from the roster>",
+  "fallback": "<second actor>",
   "fallback_after_seconds": 3600
 }
 ```
@@ -510,8 +588,8 @@ applied here to the sequencer role instead of item ownership.
 
 ### Worked example
 
-Continuing DIP-0034's worked example (`box` creates, claims, and completes
-`t-042`, three events in `box.jsonl`): the sequencer (`box`, self-assigned
+Continuing DIP-0034's worked example (`node1` creates, claims, and completes
+`t-042`, three events in `node1.jsonl`): the sequencer (`node1`, self-assigned
 via `policy.set`) cuts a block at height 0 referencing all three:
 
 ```jsonc
@@ -520,13 +598,13 @@ via `policy.set`) cuts a block at height 0 referencing all three:
   "prev_block_hash": "GENESIS",
   "cut_at": "2026-08-04T09:10:00Z",
   "entries": [
-    {"writer":"box","file":"0-personal/.datacore/events/box.jsonl","seq":0,
+    {"writer":"node1","file":"0-personal/.datacore/events/node1.jsonl","seq":0,
      "event_hash":"9f2c...a1","hlc":"1785400000000.0000.box",
      "observed_at":"2026-08-04T09:10:00Z","late":false},
-    {"writer":"box","file":"0-personal/.datacore/events/box.jsonl","seq":1,
+    {"writer":"node1","file":"0-personal/.datacore/events/node1.jsonl","seq":1,
      "event_hash":"3b7e...d4","hlc":"1785400015000.0000.box",
      "observed_at":"2026-08-04T09:10:00Z","late":false},
-    {"writer":"box","file":"0-personal/.datacore/events/box.jsonl","seq":2,
+    {"writer":"node1","file":"0-personal/.datacore/events/node1.jsonl","seq":2,
      "event_hash":"c081...9e","hlc":"1785400600000.0000.box",
      "observed_at":"2026-08-04T09:10:00Z","late":false}
   ],
@@ -870,7 +948,7 @@ for its own Open Questions:
   enough consecutive cuts to trust checkpointing it). Build
   `ledger.snapshot` and wire the O(tail) fast path into `ledger_cli.py`.
 - **Phase C — the `late` flag, end-to-end** (trigger: a real late arrival
-  occurs in practice — most plausibly [DIP-0043](DIP-0043-org-projection-genesis-import.md)'s
+  occurs in practice — most plausibly [DIP-0043](DIP-0043-org-projection.md)'s
   genesis import, whose valid-time fallback ladder is likely to backfill
   events with `hlc`s below any already-settled frontier — whichever comes
   first). Wire `observed_at`/`late` classification into the sequencer's cut
@@ -896,8 +974,8 @@ trigger fires.
 ## Open Questions
 
 1. **Block cadence value.** Not resolved here. A plausible starting point
-   is the existing box→Mac sync interval (15 minutes, per the sync cadence
-   already in place today), but this is a guess, not a decision — the
+   is the installation's existing server-to-workstation sync interval, but
+   this is a guess, not a decision — the
    right value depends on Phase A implementation experience and how large
    a "tail" is tolerable for the O(tail) fold to stay meaningfully faster
    than O(all events).
@@ -928,6 +1006,23 @@ trigger fires.
    given deployment, and what does "review" concretely mean operationally,
    is not decided here.
 
+9. **Arbiter fallback must be exercised, not just declared.** The ruling in
+   "Three roles, separately assigned" requires an explicit `fallback` on both
+   `policy.set` assignments, but a fallback that has never taken over is an
+   untested code path — and the arbiter's failure mode (work stops) is the one
+   where discovering that at the wrong moment is expensive. Open: whether
+   takeover should be periodically rehearsed, and by what mechanism. **Trigger:**
+   before the first space relies on arbitrated-pool work for anything
+   time-sensitive.
+10. **Does the arbiter need its own finality?** A grant is an ordinary pool
+   event and is therefore subject to the same provisional-until-settled status
+   as everything else. Open: whether an executor should require its grant to be
+   *below the settled height* before acting, or whether observing the grant in
+   the pool is sufficient. The permissive answer is almost certainly right at
+   N=1 owner, but it should be a decision rather than an omission. **Trigger:**
+   before any grant authorizes a side-effecting action under
+   [DIP-0038](DIP-0038-action-loop-cosign.md).
+
 ## References
 
 - `.datacore/dip-review/DESIGN-BRIEF-v2.1.md` — Section C, the binding
@@ -940,7 +1035,7 @@ trigger fires.
 - [DIP-0038](DIP-0038-action-loop-cosign.md) — Action Loop & Co-sign. First
   consumer of `policy.set`; this DIP is the second, disambiguated by the
   `policy` payload discriminator.
-- [DIP-0043](DIP-0043-org-projection-genesis-import.md) — Org Projection &
+- [DIP-0043](DIP-0043-org-projection.md) — Org Projection &
   Genesis Import. Drafted alongside this DIP from the same design-brief
   conversation; its genesis import is named here as a Rollout Plan trigger
   for the `late` flag (Phase C).
