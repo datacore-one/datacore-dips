@@ -528,9 +528,20 @@ already exist in DIP-0034's claim-safety policy — set `owner` at create
 (partitioned; no handshake at all) or mark idempotent, cheap work `open: true`
 (self-granting). **Trigger for revisiting:** once most work is partitioned or
 open, if grant latency is still a *measured* complaint rather than an
-anticipated one. See [DIP-0045](DIP-0045-node-protocol.md), which specifies
-the protocol shape should that trigger ever fire; its `notify` endpoint is
-precisely the hub capability deferred here.
+anticipated one. Should that trigger ever fire, the answer is
+[DIP-0023](DIP-0023-messaging-module.md) — every user *and agent* is already
+an ActivityPub actor there, with inbox/outbox endpoints authenticated by
+fds-id keypairs and federation by design, which is the hub capability
+deferred here without inventing a second transport.
+[DIP-0045](DIP-0045-node-protocol.md) proposed exactly such a second
+transport and was **withdrawn on 2026-08-05**: each of its four endpoints had
+an existing home, including this one. Note in particular that
+*projection/verify* — the endpoint that looked most ledger-specific — needs no
+network path at all: [DIP-0043](DIP-0043-org-projection.md)'s
+`projection.attest` event carries `{height, projector_version,
+projection_hash}` into each machine's own writer file, so comparing two
+machines is a fold rather than a request. **The ledger is its own comparison
+channel.**
 
 ### Sequencer role as data
 
