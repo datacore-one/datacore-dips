@@ -68,6 +68,9 @@ DIP-0034 built an append-only, hash-chained, per-writer event ledger and then ex
 | Is `next_actions.org` still hand-editable? | Phase 0: yes, unchanged. Phase 1: no — generated, `chmod 444`, edits refused by the projector's guard. Phase 2: yes again, via the reconciler. |
 | Is `inbox.org` ever projected or made read-only? | No, in any phase. It remains the single capture point, append-only, forever exempt — see Specification. |
 | Where do org-derived ledger events live? | `<space>/.datacore/events/<actor>.jsonl`, same per-writer files DIP-0034 defines. Genesis import writes to its own dedicated `genesis.jsonl`. |
+| What form does the opaque payload take for a task? | org-mode source text, read through `org-workspace` as a `NodeView`. Task-class items only — briefing/approval/attest/spend payloads stay purely structured. See "Opaque payload grammar". |
+| Can an event carry a whole re-serialised task? | **No.** Events carry deltas. A log of whole-object snapshots is last-writer-wins and destroys conflict-free merging — the normative constraint is in "Opaque payload grammar". |
+| Does `ledger/` depend on org-workspace? | No, and it must not. org-workspace is a projection-boundary dependency (`projector.py`, the Phase 2 reconciler) only. |
 | What is a ledger item's org `:ID:`? | The same `:ID:` org-workspace's `ensure-ids` already assigned — genesis import reuses it verbatim as the ledger item id. No remapping. |
 | What happens to a task with no `:CREATED:` property? | The three-rung valid-time fallback ladder in Specification: `:CREATED:` → first git-history appearance of its `:ID:` → a single documented genesis timestamp. Never silently invented. |
 | Are CLOCK entries and LOGBOOK hand-editable post-Phase-1? | No — CLOCK becomes `item.clock.start`/`item.clock.stop` events; LOGBOOK is rendered by the projector from event history, never an independent write surface. |
@@ -209,6 +212,72 @@ what stops the ledger schema becoming a reimplementation of org-mode: the
 temptation, once you start modeling org tasks as events, is to model *every*
 org feature as a first-class field, and the criterion above is the discipline
 against that (see Rejected Alternatives).
+
+### Opaque payload grammar: org text, read as objects (owner decision, 2026-08-04)
+
+For **task-class items only**, the opaque payload is **org-mode source text**
+— the heading body, drawers, and every property the (a)/(b)/(c) criterion
+excludes — and both the projector and the reconciler read it through
+`org-workspace` as a `NodeView` object rather than as a string.
+
+**Why this is the right carrier.** The opaque payload's whole job is to
+survive a round trip unaltered, and `org-workspace` already guarantees
+exactly that: `dumps()` over an unmodified parsed file is byte-identical to
+the input (`test_unmodified_round_trip`). Giving the opaque part org grammar
+therefore turns this DIP's round-trip acceptance criterion from something
+*tested after the fact* into something true *by construction*. It also means
+no second task-object model has to be written: `NodeView`'s accessors
+(`heading`, `todo`, `tags`, `scheduled`, `deadline`, `properties`, `body`,
+`parent`, `children`, `id()`) are the object API the projector and reconciler
+both want, already vendored, zero-dependency, and already the mandated
+interface for task queries everywhere else in Datacore.
+
+**Normative constraints.** Four, and the first is the one that matters:
+
+1. **Events carry operations, never whole-object snapshots.** An
+   `item.update` (or any state transition) MUST carry the *delta* — the
+   fields that changed — never a complete re-serialisation of the task. This
+   is not a size optimisation. Per-writer logs merge without conflict
+   precisely because they record small, independent operations; a log of
+   whole-object snapshots is a log of *states*, and two actors each appending
+   a complete representation of the same item is last-writer-wins — exactly
+   the conflict class this entire design exists to eliminate. It would also
+   destroy the derived LOGBOOK (see below), since "what changed" would only
+   be recoverable by diffing two blobs.
+2. **Org text is the remainder, never the whole payload.** First-class fields
+   stay first-class and structured. No query the fold or the SQLite index
+   answers today — `items_by(status=, owner=)`, agenda views, tag filters —
+   may come to require an org parser.
+3. **The ledger core stays org-free.** `org-workspace` is a dependency of the
+   *projection boundary* (`projector.py`, the Phase 2 reconciler), never of
+   `ledger/` itself. `hlc`, `events`, `log`, `verify`, `fold`, `index` and
+   `policy` MUST remain parseable and foldable by an implementation that has
+   never heard of org-mode — a constraint [DIP-0044](DIP-0044-actor-identity.md)'s
+   portable-identity direction makes concrete, since a non-Python
+   implementation would otherwise need an org parser to fold a ledger.
+4. **Content-hash identity uses first-class fields, not the org text.**
+   `org-workspace`'s round-trip guarantee proves parse→dump is lossless for
+   text that already exists; it does **not** prove that two actors
+   independently constructing the same task converge on the same bytes —
+   property ordering, whitespace and drawer placement may legitimately
+   differ. [DIP-0038](DIP-0038-action-loop-cosign.md)'s content-hash `item_id`
+   and its never-resurface guarantee therefore hash the structured fields.
+   Org text is carried, not hashed for identity.
+
+**Scope: task-class items only.** Briefing, approval, attestation and spend
+items keep purely structured payloads and gain nothing here. This is the same
+per-class payload discipline DIP-0034's `metric.attest` discriminator already
+established, and it is stated as a rule rather than left to be inferred so
+that no future reader assumes every ledger item carries org text.
+
+**Why this makes deferred reconciliation recoverable.** Phase 2 — translating
+hand edits back into events — is deferred with no schedule, and it is the
+weakest part of this migration precisely because a *textual* diff between an
+edited file and a projection does not map onto events. With `NodeView`
+objects on both sides the diff is object-level ("this property changed, this
+state changed"), and each difference maps directly onto one delta event. The
+decision recorded here is therefore not only about fidelity today; it is what
+keeps Phase 2 tractable enough to un-defer later.
 
 ### First-class fields
 
