@@ -1101,21 +1101,30 @@ Four consequences, recorded here rather than left to be discovered:
 - **Mobile/external access moves to an endpoint.** With `next_actions.org`
   no longer a git-tracked file any device can pull, the file-sync model
   Orgzly and similar mobile org clients depend on stops working for this
-  file by construction — access is instead served by an endpoint under
-  DIP-0045 (node protocol; not yet drafted at this writing). **Open
-  Question, recorded explicitly here rather than left to default by
-  accident:** Orgzly syncs files, or speaks WebDAV — it cannot consume a
-  plain HTTP/JSON endpoint. This DIP does not decide between the two paths
-  DIP-0045 would need to choose from: either the endpoint is
-  **WebDAV-shaped**, in which case native mobile org editing survives the
-  move to a gitignored projection, or the endpoint is a **read-only web
-  view**, in which case Orgzly (and any client relying on the same
-  file-sync model) stops working for this file, permanently. Which of these
-  two paths DIP-0045 takes determines whether mobile org editing continues
-  to exist for a migrated space at all — consequential enough that it must
-  be an explicit design decision made when DIP-0045 is drafted, not an
-  accident of "WebDAV looked harder, so the read-only view shipped first and
-  was never revisited."
+  file by construction. **This is now an unowned gap, and that is worse than
+  it was.** The earlier draft of this bullet deferred the question to
+  DIP-0045 (node protocol), which was **withdrawn on 2026-08-05** — so no DIP
+  currently owns mobile access to a projected org file.
+
+  The question itself is unchanged and still consequential: Orgzly syncs
+  files or speaks WebDAV; it cannot consume a plain HTTP/JSON endpoint. So
+  either something serves a **WebDAV-shaped** view of the projection, in
+  which case native mobile org editing survives the move to a gitignored
+  projection, or it does not, in which case Orgzly stops working for this
+  file permanently. **Open Question, recorded explicitly rather than left to
+  default by accident.**
+
+  Two things narrow it. First, Phase 1 already makes the projected file
+  read-only, so mobile *editing* is lost at Phase 1 regardless of transport —
+  what is genuinely at stake here is mobile *reading*. Second, the cheapest
+  answer may not be an endpoint at all: an installation can keep a
+  periodically committed, explicitly non-authoritative snapshot of the
+  projection (the recovery artifact already specified in the Owner Decision
+  below), which any file-syncing client can read exactly as it does today.
+  That is likely sufficient for reading and requires no new component — the
+  standard this DIP has applied throughout. **Trigger:** decide before the
+  first space flips to Phase 1, since that is when mobile access actually
+  changes.
 - **Loss to mitigate: the projection is no longer an independent recovery
   copy.** Today, the committed `next_actions.org` is an artifact independent
   of any other system — if the event pool were ever corrupted or lost, the
