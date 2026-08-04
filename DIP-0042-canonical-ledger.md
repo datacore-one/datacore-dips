@@ -76,7 +76,8 @@ pool and rejects anything that doesn't check out.
 | What happens if the sequencer is down? | Writes continue and on-the-fly fold works exactly as it does today (DIP-0034, unchanged). Only finality pauses — no new blocks, settled height stops advancing. Nothing blocks. |
 | What does a block contain? | References to pool events — `{writer, file, seq, event_hash, hlc, observed_at, late}` per entry — never copies of event payloads. |
 | How does fold cost stay bounded as the pool grows forever? | Snapshots at settled heights give O(tail) fold instead of O(all events) — see Specification, "Snapshots." |
-| How often is a block cut? | Daily (resolved 2026-08-05). Cadence is chosen for read cost, not to reduce late arrivals — no cadence can, since an actor may be offline for days. |
+| How often is a block cut? | Hybrid: a daily floor, or when the un-blocked tail exceeds a configured event count — whichever first (resolved 2026-08-05). Do not lower the floor; a shorter window manufactures `late` entries out of ordinary sync jitter. |
+| Should I shorten the cadence to catch drift or forks faster? | No. Drift detection is anchored to a writer version vector, not a height ([DIP-0043](DIP-0043-org-projection.md)), so it is bounded by sync latency. Forks are prevented by `fallback_after_seconds` exceeding the cadence floor, not detected by cutting more often. |
 | A `late: true` entry landed below my snapshot's frontier. Now what? | That snapshot and every snapshot above it are invalidated and MUST NOT be used as a fold base. Recompute from the most recent still-valid snapshot below the late event's `hlc`. A from-scratch fold was and remains correct. |
 | Who is the sequencer? | Whoever the most recent `policy.set` event (payload `policy: "ledger.sequencer"`) names. Role assignment is data, not code. |
 | Are the sequencer and the arbiter the same role? | No — three roles exist (sequencer, arbiter, hub) and they are separately assigned. They may be held by the same actor and by default should be, but merging them into one concept costs you the ability to fail over or diagnose one independently. See "Three roles, separately assigned." |
@@ -652,8 +653,33 @@ mandatory signing (`ENG-2026-0729-030`).
 
 ### Block cadence and why two sequencers must not run concurrently
 
-Blocks are cut on a fixed wall-clock interval (exact value TBD — Open
-Questions). At each cut, the acting sequencer includes every pool event it
+Blocks are cut on a **hybrid trigger: a daily wall-clock floor, or whenever
+the un-blocked tail exceeds a configured event count — whichever comes
+first** (Open Question 1, resolved 2026-08-05). The floor is what keeps quiet
+days cheap: one block, one file, and a window wide enough to absorb ordinary
+sync jitter so routine out-of-order arrival never registers as `late`. The
+volume trigger is what keeps a busy period from accumulating a tail large
+enough to make the O(tail) fold meaningfully worse than the O(all events)
+fold it replaces — bounding fold cost by *work done* rather than by *time
+elapsed*, which is the quantity that actually drives it.
+
+Do not lower the floor below a day to make anything else faster. A shorter
+window absorbs less sync jitter and therefore manufactures `late` entries out
+of ordinary machine behaviour; and the two things a shorter cadence looks
+like it would help are both better served elsewhere. **Drift detection** is
+not cadence-bound — [DIP-0043](DIP-0043-org-projection.md) anchors projection
+comparison to a writer version vector rather than to a height precisely so
+that detection latency is bounded by sync latency rather than by how often
+this sequencer runs. **Fork detection** is not cadence-bound either: a fork
+requires two concurrent sequencers, which requires a fallback to take over
+while the primary is alive, which is governed by `fallback_after_seconds`.
+**That value MUST exceed the cadence floor by a clear margin** — otherwise a
+sequencer that is merely between cuts looks indistinguishable from one that
+has stopped, and the design invites the very fork it detects. Set the
+threshold and forks are prevented structurally; shortening blocks only
+detects them sooner.
+
+At each cut, the acting sequencer includes every pool event it
 has observed — meaning every event present in its local, synced copy of
 the pool — that isn't already referenced by an earlier block. Two
 sequencers with byte-identical views of the pool at the same cut instant
@@ -1071,7 +1097,14 @@ trigger fires.
    rediscovered painfully:** a daily cadence makes settlement-gating
    unusable as a precondition for action — no actor can wait up to 24 hours
    to begin work — which is why Open Question 10 resolves the way it does.
-   Revisit only if fold cost becomes measurable, not on a schedule.
+   **Hybrid trigger (added same day):** daily is the *floor*, not the only
+   trigger — a block is also cut whenever the un-blocked tail exceeds a
+   configured event count, so fold cost is bounded by work done rather than
+   by time elapsed. The specific count is left to implementation experience;
+   what is normative is that both triggers exist and that the floor is not
+   lowered below a day (see "Block cadence" for why, and for the constraint
+   this places on `fallback_after_seconds`). Revisit only if fold cost
+   becomes measurable, not on a schedule.
 2. **Archive-frontier threshold.** Retention, Snapshots and Pruning
    specifies the *mechanism* (snapshots for read cost, archival for
    resident storage, never in-place rewriting) but not the specific
