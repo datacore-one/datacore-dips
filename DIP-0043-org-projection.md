@@ -703,6 +703,156 @@ changes *when* the projector runs, never *what* it checks before writing.
 
 Neither trigger is built by this DIP — see Implementation.
 
+## Projection Determinism
+
+**Normative requirement.** The projector (`ledger/projector.py`) MUST be
+bit-deterministic: given the same folded `LedgerState` (DIP-0034's `fold()`
+output, itself already required to be byte-for-byte reproducible per
+DIP-0034 Invariant 2) as input, two independent runs of the projector — on
+any two machines, at any two times — MUST produce byte-identical output for
+every file it writes. This is not an aspirational property; it is a
+**tested** one: the test suite runs the projector twice over identical input
+state and asserts the two output files are byte-identical, not merely
+semantically equivalent (same content rendered with different incidental
+whitespace does not pass). A projector that happens to be deterministic by
+construction but has no test enforcing it is not compliant with this
+requirement — this DIP requires the test to exist, not merely the property
+to hold.
+
+The insight this requirement exists to cash in (owner, 2026-08-04): once
+determinism is real and tested, every machine holding the same events
+produces byte-identical org files for the same fold — which turns a hash of
+the projected output into a cheap, cross-machine consistency proof. Two
+machines can confirm they agree on projected state by comparing a single
+hash instead of one shipping the other a full file for a byte-diff, or both
+re-running the fold and line-by-line comparing the result. This is the same
+economic move DIP-0034 already makes for the event log itself (a hash chain
+instead of trusting the filesystem) and DIP-0042 makes for the canonical
+chain (`root_hash` instead of re-transmitting `entries[]`), applied one
+layer further out — to the projector's *output* rather than its input.
+
+**Determinism killers.** Bit-determinism is easy to assert and easy to
+accidentally violate; this list exists so an implementer of
+`ledger/projector.py` has a concrete checklist rather than discovering each
+one the hard way as a flaky-diff bug report:
+
+- **Any wall-clock value in the rendered output** — most obviously a
+  `# Generated at <now>` header. Migration Phases already specifies a fixed
+  advisory header for Phase 1 (`# GENERATED — edits will be overwritten`);
+  it must stay a fixed string and never interpolate a timestamp into itself
+  (`# GENERATED at 2026-08-04T09:00:03Z` would fail this requirement on its
+  own). Any other wall-clock read at render time — a "last projected" line,
+  a run id — is equally disqualifying.
+- **Set or dict iteration order.** Python dicts are insertion-ordered since
+  3.7, but a `set`, or a `dict` built by iterating a `set`, is not
+  order-stable across processes or interpreter versions; if the projector
+  ever collects tags, ids, or property keys into a `set` before rendering
+  them, output order depends on incidental hash-seed/interpreter state, not
+  on the input.
+- **Locale-dependent date formatting or sorting.** `strftime` and string
+  comparison/sort behavior can both depend on the process locale (month
+  names, collation order); rendering must use a fixed, explicit format —
+  org timestamps are already a fixed `<YYYY-MM-DD Day HH:MM>` shape — and
+  any sort must be an explicit codepoint (byte) sort, never the platform's
+  default, locale-aware string comparison.
+- **Line-ending and trailing-whitespace drift.** `\n` vs. `\r\n`, and a
+  trailing space a template leaves on some lines and not others, both
+  produce a byte-level difference invisible to a casual read but fatal to a
+  byte-identical hash.
+- **Org property-drawer ordering.** A `:PROPERTIES:` drawer's key order
+  must be fixed by the projector's own rendering logic (schema field order:
+  first-class fields in a fixed order, then opaque payload keys in a fixed
+  order), never "whatever order the payload dict happened to iterate in" —
+  the opaque-payload dict (Specification, Schema principle) is exactly the
+  kind of externally-sourced, potentially insertion-order-varying structure
+  this killer targets.
+- **Hostname or absolute path leaking into output.** Nothing in a rendered
+  file may embed the machine that happened to run the projector (a comment,
+  a generated-by field, an absolute file path baked into a link) — the
+  entire point of the guarantee below is that *which machine* ran the
+  projector must not be observable in its output.
+- **The opaque payload must round-trip byte-exact.** Every field the
+  Specification's (a)/(b)/(c) criterion excludes from first-class status is
+  written back verbatim; the projector must not "clean up," re-indent,
+  re-wrap, or otherwise normalize opaque payload text on the way out —
+  doing so would make the same input `LedgerState` map to different output
+  depending on incidental formatting decisions made at render time, rather
+  than depending only on the payload bytes themselves.
+
+**A bare hash is not comparable.** Two machines legitimately hold different
+subsets of the event pool at any given moment — sync is periodic (Projection
+Timing: a 10-minute sweep), not instantaneous — so "my `next_actions.org`
+hashes to X" and "your `next_actions.org` hashes to Y" being unequal is not
+by itself evidence of a bug; it may just mean the two machines have not
+synced yet. A hash is only a meaningful consistency check when it is
+anchored to a **specific, named event set** both sides can independently
+confirm they are comparing against — which is exactly what DIP-0042's
+canonical chain provides: `height` is "the block's position in the chain,
+monotonic from 0" (DIP-0042, Block shape), and a snapshot at height N is
+`fold()` over exactly the events referenced by blocks `0..N` (DIP-0042,
+"Snapshots and the O(tail) fold"). This DIP's hash claim is therefore always
+spoken as `projection_hash @ height N`, never a bare hash — "my projection
+hash is X" is not a claim; "my projection hash at height N is X" is. Saying
+this plainly because it is the difference between a working consistency
+check and a false-alarm generator: comparing bare hashes between two
+machines at different points in their sync cycle would report a mismatch on
+nearly every comparison that doesn't happen to land on the same instant,
+which is worse than not having the check at all — it trains an operator to
+ignore the alert.
+
+**Projector version is part of the claim.** A projector code change (a bug
+fix, a rendering-format tweak, a newly-promoted first-class field) can
+change `next_actions.org`'s bytes for a height whose underlying
+`LedgerState` has not changed at all — the events are identical, only the
+code turning them into text is different. If an attestation carried only
+`{height, projection_hash}`, every projector deploy would look
+indistinguishable from real state drift: the hash changes, the height is
+the same, and nothing in the claim itself says whether that is a genuine
+inconsistency or an expected consequence of a code upgrade. The attestation
+is therefore `{height, projector_version, projection_hash}` — three fields,
+none optional. Two attestations are only comparable when `height` and
+`projector_version` both match; a mismatch on `projector_version` alone
+(same height, same underlying state, different projector code) explains a
+hash difference without it being an inconsistency, and a reader that drops
+`projector_version` from the comparison will generate a spurious mismatch
+report on every deploy — exactly the alert-fatigue failure this section
+exists to avoid.
+
+**New event type: `projection.attest`.** Payload
+`{height, projector_version, projection_hash}` — an actor emits this event
+after running the projector, attesting "at this height, with this projector
+code, I computed this hash." Per the naming convention this DIP already
+uses for its `item.clock.*` addition: **this is a DIP-0034 `EVENT_TYPES`
+registry addition this DIP proposes, not one it implements or has authority
+to add unilaterally** — DIP-0034 Invariant 6 makes an existing event type's
+*payload* additive, but a wholly new event type is a registry change, the
+same distinction this DIP already draws for `item.clock.start`/
+`item.clock.stop` (Specification, Compatibility). Following DIP-0034's own
+convention of marking a cited capability implemented-vs-proposed (the same
+convention behind, e.g., DIP-0034 Open Question 5's explicit "RESOLVED"
+marker): `projection.attest` is **proposed, not yet implemented** — no code
+in `.datacore/lib/ledger/` emits, folds, or verifies it as of this writing.
+It joins `item.clock.start`/`item.clock.stop` as a second `EVENT_TYPES`
+registry amendment this DIP requires but does not itself have the authority
+to make (see Implementation for how the `item.clock.*` amendment is
+requested; this addition follows the identical path).
+
+**Payoff.** With `projection.attest` in place, Phase 0's nightly shadow-diff
+(Migration Phases: "A nightly job diffs the projected file against the real
+one") becomes a hash comparison — compute `projection_hash @ height N` on
+each machine, compare the two attested values — instead of transmitting and
+byte-diffing a full `next_actions.projected.org` file every night. More
+generally, any actor can verify another actor's state claim by recomputing
+it independently — fold the same events to the same height, run the same
+`projector_version`, and check the hash matches — rather than trusting the
+claim on say-so. This is the identical **verify, don't trust** posture
+DIP-0042 already applies to blocks ("Can a consumer trust a block just
+because the sequencer produced it? No. Verify, don't trust: recompute event
+hashes from your own pool copy and check `root_hash`/`prev_block_hash`
+before treating a block as valid" — DIP-0042, Quick Reference), extended one
+layer further out: from "don't trust a block, recompute it" to "don't trust
+a projection, recompute it."
+
 ## Rationale
 
 **Why the (a)/(b)/(c) criterion instead of a fixed field list decided by
@@ -813,6 +963,87 @@ migrated. Named explicitly, per file/tool:
   format is valid org-mode, which Phase 1 preserves. The near-zero real
   usage of `:EXTERNAL_ID:` on this corpus (1 occurrence) means this
   interaction is currently more theoretical than load-bearing.
+
+## Owner Decision: Projected Org Files Are Gitignored
+
+**Owner decision, folded into this DIP** (2026-08-04): projected org files —
+`next_actions.org` from Phase 1 onward, and any future file this DIP's
+projection mechanism covers — are **gitignored, not committed**. Each
+machine regenerates its own copy locally from the event pool (and, once
+DIP-0042 lands, from the canonical chain); the file that used to be a
+git-tracked artifact becomes a disposable local cache of a deterministic
+computation, in exactly the same sense DIP-0034's SQLite `index.db` already
+is ("never a source of truth and always safe to delete and rebuild from the
+event log," DIP-0034 Specification) and DIP-0042's snapshots already are
+("a snapshot is never trusted on its own; it is a cache of a reproducible
+computation," DIP-0042, "Snapshots and the O(tail) fold"). This is the same
+idiom applied a third time, now to the org-mode rendering itself.
+
+Four consequences, recorded here rather than left to be discovered:
+
+- **The conflict surface disappears entirely, not merely shrinks.** The
+  duplicate-resurrection / ID-churn / stuck-rebase genre this DIP's own
+  Motivation documents via five repair scripts (`inbox_dedup.py`,
+  `inbox_dedup_verify.py`, `org_resolve_id_conflicts.py`,
+  `reconcile_sync_merge.py`, `repair_nightshift_org.py`) exists *because*
+  `next_actions.org` is multi-writer mutable state moving through git — two
+  machines each produce a version of the file, git has to merge them, and a
+  merge of two independently-mutated copies of the same headings is exactly
+  where the ID-conflict and duplicate-resurrection failure modes live. A
+  gitignored, per-machine-regenerated file was never committed by more than
+  one writer in the first place, so there is nothing for git to merge — this
+  is a stronger claim than "conflicts become rarer" or "conflicts become
+  easier to resolve" (which is what Phase 1's still-git-tracked,
+  refuse-to-overwrite design in Migration Phases already achieves); it is
+  "there is no merge step for this file to conflict in," full stop.
+- **`inbox.org` is unaffected.** It is not a projection — it is human,
+  append-only capture, per Specification and Rationale ("It is the one file
+  in this DIP's scope that never had the mutable-shared-state problem to
+  begin with"), and appends do not conflict for the same reason DIP-0034's
+  per-writer event files do not conflict (Rationale: "an append-only surface
+  has no overwrite hazard by construction"). It stays in git, exactly as it
+  does today, in every phase.
+- **Mobile/external access moves to an endpoint.** With `next_actions.org`
+  no longer a git-tracked file any device can pull, the file-sync model
+  Orgzly and similar mobile org clients depend on stops working for this
+  file by construction — access is instead served by an endpoint under
+  DIP-0045 (node protocol; not yet drafted at this writing). **Open
+  Question, recorded explicitly here rather than left to default by
+  accident:** Orgzly syncs files, or speaks WebDAV — it cannot consume a
+  plain HTTP/JSON endpoint. This DIP does not decide between the two paths
+  DIP-0045 would need to choose from: either the endpoint is
+  **WebDAV-shaped**, in which case native mobile org editing survives the
+  move to a gitignored projection, or the endpoint is a **read-only web
+  view**, in which case Orgzly (and any client relying on the same
+  file-sync model) stops working for this file, permanently. Which of these
+  two paths DIP-0045 takes determines whether mobile org editing continues
+  to exist for a migrated space at all — consequential enough that it must
+  be an explicit design decision made when DIP-0045 is drafted, not an
+  accident of "WebDAV looked harder, so the read-only view shipped first and
+  was never revisited."
+- **Loss to mitigate: the projection is no longer an independent recovery
+  copy.** Today, the committed `next_actions.org` is an artifact independent
+  of any other system — if the event pool were ever corrupted or lost, the
+  org file in git history is still a readable, self-contained record.
+  Gitignoring the projection removes that independent copy: once this
+  decision lands, the event pool (Specification, "Pool vs. chain") becomes
+  the *only* copy of the state that produces `next_actions.org`, for any
+  machine that has not separately preserved its own generated file. This is
+  a real loss, not a hypothetical one, and this DIP does not treat it as an
+  acceptable trade made silently. **Belt-and-braces mitigation — the second
+  ratified decision in this section:** a projection snapshot is committed
+  **periodically** — weekly, or via a [DIP-0035](DIP-0035-job-contracts.md)
+  job contract on that cadence — **explicitly marked non-authoritative**
+  (e.g. a `# SNAPSHOT — recovery artifact only, not source of truth,
+  projector output as of height N` header, distinct from Phase 1's own
+  `# GENERATED` header, so a reader can never mistake the periodic snapshot
+  for the live, currently-authoritative file). Its only purpose is to give
+  a future incident response something to read if the ledger itself is ever
+  unavailable or corrupted — it is never regenerated *from*, never diffed
+  against for Phase 0's shadow-diff, and never a second source of truth
+  competing with the event pool, the same non-authoritative, disposable-cache
+  posture DIP-0034's index and DIP-0042's snapshots already establish for
+  their own derived artifacts.
 
 ## Security Considerations
 
