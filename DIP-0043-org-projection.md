@@ -881,40 +881,78 @@ hashes to X" and "your `next_actions.org` hashes to Y" being unequal is not
 by itself evidence of a bug; it may just mean the two machines have not
 synced yet. A hash is only a meaningful consistency check when it is
 anchored to a **specific, named event set** both sides can independently
-confirm they are comparing against — which is exactly what DIP-0042's
-canonical chain provides: `height` is "the block's position in the chain,
-monotonic from 0" (DIP-0042, Block shape), and a snapshot at height N is
-`fold()` over exactly the events referenced by blocks `0..N` (DIP-0042,
-"Snapshots and the O(tail) fold"). This DIP's hash claim is therefore always
-spoken as `projection_hash @ height N`, never a bare hash — "my projection
-hash is X" is not a claim; "my projection hash at height N is X" is. Saying
-this plainly because it is the difference between a working consistency
-check and a false-alarm generator: comparing bare hashes between two
-machines at different points in their sync cycle would report a mismatch on
-nearly every comparison that doesn't happen to land on the same instant,
-which is worse than not having the check at all — it trains an operator to
-ignore the alert.
+confirm they are comparing against. "My projection hash is X" is not a
+claim; "my projection hash over *this exact input* is X" is. Saying this
+plainly because it is the difference between a working consistency check and
+a false-alarm generator: comparing bare hashes between two machines at
+different points in their sync cycle would report a mismatch on nearly every
+comparison that doesn't happen to land on the same instant, which is worse
+than not having the check at all — it trains an operator to ignore the alert.
+
+**The anchor is a writer version vector, not a block height** (amended
+2026-08-05, superseding this section's original rule). An earlier draft
+anchored the claim to [DIP-0042](DIP-0042-canonical-ledger.md)'s `height`,
+spoken as `projection_hash @ height N`. That rule is **withdrawn**, for two
+reasons:
+
+1. **Height is a proxy for the input set, and an imprecise one.** A snapshot
+   at height N folds the events referenced by blocks `0..N`, but a projector
+   runs on a 10-minute sweep and folds *everything it currently holds* —
+   including the un-blocked tail. Two machines can therefore sit at the same
+   height while having folded different tails, making equal heights an
+   insufficient basis for comparison, and unequal heights an unnecessary
+   barrier to it.
+2. **It makes drift detection a hostage to block cadence.** With DIP-0042's
+   daily cadence, height advances once per day, so a projector bug or a
+   divergent fold introduced in the morning would not be *detectable at a
+   common anchor* until that night's cut. Detection latency should be bounded
+   by sync latency, not by how often the sequencer happens to run.
+
+The anchor is instead the **writer version vector**: `{actor: max_seq}` over
+every writer file the projector folded. Because each writer file is
+append-only with a monotonic, gapless `seq` (DIP-0034, Event schema), this
+vector identifies *exactly* which prefix of every log was consumed. Two
+machines with identical vectors and identical `projector_version` MUST
+produce identical output; if they do not, that is drift — immediately,
+unambiguously, and without waiting for a block.
+
+Crucially it also preserves the "not comparable" answer that height was
+introduced to give, and makes it exact rather than approximate:
+
+- **identical vectors** → comparable; hashes must match, and a mismatch is a
+  real defect;
+- **one vector is a strict prefix of the other** (every entry ≤, at least one
+  <) → not comparable; the lagging machine simply has not synced yet, which
+  is the ordinary case and MUST NOT be reported as drift;
+- **vectors diverge** (each has an entry the other lacks, or a writer the
+  other has never seen) → not comparable, and also a signal that neither
+  machine has a complete view.
+
+Only the first case is an alert. Height MAY still be carried as a human
+convenience, but it is not the anchor and MUST NOT be used as the comparison
+key.
 
 **Projector version is part of the claim.** A projector code change (a bug
 fix, a rendering-format tweak, a newly-promoted first-class field) can
-change `next_actions.org`'s bytes for a height whose underlying
+change `next_actions.org`'s bytes for an input set whose underlying
 `LedgerState` has not changed at all — the events are identical, only the
 code turning them into text is different. If an attestation carried only
-`{height, projection_hash}`, every projector deploy would look
-indistinguishable from real state drift: the hash changes, the height is
+the input anchor and a hash, every projector deploy would look
+indistinguishable from real state drift: the hash changes, the input set is
 the same, and nothing in the claim itself says whether that is a genuine
 inconsistency or an expected consequence of a code upgrade. The attestation
-is therefore `{height, projector_version, projection_hash}` — three fields,
-none optional. Two attestations are only comparable when `height` and
-`projector_version` both match; a mismatch on `projector_version` alone
-(same height, same underlying state, different projector code) explains a
+is therefore `{writers, projector_version, projection_hash}` — three fields,
+none optional. Two attestations are only comparable when `writers` is
+identical and `projector_version` matches; a mismatch on `projector_version` alone
+(same input set, same underlying state, different projector code) explains a
 hash difference without it being an inconsistency, and a reader that drops
 `projector_version` from the comparison will generate a spurious mismatch
 report on every deploy — exactly the alert-fatigue failure this section
 exists to avoid.
 
 **New event type: `projection.attest`.** Payload
-`{height, projector_version, projection_hash}` — an actor emits this event
+`{writers: {actor: max_seq}, projector_version, projection_hash, height?}` —
+an actor emits this event
 after running the projector, attesting "at this height, with this projector
 code, I computed this hash." Per the naming convention this DIP already
 uses for its `item.clock.*` addition: **this is a DIP-0034 `EVENT_TYPES`
@@ -934,9 +972,12 @@ requested; this addition follows the identical path).
 
 **Payoff.** With `projection.attest` in place, Phase 0's nightly shadow-diff
 (Migration Phases: "A nightly job diffs the projected file against the real
-one") becomes a hash comparison — compute `projection_hash @ height N` on
-each machine, compare the two attested values — instead of transmitting and
-byte-diffing a full `next_actions.projected.org` file every night. More
+one") becomes a hash comparison — compute the hash and its `writers` vector
+on each machine and compare the two attested values — instead of
+transmitting and byte-diffing a full `next_actions.projected.org` file every
+night. Because the anchor is the vector rather than a block height, this
+comparison is available as soon as two machines have synced to the same
+point, rather than once per block. More
 generally, any actor can verify another actor's state claim by recomputing
 it independently — fold the same events to the same height, run the same
 `projector_version`, and check the hash matches — rather than trusting the
