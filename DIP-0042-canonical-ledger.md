@@ -76,6 +76,8 @@ pool and rejects anything that doesn't check out.
 | What happens if the sequencer is down? | Writes continue and on-the-fly fold works exactly as it does today (DIP-0034, unchanged). Only finality pauses — no new blocks, settled height stops advancing. Nothing blocks. |
 | What does a block contain? | References to pool events — `{writer, file, seq, event_hash, hlc, observed_at, late}` per entry — never copies of event payloads. |
 | How does fold cost stay bounded as the pool grows forever? | Snapshots at settled heights give O(tail) fold instead of O(all events) — see Specification, "Snapshots." |
+| How often is a block cut? | Daily (resolved 2026-08-05). Cadence is chosen for read cost, not to reduce late arrivals — no cadence can, since an actor may be offline for days. |
+| A `late: true` entry landed below my snapshot's frontier. Now what? | That snapshot and every snapshot above it are invalidated and MUST NOT be used as a fold base. Recompute from the most recent still-valid snapshot below the late event's `hlc`. A from-scratch fold was and remains correct. |
 | Who is the sequencer? | Whoever the most recent `policy.set` event (payload `policy: "ledger.sequencer"`) names. Role assignment is data, not code. |
 | Are the sequencer and the arbiter the same role? | No — three roles exist (sequencer, arbiter, hub) and they are separately assigned. They may be held by the same actor and by default should be, but merging them into one concept costs you the ability to fail over or diagnose one independently. See "Three roles, separately assigned." |
 | Which actor should hold them? | Apply the three selection criteria (highest availability, single writer, freshest view). An installation's Chief-of-Staff actor typically satisfies all three and is the recommended default — but this spec assigns nothing. |
@@ -416,6 +418,31 @@ changes what a from-scratch fold over the pool reports (that's still
 DIP-0034's job, and it's always right); it changes only which *cached
 snapshots* downstream consumers are entitled to treat as fixed without
 re-deriving them.
+
+**Snapshot invalidation (normative, owner decision 2026-08-05).** The
+paragraph above says an already-cut snapshot is never *silently* regenerated
+with a different answer. That is a guarantee about silence, and on its own it
+leaves a hole: a consumer would otherwise be entitled to keep trusting a
+snapshot it can prove is stale. The missing rule:
+
+> A block entry flagged `late: true` whose `hlc` falls **below** the frontier
+> of snapshot *N* **invalidates snapshot *N* and every snapshot above it**.
+> An invalidated snapshot MUST NOT be used as a fold base. The next snapshot
+> is recomputed from the most recent still-valid snapshot below the late
+> event's `hlc`, or from genesis if none remains.
+
+Consumers therefore have three states rather than two — valid, invalidated,
+and absent — and `late: true` is the transition signal. This is cheap because
+late arrivals below a settled frontier are rare by construction: they require
+an actor to have been out of contact for longer than the block cadence. It is
+also the reason `late` is a *flag in the index* rather than a log line: a
+consumer must be able to detect invalidation mechanically, from data it
+already reads, without consulting an operator.
+
+Note what this does **not** change. The affected events are still ordered by
+`hlc`, causality is still preserved, and a from-scratch fold was correct
+before the invalidation and remains correct after it. Only the cache is
+discarded.
 
 ### Degradation: no single point of failure
 
@@ -1018,12 +1045,22 @@ trigger fires.
 
 ## Open Questions
 
-1. **Block cadence value.** Not resolved here. A plausible starting point
-   is the installation's existing server-to-workstation sync interval, but
-   this is a guess, not a decision — the
-   right value depends on Phase A implementation experience and how large
-   a "tail" is tolerable for the O(tail) fold to stay meaningfully faster
-   than O(all events).
+1. **Block cadence value — RESOLVED (2026-08-05, owner decision: daily).**
+   One block per day. The reasoning is recorded because the obvious
+   alternative — tuning cadence to reduce late arrivals — does not work:
+   an actor may be offline for days, so **no cadence eliminates lateness**,
+   and choosing a short one to chase that goal buys nothing while producing
+   more blocks, more files in git, and more `late` flags to triage. Cadence
+   is therefore chosen for read cost alone, and read cost is not yet a real
+   problem — at this design's realistic event volume a from-scratch fold
+   stays inexpensive for years, so snapshots are a bounded-cost guarantee
+   rather than an urgent optimisation. Daily also matches the system's
+   existing rhythm (overnight sync, morning briefing) and is legible to a
+   human: *yesterday is settled*. **Consequence, stated so it is not
+   rediscovered painfully:** a daily cadence makes settlement-gating
+   unusable as a precondition for action — no actor can wait up to 24 hours
+   to begin work — which is why Open Question 10 resolves the way it does.
+   Revisit only if fold cost becomes measurable, not on a schedule.
 2. **Archive-frontier threshold.** Retention, Snapshots and Pruning
    specifies the *mechanism* (snapshots for read cost, archival for
    resident storage, never in-place rewriting) but not the specific
