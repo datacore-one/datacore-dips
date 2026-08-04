@@ -21,6 +21,32 @@
 
 DIP-0034 built an append-only, hash-chained, per-writer event ledger and then explicitly excluded GTD tasks from it, leaving org-mode files as the multi-writer mutable state they always were. This DIP finishes the job DIP-0034 started: it defines a schema for projecting `item.*` ledger events onto org-mode task files, a genesis import that folds the *existing* corpus of active org tasks into the ledger without discarding their identity, and a three-phase migration (shadow projection → read-only generated file with a refuse-to-overwrite guard → org-edit reconciler) that gets from today's hand-edited `next_actions.org` to a generated one without a flag-day cutover or an unverified leap of faith. `inbox.org` is exempt throughout — it stays the single, frictionless, append-only capture surface it already is.
 
+> **This DIP is the normative carrier of the source-of-truth boundary**
+> (promoted 2026-08-04, owner decision). [DIP-0034](DIP-0034-event-ledger-substrate.md)
+> inverted its boundary on the same day — the ledger is the system of record
+> for GTD task state, org files are its projection — but deliberately did not
+> restate the rule in operational terms. **This DIP owns it.** Where DIP-0034,
+> [DIP-0009](DIP-0009-gtd-specification.md) or
+> [DIP-0010](DIP-0010-external-sync-architecture.md) and this DIP disagree
+> about what is authoritative for a GTD task, this DIP governs.
+>
+> The rule is **per-space and per-phase, never global**: a space at Phase 1 or
+> beyond has a ledger-authoritative, generated `next_actions.org`; a space
+> below Phase 1 has an authoritative hand-edited one and behaves exactly as
+> DIP-0009 describes. There is no global switch and no flag day. Determining
+> which regime a space is in means checking that space's phase — the answer is
+> never "the whole installation is on v2".
+>
+> Two guarantees hold in every phase, for every space: the projected file
+> keeps its **original path and name** (`<space>/org/next_actions.org`), so
+> existing readers — org-workspace, the GTD MCP tools, agenda queries, mobile
+> clients — continue to resolve it; and **`inbox.org` is never projected**.
+>
+> DIP-0009 and DIP-0010 both assert org-mode as the source of truth in
+> unqualified terms and are merged; each owes an amendment scoping the claim
+> per-space. Until those land, this paragraph is the operative rule and the
+> discrepancy is recorded rather than hidden.
+
 ## Agent Context
 
 ### When to Reference This DIP
@@ -593,8 +619,8 @@ it.** Four points, then the trade-off this decision is not free of.
    module-hosted twin under `chief-of-staff/server/lib/`) already runs on a
    schedule as exactly this: `cos_sync.sh` (sync) → a routed
    `inbox-processing` task invocation via `cos_route.py`/`cos_llm.sh`
-   ("ollama → local, cloud → hermes, fail-soft to hermes" per that script's
-   own comment) calling `/process-inbox` (run) → `git commit` (commit) →
+   (its own routing comment: a local model by default, escalating to a
+   hosted model, failing soft back to the hosted one) calling `/process-inbox` (run) → `git commit` (commit) →
    `cos_sync.sh` again (sync). The sync-run-commit-sync ordering is itself
    the fix for a past incident where the box could otherwise act on stale
    data or leave its own output unpublished — this DIP does not introduce
@@ -646,7 +672,7 @@ it.** Four points, then the trade-off this decision is not free of.
 Routing an inbox entry is a judgment call, and the box runs a
 lighter-weight, differently-tiered model for this task than an interactive
 session does — `cos_llm.sh`'s own routing comment for the `inbox-processing`
-task class states it plainly: "ollama → local, cloud → hermes." Concentrating
+task class states it plainly — a local model by default. Concentrating
 classification onto one consistently lighter-resourced processor bounds
 routing quality for every capture that goes through it, system-wide. That
 bound is fine for confident, close-to-mechanical classification — "this is a
