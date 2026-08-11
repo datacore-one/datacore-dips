@@ -153,8 +153,16 @@ program. It is an archive, not a source. Anything that reads it is a bug.
    name.
 2. **Never rebase; merge only.** Disjoint files always merge cleanly. Rebase
    buys nothing here and is the operation that strands work.
-3. **Push immediately after append.** A failed push is an error, never a
-   warning. Appends are idempotent by content hash, so retry is always safe.
+3. **Push after append, and treat a failed push as an error.** Appends are
+   idempotent by content hash, so retry is always safe.
+
+   "Immediately" and the existing 15-minute sync interval were stated in the
+   same document and contradict each other; the resolution is that **latency is
+   per event class**, not global. A `item.claim` pushes immediately, because the
+   claim window is the duplication window. A `metric.attest` from a detector can
+   ride the next scheduled converge. Pushing *every* event immediately means a
+   git round trip per event across 15+ migrated writers, which is a real
+   operational cost and buys nothing for events nobody is racing on.
 4. **Never force-push; never `reset --hard`.** With no mutable shared state
    there is no divergence to resolve.
 5. **Integrity is not git's job.** `verify_chain` proves the log is intact
@@ -166,10 +174,18 @@ program. It is an archive, not a source. Anything that reads it is a bug.
    with per-account nonces: a transaction with the wrong nonce is rejected
    rather than applied out of order. Our present design only *detects* gaps,
    which is why a missing push looked identical to a slow one.
-7. **The fold publishes a state root.** Folding produces a hash over the
-   resulting state, not just the state. Two machines then answer "do we agree?"
-   by comparing one hash instead of replaying two logs. This is the single most
-   useful idea to take from Ethereum's design and it costs a few lines.
+7. **The fold publishes a state root**, over **all three** `LedgerState`
+   fields — `items`, `spend` and `orphans` — encoded with the same
+   `canonical_bytes` the event hash already uses. Hashing only `items` would
+   attest agreement while `spend` totals differed or one machine had silently
+   accumulated orphans, which is worse than no root: a confident answer to a
+   question it did not ask.
+
+   A root mismatch is **not** an alarm on its own. Two machines mid-convergence
+   hold different event sets and *must* differ. The root is only meaningful once
+   per-actor `seq` agrees, so the comparison is gated on seq-agreement first —
+   otherwise the detector is noisy by construction and gets ignored, which is
+   the failure mode alarms die of.
 
 ### 4. Commit provenance
 
@@ -193,8 +209,18 @@ to land in one commit, and chasing that is the wrong goal — the two-phase writ
 it implies is unachievable over git and unnecessary. Instead the write is
 **sequenced**:
 
-1. commit and push the **artifact**;
-2. append the **event**, carrying the artifact's commit sha.
+1. commit **and push** the **artifact** — and *confirm the push*;
+2. only then append the **event**, carrying the artifact's commit sha.
+
+The confirmation is a hard gate, not narrative. "Commit and push" is two
+operations with different failure profiles: a commit essentially never fails, a
+push fails routinely — offline, auth, non-fast-forward. If step 2 proceeds
+regardless of step 1's *push* outcome, the result is an event naming a commit no
+other machine can resolve — the "dangerous direction" below, reached not by
+lying but by a swallowed push. That is `cos_sync.sh`'s `|| true` wearing a
+different hat, and this DIP's own motivation table lists it as a root cause.
+So: **push unconfirmed ⇒ no event.** The item stays incomplete and the push is
+retried.
 
 ```
 {"type": "item.complete", "payload": {
@@ -342,9 +368,22 @@ dated artifact and `max_age_hours`:
 | **commit ↔ event cross-ref** | agent wrote without recording, or recorded without writing |
 | **projection drift** — regenerate and diff | fold divergence between machines |
 | **actor-file ownership** | one actor wrote another's log |
-| **config drift** — `core.hooksPath`, ruleset state | our own enforcement being switched off |
-| **actor presence** — every actor in the roster has a log, non-empty, advancing | a log that was **deleted** |
-| **state-root agreement** — compare roots across machines | silent fold divergence |
+| **config drift** — `core.hooksPath`, ruleset state, on **all five machines** | our own enforcement being switched off |
+| **actor presence** — every rostered actor has a log that is present, advancing, and **written only by its owner** | a log that was **deleted**, truncated, or written by the wrong actor |
+
+Six, not eight. Two pairs collapsed because each pair asked one question twice:
+
+- **state-root agreement folded into projection drift.** Both ask "do machines
+  agree on derived state", and regenerate-and-diff is strictly more informative
+  than a hash — it says *what* differs, not merely *that* something does. The
+  root becomes a field the drift detector emits, not a job of its own. It is
+  also weakly motivated: once seq-gap says no gap and chain-verify says intact,
+  both machines hold the identical event set, and `fold()` is a pure function
+  over it. Divergence then means version skew in `fold.py`, which a golden-
+  fixture test catches more cheaply than a standing job.
+- **actor-file ownership folded into actor presence.** Both check the roster's
+  claim against the logs on disk; that is one check with two assertions, not two
+  detectors with two contracts and two `metric.attest` streams.
 
 **Absence is a first-class failure.** `verify_chain` verifies a file it is
 given; it has nothing to say about a file that is not there, because a chain of
@@ -403,23 +442,39 @@ correct for them later. If callers speak to the interface, that is a
 configuration change. If callers call `git` directly — as sixteen of them do
 today — it is a rewrite.
 
-### 10. Facts are published atomically
+### 10. Atomic publish applies to whole-file artifacts, not to the log
 
-Appending to a JSONL file is **not atomic**. A concurrent reader, or a
-`git add` racing an append, can observe a truncated final line. The chain hash
-catches it on verification, but only after a malformed record may already have
-been committed and replicated.
+An earlier draft required every fact to be published by writing a temporary file
+and `rename()`-ing it into place, borrowing prime-rl's `rank_N.bin.tmp → rename`
+pattern. **That was wrong, and applying it would have regressed working code.**
 
-Every fact is published by writing to a temporary path and `rename()`-ing it
-into place, so a reader sees either the previous complete state or the new
-complete state and never a partial one. Readiness is then a simple existence or
-length check, which is only sound *because* publication is atomic — the two go
-together and neither is safe alone.
+The analogy does not hold. prime-rl's file is a fixed-size shard rewritten
+wholesale once per round. Ours is an ever-growing append-only log taking
+thousands of small appends. To publish one line by temp+rename you must read the
+entire file, build old+new, and write the whole blob back — turning an O(n)
+append into O(n) read *plus* O(n) write, so **O(n²) I/O over the life of the
+log**. Worse, done without preserving a single critical section it reintroduces
+a lost update: two appenders each read the current file, each build their own
+old+one-line content, and whichever renames second silently discards the other's
+event — the precise failure this DIP exists to eliminate, reintroduced by the
+rule meant to harden it.
 
-This is `prime-rl`'s filesystem transport verbatim in principle
-(`rank_N.bin.tmp` → `rename` → `rank_N.bin`, receiver checks `exists()`), and it
-is the one piece of their design that transfers without modification, because
-the hazard is identical: multiple processes, one directory, no lock.
+`log.py` already solves this correctly and has since before this DIP:
+`EventLog.append()` opens the actor's file, takes `fcntl.flock(LOCK_EX)`, reads
+the tail under that lock, truncates a torn final line if it finds one, computes
+`seq`/`prev`/`hlc`, and appends one line — all inside one critical section. No
+reader observes a partial line; no two same-actor appenders fork the chain.
+**Nothing in this DIP changes it.**
+
+Temp-file-plus-rename remains correct for the payloads it was designed for —
+whole-file artifacts that are replaced rather than extended: **snapshots (§12)
+and generated projections (§2)**. Those are rewritten wholesale, so an atomic
+swap is exactly right and costs nothing.
+
+The general rule this leaves is narrower and truer: *a reader must never observe
+a partially-written artifact.* For an append-only log that is achieved by
+locking and appending; for a replaced file, by renaming. Choosing the mechanism
+by file shape rather than by analogy is the actual requirement.
 
 ### 11. The space is the unit
 
@@ -463,43 +518,36 @@ separating them resolves it:
 | **deployment** | which actor names may run on machine M | `infrastructure.yaml` — machine-shaped, correct as-is, retained |
 | **membership** | which actors may write to space S | a **fact in S's own log** |
 
-Membership is recorded as `member.add` / `member.remove` events in the space's
-own event log. The space becomes **self-describing**: clone it, fold it, and you
-know who belongs — no external registry to consult, drift from, or forget to
-update. It is also the right shape for the question membership actually raises,
-which is not "who is a member" but "**who admitted this actor, and when**". That
-is an audit question, and audit questions belong in the ledger.
+Membership is a **flat, git-tracked file** in the space:
+`<space>/.datacore/members.yaml`, listing actor names.
 
-The nine existing spaces have no `member.*` events, so membership is
-**backfilled once** from `infrastructure.yaml`'s current `ledger_actors`,
-emitting a genesis `member.add` per actor per space it already writes to. This
-mirrors the genesis org import exactly: a one-time, idempotent, keyed import that
-turns existing implicit state into explicit facts. After the backfill,
-`ledger_actors` keeps only its deployment meaning (§11 table).
+An earlier draft made it `member.add` / `member.remove` events with genesis
+membership and "any existing member may admit another", modelled explicitly on a
+genesis validator set. That was wrong for two reasons, and the second is
+decisive.
 
-Bootstrap of a *new* space is the obvious remaining objection: writing to its log
-requires membership, and membership is established by writing to that log. The
-resolution is the one every chain uses — **genesis membership**. A space's founding events
-declare its initial members, exactly as a genesis block declares an initial
-validator set. Thereafter an existing member admits a new one, and every change
-is an auditable event authored by a named actor.
+It imports admission machinery — bootstrap, authority, revocation ordering —
+built for many mutually-distrusting writers, into a fact that **one person edits
+a few times a year**. This DIP already refuses consensus on exactly that ground
+("all five machines belong to one principal… nothing to vote on"); admission
+control is consensus's sibling and the same argument applies. The audit question
+it was meant to answer — *who admitted this actor, and when* — is answered for
+free by `git log` on a tracked file, which is the audit mechanism this DIP
+relies on everywhere else.
 
-Authority is deliberately weak for now: **any existing member may admit
-another**, because all current members belong to a single principal and a richer
-role model would be unenforced ceremony. It tightens naturally when DIP-0044
-lands and `member.*` events carry signatures, at which point admission becomes a
-cryptographically attributable act rather than an assertion.
-
-The folded member set is what §3.1 validates against, and what a Gitea
-`pre-receive` (§7) derives in order to reject a push writing a non-member's log.
-That is the reason membership must be a fact rather than a config file: the
-enforcement point has the repository and nothing else.
+And it would have contradicted its own justification. The argument for
+membership-as-fact was that "the enforcement point has the repository and
+nothing else" — but folding member events at push time means the **Gitea server
+needs a correct, version-locked copy of `fold.py`**, a deployment dependency
+nothing else in this design has. A flat file in the same repository is equally
+available to the hook and needs no code at all. The reasoning that made
+membership a fact argued *against* it once followed through.
 
 **Placement.** DIP-0044 answers *what key proves you are `data`*; membership
 answers *which spaces `data` may write to*. Authentication and authorization
 stay separate on purpose, so this is not folded into DIP-0044. The `member.add`
-/ `member.remove` **event types belong to DIP-0034**, which owns the event
-vocabulary — an amendment obligation on that DIP, not a new DIP here.
+membership needs no new event types at all — the amendment obligation on
+DIP-0034 is withdrawn.
 
 **Transport binds per space, not globally.** §9 makes transport an interface;
 this makes the binding a property of the space. Git is the implementation for
@@ -641,8 +689,16 @@ writers never touch one file, which is the property §2 depends on.
 | `git_fleet_audit.py` → seq-gap detector | 172 → ~40 |
 | the shadowed duplicate copies of `claim.py`, `today_orchestrator.py`, `research_orchestrator.py` | — |
 
-Net: roughly **1,000+ lines removed** against **~200 written**. The reduction is
-large because the problem is deleted, not refactored.
+Track C alone removes roughly **1,000 lines** against **~200 written**, and that
+reduction is real because the problem is deleted rather than refactored.
+
+**That figure is not the DIP's net**, and quoting it as one would be flattering
+arithmetic over a favourable subset. It excludes everything the other tracks
+*add*: six detectors, the repository registry, the commit-decision gate,
+worktree isolation, snapshots, and the provenance module. Several of those are
+justified by a named incident; none of them are free. The honest claim is that
+**Track C is strongly net-negative in code** and the rest of the DIP is net-
+positive, bought deliberately.
 
 ## Rationale
 

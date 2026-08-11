@@ -300,8 +300,6 @@ needing a signature.
 | `metric.attest` | A **namespaced family**. Every payload MUST carry a `metric` discriminator naming the measurement class; all other payload fields are defined by the DIP that allocates that class. See the discriminator table below. |
 | `artifact.attest` | Content-address an artifact by hash ([DIP-0039](DIP-0039-server-first-artifacts.md)) |
 | `policy.set` | Change a co-sign/approval threshold ([DIP-0038](DIP-0038-action-loop-cosign.md)) |
-| `member.add` | Admit an actor to this space — `{actor, admitted_by, note?}` ([DIP-0046](DIP-0046-git-transport.md) §11) |
-| `member.remove` | Revoke an actor's membership of this space — `{actor, removed_by, reason?}` ([DIP-0046](DIP-0046-git-transport.md) §11) |
 
 **`metric.attest` allocated classes** (new classes are allocated by amending
 this table; consumers MUST ignore classes they do not recognise):
