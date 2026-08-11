@@ -853,7 +853,7 @@ ledger. Measured surface:
 |---|---|---|
 | slash commands (`/today`, `/tomorrow`, `/process-inbox`, `/wrap-up`, `/continue`) | 5 | this |
 | library + module code writing org state | 15 | this, nightshift |
-| module hooks that write (`crm`, `mail`, `meetings`, `github`, `health`, `research`, `nightshift`, …) | 10+ | this |
+| module hooks that write task state | **1** — measured 2026-08-11: 10 of the 11 org-referencing hooks are readers only, and `research/nightshift-hook` writes a journal entry, not task state | this |
 | GTD MCP write tools (`add_task`, `complete_task`, `set_task_state`, …) | — | `datacore-mcp` |
 | desktop app task actions — currently **no ledger awareness at all** | — | `datacore-app` |
 
