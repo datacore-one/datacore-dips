@@ -23,6 +23,11 @@ locally rather than synchronised. Repositories are classified as **knowledge**
 or **code**, and the two get different rules — knowledge commits directly to its
 default branch, code goes through branch-and-review.
 
+The **space is the unit**: facts, knowledge and projections live together, and
+membership in a space — not possession of a clone — is what grants an actor
+access to both. Transport binds per space, so a space that outgrows git changes
+one binding rather than the architecture.
+
 This retires `git push`-as-lock, the rescue-branch machinery, the merge
 gatekeeper, and the branch-recovery tooling, because it removes the conditions
 that made them necessary rather than hardening them.
@@ -154,6 +159,34 @@ Git and the ledger become **cross-verifiable in both directions**: every agent
 commit must name an event that exists in the chain, and every `item.complete`
 must have a commit. A missing pair is a detector rather than an unanswerable
 question.
+
+**Order replaces atomicity.** An event and the artifact it describes do not need
+to land in one commit, and chasing that is the wrong goal — the two-phase write
+it implies is unachievable over git and unnecessary. Instead the write is
+**sequenced**:
+
+1. commit and push the **artifact**;
+2. append the **event**, carrying the artifact's commit sha.
+
+```
+{"type": "item.complete", "payload": {
+   "id": "...", "artifact_commit": "a327401", "artifact_paths": ["0-inbox/report.md"]}}
+```
+
+A commit sha is an immutable content hash, so an event that names one is making
+a claim that can be checked by anyone, later, without trusting the writer. The
+ordering is what makes the failure modes benign and *distinguishable*:
+
+- **artifact committed, event missing** → work exists, unrecorded. Detected by
+  a commit with `Datacore-Event` trailers and no matching event. Recoverable:
+  append the event.
+- **event present, artifact commit unresolvable** → a claim about work that does
+  not exist. This is the dangerous direction, and the ordering makes it
+  impossible to reach by crashing — only by lying.
+
+The reverse order would invert that: a crash between the two would leave the
+ledger asserting a completion whose artifact was never pushed, which is exactly
+the state no detector can distinguish from a fabrication.
 
 `Generated-by` / `Co-authored-by` / `Assisted-by` follow the emerging convention
 graded by AI contribution, with `Signed-off-by` naming the accountable human.
@@ -296,42 +329,62 @@ This is `prime-rl`'s filesystem transport verbatim in principle
 is the one piece of their design that transfers without modification, because
 the hazard is identical: multiple processes, one directory, no lock.
 
-### 11. The ledger lives in its own repository
+### 11. The space is the unit
 
-Facts are stored in a **single installation-wide ledger repository**, not inside
-each space. Events already carry `space` in their payload, so one repository
-serves all nine.
+Facts live **inside their space**, not in a separate ledger repository. An
+earlier draft proposed extracting them; that draft was wrong, and the reason it
+was wrong is worth recording because it is a trap this design invites.
 
-The measurement that decides it: to participate in the ledger, `data` cloned
-**2.3 GB** of `5-plur` to read **1.6 MB** of events — a 1,400× overhead, and
-with it read access to every journal, note and knowledge file in a space whose
-content it has no business holding. Separation is a size argument and an access
-argument at once.
+It argued that `data` cloning 2.3 GB of `5-plur` to read 1.6 MB of events was
+waste, and that the read access to journals and knowledge which came with it was
+an access-control problem. **The knowledge is not overhead — it is the point.**
+An agent producing work in a space draws on that space's knowledge base; an
+agent holding only the event log can claim items and cannot do them well. The
+size number was real and the conclusion drawn from it was not.
 
-It also lets the two payload classes get the rules they actually need. The
-ledger repository is machine-written, append-only, never rebased, never
-force-pushed, and protected accordingly. Space repositories keep human content
-with human editing. One rule set stops having to cover both, which is the
-condition that produced four divergent sync implementations.
+A single installation-wide ledger fails for a second, structural reason: **not
+every actor belongs to every space, new actors will join, and the design must
+reach past this cluster.** One global log makes membership a fiction — everyone
+holds everything — and there is no natural boundary at which to admit an agent
+that should see one space and not another. Per-space keeps the permission
+boundary where it already is.
 
-**One repository, not one per space.** Nine spaces would become eighteen
-repositories, each needing credentials, protection rules, hooks and detectors on
-up to five machines. Our recurring failure mode is unmanaged configuration
-drifting; doubling the configuration surface to solve a sizing problem trades a
-measured cost for an unmeasured one. Ten repositories is the smaller change.
+A space is therefore the unit of participation, and has five parts:
 
-**What separation costs.** An event and the artifact it describes now live in
-different repositories, so they cannot land in one commit. That objection is
-weaker than it appears — the current design already pushes events and artifacts
-through different flows, and the fold never asserted that an artifact exists — but
-it is real, and it is why the commit↔event cross-reference detector (§8) becomes
-a cross-repository check rather than a local one.
+| Part | Example | Class (§2) |
+|---|---|---|
+| **identity** | name, id | — |
+| **membership** | which actors write here, and as which actor name | — |
+| **facts** | `.datacore/events/<actor>.jsonl` | Facts |
+| **knowledge + content** | `3-knowledge/`, journals, reports, org | Content |
+| **projections** | `next_actions.org` | Derived |
 
-**The alternative we are not building yet.** Ethereum's light clients verify a
-fact against a state root without holding the chain. The same shape would let a
-satellite verify its own item with a proof and hold no log at all — strictly
-better than either repository layout. It requires proofs we have not built, so
-separation is the pragmatic step and proofs are the evolution, recorded as OQ-9.
+**Membership becomes explicit data**, not an implication of who holds a clone.
+That is the piece that lets this reach beyond the cluster: an agent joins a
+space, and joining grants its events and its knowledge together. Today
+membership is `ledger_actors` in `registry/infrastructure.yaml`, which is
+machine-shaped; it should become space-shaped, because an actor is a member of
+*spaces*, not of *machines*.
+
+**Transport binds per space, not globally.** §9 makes transport an interface;
+this makes the binding a property of the space. Git is the implementation for
+all nine today. A space that outgrows git — or a member that cannot be given a
+clone — changes one binding rather than the architecture. That is the
+scaling path, and it is deliberately not exercised yet.
+
+**What co-location costs, stated plainly.** Putting facts inside a repository
+that also carries human content means the whole repository inherits the facts'
+rules: **no rebase, no force-push, no history rewrite** — because those
+operations would destroy the log. Humans lose those operations in their own
+knowledge repository. That is judged acceptable (rebasing a notes repo is rare
+and never necessary) but it is a real constraint, and it is the price of not
+splitting.
+
+Full modularity — pluggable transport *and* pluggable knowledge bases, so a
+space's storage, facts and knowledge can each be swapped independently — is a
+later version's problem. This DIP makes the transport an interface and the
+membership explicit, which are the two seams that make that later work possible
+without making it now.
 
 ### 12. Snapshots
 
@@ -542,6 +595,7 @@ migration worked.
   an email sent, a PR merged — how is any of that checked without re-reading the
   agent's own claim? Unsolved, and the reason side-effecting tasks finish in
   review rather than complete.
-- **OQ-9.** Light-client proofs would let a satellite verify its own items
-  holding no log at all — better than the repository split of §11. Worth
-  building, or is the split sufficient indefinitely?
+- **OQ-9.** Membership is currently `ledger_actors` in `infrastructure.yaml`,
+  which is machine-shaped, but an actor is a member of *spaces*, not machines
+  (§11). Where should space membership live, and does it become a fact in the
+  space's own log — a space describing its own members?
