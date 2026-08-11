@@ -69,7 +69,15 @@ own ratified DIP."* This is that DIP.
 
 ### 1. Two categories
 
-Repositories are classified, and the classification is **data**, not convention.
+Repositories are classified, and the classification is **data**, not convention:
+it lives in `registry/repositories.yaml`, alongside the existing `agents.yaml`,
+`commands.yaml` and `infrastructure.yaml`, and maps each repository to its
+category and its transport binding (§11). A repository absent from that registry
+is **unclassified and refused by `ledger_transport.py`** — silently defaulting to
+either category is how a production repo would end up taking knowledge rules.
+
+Space membership is *not* duplicated there: the registry says what a repository
+IS, the space's own log says who may write to it (§11).
 
 | Category | Contents | Rule |
 |---|---|---|
@@ -400,9 +408,16 @@ update. It is also the right shape for the question membership actually raises,
 which is not "who is a member" but "**who admitted this actor, and when**". That
 is an audit question, and audit questions belong in the ledger.
 
-Bootstrap is the obvious objection: writing to a space's log requires
-membership, and membership is established by writing to that log. The resolution
-is the one every chain uses — **genesis membership**. A space's founding events
+The nine existing spaces have no `member.*` events, so membership is
+**backfilled once** from `infrastructure.yaml`'s current `ledger_actors`,
+emitting a genesis `member.add` per actor per space it already writes to. This
+mirrors the genesis org import exactly: a one-time, idempotent, keyed import that
+turns existing implicit state into explicit facts. After the backfill,
+`ledger_actors` keeps only its deployment meaning (§11 table).
+
+Bootstrap of a *new* space is the obvious remaining objection: writing to its log
+requires membership, and membership is established by writing to that log. The
+resolution is the one every chain uses — **genesis membership**. A space's founding events
 declare its initial members, exactly as a genesis block declares an initial
 validator set. Thereafter an existing member admits a new one, and every change
 is an auditable event authored by a named actor.
@@ -475,7 +490,8 @@ without holding anyone else's snapshot.
   `append_and_push(space, actor, event)`, `converge(space)` (fetch + merge,
   never rebase), `gaps(space)` (seq comparison), per-repo lock. Every caller
   uses it; no caller invokes `git` directly.
-- `.datacore/lib/detectors/` — the six detectors of §8.
+- `.datacore/lib/detectors/` — the eight detectors of §8.
+- `registry/repositories.yaml` — repository category and transport binding (§1).
 - `.datacore/githooks/commit-msg` — renders and validates the trailer block.
 - Gitea `pre-receive` — actor-file ownership, on the four self-hosted spaces.
 
@@ -568,8 +584,14 @@ Phased, and each phase is independently reversible until the last.
 - **Phase 0 — shadow.** Projection written alongside the authored file and
   diffed. Currently 9/9 clean, streak 1 day. No behaviour change.
 - **Phase 1 — generated.** Per space, once the streak is credible: the org file
-  becomes generated and gitignored. **This is the irreversible step** and is
-  taken one space at a time.
+  becomes generated and gitignored. Taken **one space at a time**.
+
+  Calling this irreversible was imprecise. Reverting is mechanical — un-gitignore
+  the file, commit the current projection, resume hand-authoring — and the ledger
+  still holds every fact. What cannot be recovered is the **git history of that
+  file for the period it was untracked**: `git log next_actions.org` will show a
+  gap. That is the actual one-way cost, and it is small enough to accept and
+  large enough to state.
 - **Phase 2 — transport.** Callers migrate to `ledger_transport.py`. Old scripts
   remain until their callers are gone, then are deleted.
 - **Phase 3 — claim migration.** `item.claim` replaces `git push`-as-lock, with
@@ -642,9 +664,10 @@ migration worked.
 ## Open Questions
 - **OQ-1.** Snapshot cadence and format — event count, wall clock, or
   size-triggered?
-- **OQ-2.** Which machine projects a space in Phase 1, and what happens when two
-  project concurrently? The refuse-to-overwrite guard detects it; nothing
-  resolves it.
+- **OQ-2.** *(BLOCKS Phase 1.)* Which machine projects a space, and what happens
+  when two project concurrently? The refuse-to-overwrite guard detects it;
+  nothing resolves it. Phase 1 cannot start for a space until this is answered
+  for that space. Every other open question can be resolved while running.
 - **OQ-3.** Journals are genuinely co-authored (a real conflict occurred
   2026-08-10). Split per-actor and merge at read time, or accept conflicts?
 - **OQ-4.** Claim latency equals the sync interval — currently 15 minutes, so
