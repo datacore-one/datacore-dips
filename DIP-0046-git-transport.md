@@ -13,7 +13,7 @@
 | **Affects** | `.datacore/lib/` (sync scripts), `.datacore/githooks/`, `.datacore/hooks/`, `.datacore/modules/nightshift/lib/run.py`, `.datacore/modules/chief-of-staff/server/lib/`, `/today`, `/tomorrow`, `/wrap-up`, `/continue`, `/process-inbox` |
 | **Specs** | `.datacore/lib/jobs/manifest.yaml` (detector contracts) |
 | **Agents** | `nightshift-orchestrator`, `journal-coordinator`, `wrap-up-executor` |
-| **Relates to** | DIP-0011 (Nightshift — the `git push`-as-lock this replaces), DIP-0034 (Event Ledger Substrate — reserves this migration for its own DIP), DIP-0035 (Job Contracts — detector contracts), DIP-0043 (Org Projection), DIP-0018 (Credential Management), ENG-2026-0423-001, ENG-2026-0729-009, ENG-2026-0804-033, ENG-2026-0811-005 |
+| **Relates to** | DIP-0011 (Nightshift — the `git push`-as-lock this replaces), DIP-0034 (Event Ledger Substrate — reserves this migration for its own DIP; **this DIP obliges an amendment adding `member.*` event types**), DIP-0044 (Actor Identity — authentication, where this DIP is authorization), DIP-0035 (Job Contracts — detector contracts), DIP-0043 (Org Projection), DIP-0018 (Credential Management), ENG-2026-0423-001, ENG-2026-0729-009, ENG-2026-0804-033, ENG-2026-0811-005 |
 
 ## Summary
 
@@ -361,10 +361,46 @@ A space is therefore the unit of participation, and has five parts:
 
 **Membership becomes explicit data**, not an implication of who holds a clone.
 That is the piece that lets this reach beyond the cluster: an agent joins a
-space, and joining grants its events and its knowledge together. Today
-membership is `ledger_actors` in `registry/infrastructure.yaml`, which is
-machine-shaped; it should become space-shaped, because an actor is a member of
-*spaces*, not of *machines*.
+space, and joining grants its events and its knowledge together.
+
+Two different facts were conflated in `registry/infrastructure.yaml`, and
+separating them resolves it:
+
+| Fact | Question it answers | Where it lives |
+|---|---|---|
+| **deployment** | which actor names may run on machine M | `infrastructure.yaml` — machine-shaped, correct as-is, retained |
+| **membership** | which actors may write to space S | a **fact in S's own log** |
+
+Membership is recorded as `member.add` / `member.remove` events in the space's
+own event log. The space becomes **self-describing**: clone it, fold it, and you
+know who belongs — no external registry to consult, drift from, or forget to
+update. It is also the right shape for the question membership actually raises,
+which is not "who is a member" but "**who admitted this actor, and when**". That
+is an audit question, and audit questions belong in the ledger.
+
+Bootstrap is the obvious objection: writing to a space's log requires
+membership, and membership is established by writing to that log. The resolution
+is the one every chain uses — **genesis membership**. A space's founding events
+declare its initial members, exactly as a genesis block declares an initial
+validator set. Thereafter an existing member admits a new one, and every change
+is an auditable event authored by a named actor.
+
+Authority is deliberately weak for now: **any existing member may admit
+another**, because all current members belong to a single principal and a richer
+role model would be unenforced ceremony. It tightens naturally when DIP-0044
+lands and `member.*` events carry signatures, at which point admission becomes a
+cryptographically attributable act rather than an assertion.
+
+The folded member set is what §3.1 validates against, and what a Gitea
+`pre-receive` (§7) derives in order to reject a push writing a non-member's log.
+That is the reason membership must be a fact rather than a config file: the
+enforcement point has the repository and nothing else.
+
+**Placement.** DIP-0044 answers *what key proves you are `data`*; membership
+answers *which spaces `data` may write to*. Authentication and authorization
+stay separate on purpose, so this is not folded into DIP-0044. The `member.add`
+/ `member.remove` **event types belong to DIP-0034**, which owns the event
+vocabulary — an amendment obligation on that DIP, not a new DIP here.
 
 **Transport binds per space, not globally.** §9 makes transport an interface;
 this makes the binding a property of the space. Git is the implementation for
@@ -566,6 +602,12 @@ Ordered so that each step is verifiable before the next depends on it.
    is the whole point.
 7. **Delete** what nothing calls.
 
+**Amendment obligation on DIP-0034.** The `member.add` / `member.remove` event
+types resolved in §11 belong to DIP-0034's event vocabulary. This DIP does not
+add them unilaterally; ratifying it obliges an amendment to DIP-0034 introducing
+the two types and their payloads, in the same way DIP-0044 records its
+supersession obligation over DIP-0034's key-custody sections.
+
 Detectors precede the migration deliberately: they are what tell us whether the
 migration worked.
 
@@ -595,7 +637,3 @@ migration worked.
   an email sent, a PR merged — how is any of that checked without re-reading the
   agent's own claim? Unsolved, and the reason side-effecting tasks finish in
   review rather than complete.
-- **OQ-9.** Membership is currently `ledger_actors` in `infrastructure.yaml`,
-  which is machine-shaped, but an actor is a member of *spaces*, not machines
-  (§11). Where should space membership live, and does it become a fact in the
-  space's own log — a space describing its own members?
