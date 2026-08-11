@@ -215,12 +215,34 @@ touched. A task whose deliverable is an effect in the world — a service runnin
 an email sent, a PR merged — has no such artifact, and re-reading the agent's
 own report is not verification.
 
-Side-effecting tasks are therefore **not** covered by this section. They remain
-gated at creation by `guarded_append` (co-sign against a recorded grant) and are
-never auto-completed: they finish in a review state with the evidence attached.
-Independent verification of effects is an open problem, recorded as OQ-8 rather
-than papered over — a check that only covers the easy half while reading as a
-general guarantee is the same defect this section exists to remove.
+**Effects are verified per type, against their own system of record.** There is
+no universal mechanism, and looking for one is what made this appear unsolvable.
+Each `effects` tag binds a verifier, and the verifier's defining property is
+that it reads **a record the acting agent does not control**:
+
+| Effect tag | System of record | Verifier reads |
+|---|---|---|
+| `service.deploy` | the service itself | health endpoint, or the server's own logs |
+| `email.send` | the mail provider | the Sent folder, or a control recipient BCC'd on every send |
+| `pr.merge` | the forge | the API — is the PR merged, at which sha |
+| `payment` | the ledger of the payment provider | the transaction record |
+
+The BCC case is the sharpest illustration of the principle: it does not inspect
+the agent's claim, it **manufactures independent evidence in a third place**
+before the claim is made. A verifier that queries the agent, or a log the agent
+writes, verifies nothing.
+
+The result is recorded as a `metric.attest` event of class `effect.verify`,
+carrying `{item, effect, ok, source_of_record, evidence}` — allocated by
+amendment to DIP-0034's discriminator table, per that DIP's rule that a new
+measurement class is a table amendment and never a new event type.
+
+**An effect with no registered verifier cannot auto-complete.** It finishes in
+review with its evidence attached. This is the honest failure mode: the set of
+verifiable effects grows as verifiers are written, and everything outside that
+set is visibly pending rather than silently trusted. Side-effecting items remain
+gated at creation by `guarded_append` regardless — creation-time co-sign and
+completion-time verification are independent controls.
 
 ### 6. Loud degrade
 
@@ -602,11 +624,17 @@ Ordered so that each step is verifiable before the next depends on it.
    is the whole point.
 7. **Delete** what nothing calls.
 
-**Amendment obligation on DIP-0034.** The `member.add` / `member.remove` event
-types resolved in §11 belong to DIP-0034's event vocabulary. This DIP does not
-add them unilaterally; ratifying it obliges an amendment to DIP-0034 introducing
-the two types and their payloads, in the same way DIP-0044 records its
-supersession obligation over DIP-0034's key-custody sections.
+**DIP-0034 amendments (applied).** Two additions to DIP-0034, made on this
+branch because both are obligations created by this DIP and neither is coherent
+without it. DIP-0034 is Draft, so this is an amendment rather than a change to a
+ratified spec:
+
+- event types `member.add` / `member.remove` (§11), carrying
+  `{actor, admitted_by|removed_by, note?|reason?}`;
+- `metric.attest` class `effect.verify` (§5), carrying
+  `{item, effect, ok, source_of_record, evidence}` — allocated by amending the
+  discriminator table, per DIP-0034's own rule that a new measurement class is
+  never a new event type.
 
 Detectors precede the migration deliberately: they are what tell us whether the
 migration worked.
@@ -633,7 +661,3 @@ migration worked.
   At claim/complete frequency that is negligible; if event rate rises, batching
   appends within a bounded window may be needed, which reintroduces a window in
   which facts exist only locally.
-- **OQ-8.** Effects have no artifact to verify against (§5). A service running,
-  an email sent, a PR merged — how is any of that checked without re-reading the
-  agent's own claim? Unsolved, and the reason side-effecting tasks finish in
-  review rather than complete.
