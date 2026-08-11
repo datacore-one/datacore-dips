@@ -96,6 +96,23 @@ This is what deletes the rescue branch, the hard reset, the merge gatekeeper,
 and the recovery script — not better handling of those paths, but the removal of
 the state that required them.
 
+**What this costs, stated rather than discovered later.** Two capabilities are
+lost when a projection stops being tracked:
+
+- *Readability without the toolchain.* Today `next_actions.org` opens in
+  Obsidian, in Emacs, on a phone, in a web UI. After Phase 1 a machine without
+  the ledger code sees an empty directory. The projection is regenerated on
+  every `converge()`, so any machine that syncs still has the file on disk —
+  but a machine that only clones does not.
+- *`git log next_actions.org`.* Task history via diff is a real forensic tool
+  and it ends at Phase 1 for that file. The ledger holds the history, but folded
+  JSONL is not a readable diff.
+
+Mitigation is deliberately weak and deliberately explicit: a **weekly tracked
+snapshot** of the projection is committed to the space as
+`org/next_actions.weekly.org` — human-readable, diffable, and never read by any
+program. It is an archive, not a source. Anything that reads it is a bug.
+
 ### 3. Transport rules for facts
 
 1. **One writer per file.** Enforced by filename (`<actor>.jsonl`) and the
@@ -110,6 +127,16 @@ the state that required them.
 5. **Integrity is not git's job.** `verify_chain` proves the log is intact
    regardless of how it travelled. Fault-injected 2026-08-11: a single changed
    byte yields `line 52: hash mismatch` and a non-zero exit.
+6. **Sequence numbers are enforced on read, not merely observed.** Each actor's
+   events carry a monotonic `seq`. A gap is not a warning — the fold refuses to
+   advance past it and reports the missing range. Ethereum enforces exactly this
+   with per-account nonces: a transaction with the wrong nonce is rejected
+   rather than applied out of order. Our present design only *detects* gaps,
+   which is why a missing push looked identical to a slow one.
+7. **The fold publishes a state root.** Folding produces a hash over the
+   resulting state, not just the state. Two machines then answer "do we agree?"
+   by comparing one hash instead of replaying two logs. This is the single most
+   useful idea to take from Ethereum's design and it costs a few lines.
 
 ### 4. Commit provenance
 
@@ -148,6 +175,19 @@ Checks run against a separate checkout, populated from the committed result,
 that the executing agent never had access to. This mirrors the practice of
 withholding grading material during execution, on the stated principle that
 anything readable by the agent is fair game for a reward hack.
+
+**This covers file-producing tasks only, and that limit is the point.** A task
+whose deliverable is a file can be verified from a checkout the agent never
+touched. A task whose deliverable is an effect in the world — a service running,
+an email sent, a PR merged — has no such artifact, and re-reading the agent's
+own report is not verification.
+
+Side-effecting tasks are therefore **not** covered by this section. They remain
+gated at creation by `guarded_append` (co-sign against a recorded grant) and are
+never auto-completed: they finish in a review state with the evidence attached.
+Independent verification of effects is an open problem, recorded as OQ-8 rather
+than papered over — a check that only covers the easy half while reading as a
+general guarantee is the same defect this section exists to remove.
 
 ### 6. Loud degrade
 
@@ -190,6 +230,26 @@ dated artifact and `max_age_hours`:
 | **projection drift** — regenerate and diff | fold divergence between machines |
 | **actor-file ownership** | one actor wrote another's log |
 | **config drift** — `core.hooksPath`, ruleset state | our own enforcement being switched off |
+| **actor presence** — every actor in the roster has a log, non-empty, advancing | a log that was **deleted** |
+| **state-root agreement** — compare roots across machines | silent fold divergence |
+
+**Absence is a first-class failure.** `verify_chain` verifies a file it is
+given; it has nothing to say about a file that is not there, because a chain of
+zero events is a valid chain. Delete `data.jsonl` and every surviving copy still
+reports OK. This is not hypothetical — a sweep wiped 110 files from
+datafund-space on 2026-07-21, and `git_fleet_sync` refuses to propagate
+deletions precisely because of it.
+
+The roster in `registry/infrastructure.yaml` is therefore **load-bearing for
+integrity, not just for naming**: it is the only statement of which logs must
+exist. The actor-presence detector reads it and asserts each named actor has a
+log whose `seq` is non-decreasing since the last run. A log that vanishes, or
+stops advancing while its machine is up, is a failure.
+
+**Detectors report positively.** Each emits counts — events published, events
+converged, gaps, chain status, root agreement, per actor per day — never merely
+the absence of an alarm. Silence is consistent with "nothing is wrong" and with
+"the detector is broken", and telling those apart is the entire purpose.
 
 The seq-gap detector subsumes `git_fleet_audit.py`'s purpose: a gap **is** the
 drain metric. It works under both the current and target designs, which is why
@@ -236,13 +296,65 @@ This is `prime-rl`'s filesystem transport verbatim in principle
 is the one piece of their design that transfers without modification, because
 the hazard is identical: multiple processes, one directory, no lock.
 
-### 11. Snapshots
+### 11. The ledger lives in its own repository
+
+Facts are stored in a **single installation-wide ledger repository**, not inside
+each space. Events already carry `space` in their payload, so one repository
+serves all nine.
+
+The measurement that decides it: to participate in the ledger, `data` cloned
+**2.3 GB** of `5-plur` to read **1.6 MB** of events — a 1,400× overhead, and
+with it read access to every journal, note and knowledge file in a space whose
+content it has no business holding. Separation is a size argument and an access
+argument at once.
+
+It also lets the two payload classes get the rules they actually need. The
+ledger repository is machine-written, append-only, never rebased, never
+force-pushed, and protected accordingly. Space repositories keep human content
+with human editing. One rule set stops having to cover both, which is the
+condition that produced four divergent sync implementations.
+
+**One repository, not one per space.** Nine spaces would become eighteen
+repositories, each needing credentials, protection rules, hooks and detectors on
+up to five machines. Our recurring failure mode is unmanaged configuration
+drifting; doubling the configuration surface to solve a sizing problem trades a
+measured cost for an unmeasured one. Ten repositories is the smaller change.
+
+**What separation costs.** An event and the artifact it describes now live in
+different repositories, so they cannot land in one commit. That objection is
+weaker than it appears — the current design already pushes events and artifacts
+through different flows, and the fold never asserted that an artifact exists — but
+it is real, and it is why the commit↔event cross-reference detector (§8) becomes
+a cross-repository check rather than a local one.
+
+**The alternative we are not building yet.** Ethereum's light clients verify a
+fact against a state root without holding the chain. The same shape would let a
+satellite verify its own item with a proof and hold no log at all — strictly
+better than either repository layout. It requires proofs we have not built, so
+separation is the pragmatic step and proofs are the evolution, recorded as OQ-9.
+
+### 12. Snapshots
 
 The fold replays every event from genesis. At 1,406 items and growing, replay
 cost is linear in history forever. The ledger gains periodic **snapshots**: a
 folded state at a known event, with the log retained so full history stays
-recoverable. Snapshot cadence and format are deferred to implementation; the
-requirement is that a snapshot never becomes the only copy of anything.
+recoverable.
+
+**Snapshots are NOT tracked in git.** This is decided here rather than deferred,
+because it is the architectural question and not a detail. A tracked snapshot is
+derived mutable shared state — precisely what §2 removes — and would reintroduce
+merges over a file every machine rewrites. Untracked, a snapshot is a local
+cache: each machine builds its own, and a corrupt or missing one costs a replay
+and nothing else.
+
+The consequence is accepted: **a new machine bootstraps by replaying from
+genesis.** Snapshots do not solve bootstrap. They solve the steady state, which
+is the case that runs thousands of times a day, and bootstrap happens when a
+machine joins the fleet.
+
+What *is* published is the **state root** (§3.7) — a hash, not a state. It
+travels in a `projection.attest` event, so any machine can check agreement
+without holding anyone else's snapshot.
 
 ## Changes Required
 
@@ -308,6 +420,29 @@ JSONL files" with workers recoverable from those logs plus snapshots. A second
 and third team reaching the same shape is stronger evidence for the direction
 than another internal review round.
 
+**What a settled distributed ledger already answers.** Ethereum solves the same
+shape of problem — many writers, no single trusted machine, state derived by
+folding an ordered log — and four of its answers transfer:
+
+- **State root.** State is a fold over the log, and the *root hash* of that
+  state is published with it, so agreement is one comparison rather than two
+  replays (§3.7).
+- **Per-account nonces.** Sequence gaps are *rejected*, not logged. A
+  transaction out of order does not apply. Our seq gap should stall that actor's
+  fold rather than be noted in a report (§3.6).
+- **Finality versus head.** Reads that matter use settled state; only the UI
+  reads the tip. That is the distinction DIP-0042 draws for block time.
+- **Light clients.** A fact can be verified against a root without holding the
+  chain — the honest long-run answer to satellite access (§11, OQ-9).
+
+What does **not** transfer is the part people usually copy: consensus. Proof of
+stake, mining, and fork choice exist to tolerate byzantine participants competing
+to write. All five of our machines belong to one principal, write disjoint files,
+and have no incentive to lie. There are no competing histories per writer, so
+there is no fork to choose and nothing to vote on. Adopting consensus here would
+buy nothing and cost everything — and the reason our design is simple is exactly
+that we are allowed to skip it.
+
 **What we take from those systems, and what we do not.** Snapshots, isolated
 verification, and evidence-backed self-improvement transfer. Their *transports*
 do not: Prime Intellect's harness is single-host with no cross-machine sync at
@@ -330,7 +465,17 @@ Phased, and each phase is independently reversible until the last.
   a dual-write period.
 
 The root `~/Data` repository is a public repository with human commits and
-review. It is explicitly **out of scope** and keeps conventional git.
+review, and it keeps conventional git — including rebase, which §3 forbids only
+for fact repositories.
+
+But it is **not** out of scope, and saying so earlier was the gap that produced
+part of the incident this DIP is motivated by. `_run_repos()` includes the root
+repository: nightshift writes to it, and 3 of the 76 stranded branches were
+there. A repository that agents write to cannot be governed by neither category.
+
+It is therefore classified **code**: agent writes go through a branch and a
+review, human writes continue as today. That is the same rule the category
+already carries, applied to the one repository that was quietly exempt.
 
 ## Security Considerations
 
@@ -360,15 +505,18 @@ Ordered so that each step is verifiable before the next depends on it.
 3. **Gitea `pre-receive`.** The only unbypassable enforcement available.
 4. **`core.hooksPath`** on the agent machines, plus its config-drift detector.
 5. **`ledger_transport.py`**, then migrate callers one at a time.
-6. **Phase 1 on one space**, and observe whether the rescue machinery goes
-   quiet.
+6. **Phase 1 on one space.** Success is a *positive* signal, not a silence:
+   for fourteen consecutive days, that space reports events published and
+   converged per actor, zero seq gaps, chain verified, roots in agreement, and
+   every rostered actor present. "The rescue machinery went quiet" is
+   consistent with both success and a broken detector, and distinguishing those
+   is the whole point.
 7. **Delete** what nothing calls.
 
 Detectors precede the migration deliberately: they are what tell us whether the
 migration worked.
 
 ## Open Questions
-
 - **OQ-1.** Snapshot cadence and format — event count, wall clock, or
   size-triggered?
 - **OQ-2.** Which machine projects a space in Phase 1, and what happens when two
@@ -390,3 +538,10 @@ migration worked.
   At claim/complete frequency that is negligible; if event rate rises, batching
   appends within a bounded window may be needed, which reintroduces a window in
   which facts exist only locally.
+- **OQ-8.** Effects have no artifact to verify against (§5). A service running,
+  an email sent, a PR merged — how is any of that checked without re-reading the
+  agent's own claim? Unsolved, and the reason side-effecting tasks finish in
+  review rather than complete.
+- **OQ-9.** Light-client proofs would let a satellite verify its own items
+  holding no log at all — better than the repository split of §11. Worth
+  building, or is the split sufficient indefinitely?
