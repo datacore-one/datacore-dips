@@ -10,7 +10,7 @@
 | **Created** | 2026-08-11 |
 | **Updated** | 2026-08-11 |
 | **Tags** | `git`, `transport`, `ledger`, `sync`, `provenance`, `detectors` |
-| **Affects** | `.datacore/lib/` (sync scripts), `.datacore/githooks/`, `.datacore/hooks/`, `.datacore/modules/nightshift/lib/run.py`, `.datacore/modules/chief-of-staff/server/lib/`, `/today`, `/tomorrow`, `/wrap-up`, `/continue`, `/process-inbox` |
+| **Affects** | `.datacore/lib/` (sync scripts), `.datacore/githooks/`, `.datacore/hooks/`, `.datacore/modules/nightshift/lib/`, `.datacore/modules/chief-of-staff/server/lib/`, 10+ module `*-hook` commands, `/today`, `/tomorrow`, `/wrap-up`, `/continue`, `/process-inbox`, and — in separate repositories — `datacore-mcp` (GTD write tools) and `datacore-app` (no ledger awareness today) |
 | **Specs** | `.datacore/lib/jobs/manifest.yaml` (detector contracts) |
 | **Agents** | `nightshift-orchestrator`, `journal-coordinator`, `wrap-up-executor` |
 | **Relates to** | DIP-0011 (Nightshift — the `git push`-as-lock this replaces), DIP-0034 (Event Ledger Substrate — reserves this migration for its own DIP; **this DIP obliges an amendment adding `member.*` event types**), DIP-0044 (Actor Identity — authentication, where this DIP is authorization), DIP-0035 (Job Contracts — detector contracts), DIP-0043 (Org Projection), DIP-0018 (Credential Management), ENG-2026-0423-001, ENG-2026-0729-009, ENG-2026-0804-033, ENG-2026-0811-005 |
@@ -220,6 +220,36 @@ the state no detector can distinguish from a fabrication.
 graded by AI contribution, with `Signed-off-by` naming the accountable human.
 The convention's own caveat is respected: trailers are inspectable but are not
 proof by themselves — here the proof is the chain the trailer points into.
+
+**Provenance is an interface with pluggable sinks, not a trailer format.** The
+trailers above are what the *local* sink emits; they are not the definition. A
+provenance record is:
+
+```
+{ subject: <commit sha>,        # what is being attested — a content hash
+  actor:   <ledger actor>,      # who
+  action:  <event type>,        # what they did
+  event:   <hlc>,               # where it is recorded
+  at:      <timestamp> }
+```
+
+Two sinks consume it. The **local sink** writes the trailers and the ledger
+event, and is always on. An **external attestor** is optional and additive:
+Datafund's Verity already models exactly this as a `ProvenanceEvent` with
+`signature`, `notarySigner`, `notaryTimestamp` and blockchain anchoring, so
+wiring it in is an adapter that maps the record above onto that schema and posts
+it — **no caller changes, no record changes**.
+
+This is the same discipline as §9: the thing that varies is behind an interface
+from the start, so adopting it later is wiring rather than redesign. Two
+properties make that possible and are therefore requirements, not niceties:
+
+- **`subject` is a content hash.** A commit sha is verifiable by anyone, later,
+  without trusting us — which is the minimum an external notary needs to attest
+  anything meaningful.
+- **A sink never gates the write.** An attestor that is slow, down, or absent
+  must not block an append. Attestation is asynchronous and its own failure is
+  a detector's problem, not the writer's.
 
 **Commit messages are rendered, not validated.** The agent emits structured
 fields (`type`, `scope`, `subject`, `body`, `breaking`); the renderer constructs
@@ -667,9 +697,25 @@ model-authored Conventional Commits prefix is refused by the renderer.
 
 **Track C — transport** *(the long pole)*
 1. atomic publish (tmp + rename) in `log.py` · 2. `ledger_transport.py` ·
-3. migrate 16 callers *(needs C2)* · 4. commands: `/today`, `/tomorrow`,
-`/process-inbox`, `/wrap-up`, `/continue` *(needs C2)* · 5. delete dead code
-*(needs C3, C4)*
+3. migrate 16 git callers *(needs C2)* · 4. migrate **org writers** *(needs C2)* ·
+5. delete dead code *(needs C3, C4)*
+
+The org-writer surface is larger than an earlier draft implied, and the
+scoping principle that makes it tractable is: **Phase 1 breaks writers, not
+readers.** A generated file is still a file — anything that reads
+`next_actions.org` keeps working untouched. Only writes must route through the
+ledger. Measured surface:
+
+| Writer | Count | Repo |
+|---|---|---|
+| slash commands (`/today`, `/tomorrow`, `/process-inbox`, `/wrap-up`, `/continue`) | 5 | this |
+| library + module code writing org state | 15 | this, nightshift |
+| module hooks that write (`crm`, `mail`, `meetings`, `github`, `health`, `research`, `nightshift`, …) | 10+ | this |
+| GTD MCP write tools (`add_task`, `complete_task`, `set_task_state`, …) | — | `datacore-mcp` |
+| desktop app task actions — currently **no ledger awareness at all** | — | `datacore-app` |
+
+The last two are separate repositories and are the reason C is the critical
+path: this DIP cannot be finished inside one repo.
 Verify: a concurrent-append test observes no torn line; every caller migrated is
 a caller that no longer invokes `git` directly (`grep`-assertable); `/wrap-up`
 refuses to close with a non-zero gap count.
