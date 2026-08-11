@@ -288,10 +288,27 @@ A completion check **must not run in an environment the executing agent could
 write to**. Otherwise the check is satisfiable by the thing being checked:
 `test -s proof.txt` is met by `touch proof.txt`.
 
-Checks run against a separate checkout, populated from the committed result,
-that the executing agent never had access to. This mirrors the practice of
-withholding grading material during execution, on the stated principle that
-anything readable by the agent is fair game for a reward hack.
+Checks run against a fresh worktree of the **committed** result. That buys two
+things: a pass means something durable anyone can re-verify from the sha rather
+than a fact about one machine's `/tmp`, and a check cannot quietly depend on
+machine-local state.
+
+**It does not prevent a fabricated artifact, and an earlier draft wrongly
+implied it did.** Measured: an agent that writes `faked` into `proof.txt`
+without doing the work still passes `test -s proof.txt` under isolation, because
+committing the agent's output is exactly what isolation does — and for a
+file-producing task, producing the file *is* the work.
+
+The defence against fabrication is **check strength**:
+
+```
+test -s proof.txt             passes on "faked"    — asserts existence
+grep -qx verified proof.txt   fails  on "faked"    — asserts content
+```
+
+So the requirement is on the check, not the sandbox: **a check must assert the
+outcome, never merely that something appeared.** Isolation and strength are
+independent, and only the second one resists a reward hack.
 
 **This covers file-producing tasks only, and that limit is the point.** A task
 whose deliverable is a file can be verified from a checkout the agent never
