@@ -100,6 +100,26 @@ are not "harmonised" later by someone applying one category's rule to the other.
 | **Derived** | `next_actions.org`, briefings, status JSON | **not tracked** — regenerated from the fold | none: nothing to sync |
 | **Content** | reports, zettels, journal entries | additive new paths, one author per path | rare and genuine |
 
+**Every machine projects for itself.** Because a projection is untracked, there
+is no shared file to contend for: each machine folds the log it holds and writes
+its own local copy. Two machines projecting at the same moment is not a race, it
+is the normal case, and they agree because the fold is deterministic over the
+same events — checked by comparing state roots (§3.7) rather than by
+coordinating writes.
+
+This is why no projector election, lock, or designated machine is needed. The
+refuse-to-overwrite guard belongs to **Phase 0**, where the file is still
+tracked and hand-authored and an overwrite would destroy human work; it has no
+role once the file is generated. An earlier draft carried a projector-election
+open question straight from the old model into this one, which was a
+contradiction of this very section.
+
+Winston's role is unchanged and unrelated: it sequences **finality** over the
+combined log (DIP-0042). Appends need no sequencer — they are per-actor and
+disjoint — and projection needs no sequencer either. What a sequencer provides
+is ordering *across* actors for settlement, which is a different question from
+who renders a local view.
+
 The **Derived** row is the load-bearing decision. A projection that is
 deterministic from the ledger is a build artifact. Tracking a build artifact in
 git and then merging it across five machines is the whole disease. Gitignore it
@@ -629,34 +649,55 @@ already carries, applied to the one repository that was quietly exempt.
 
 ## Implementation
 
-Ordered so that each step is verifiable before the next depends on it.
+Six tracks. Within a track the order is a dependency; across tracks there is
+none, so all six start together. Every item carries its own verification — a
+track is done when its checks pass, not when its code lands.
 
-1. **Seq-gap detector.** ~40 lines, works under the current design, would have
-   caught both stranding incidents on day one. Contract it immediately.
-2. **Commit trailers.** Pure addition, no behaviour change; makes the
-   cross-reference detector possible.
-3. **Gitea `pre-receive`.** The only unbypassable enforcement available.
-4. **`core.hooksPath`** on the agent machines, plus its config-drift detector.
-5. **`ledger_transport.py`**, then migrate callers one at a time.
-6. **Phase 1 on one space.** Success is a *positive* signal, not a silence:
-   for fourteen consecutive days, that space reports events published and
-   converged per actor, zero seq gaps, chain verified, roots in agreement, and
-   every rostered actor present. "The rescue machinery went quiet" is
-   consistent with both success and a broken detector, and distinguishing those
-   is the whole point.
-7. **Delete** what nothing calls.
+**Track A — detectors** *(no dependencies; ships first and guards everything else)*
+1. seq-gap · 2. actor-presence · 3. state-root · 4. contracts in `manifest.yaml`
+Verify: fault-inject each — delete a log, withhold a push, diverge a fold — and
+confirm a red artifact with a non-zero exit, as `job.verify` was fault-injected
+on 2026-08-11.
 
-**DIP-0034 amendments (applied).** Two additions to DIP-0034, made on this
-branch because both are obligations created by this DIP and neither is coherent
-without it. DIP-0034 is Draft, so this is an amendment rather than a change to a
-ratified spec:
+**Track B — provenance**
+1. commit trailers · 2. `commit-msg` hook rendering from structured fields ·
+3. commit↔event cross-reference detector *(needs B1)*
+Verify: a commit whose `Datacore-Event` names no event fails the cross-check; a
+model-authored Conventional Commits prefix is refused by the renderer.
 
-- event types `member.add` / `member.remove` (§11), carrying
-  `{actor, admitted_by|removed_by, note?|reason?}`;
-- `metric.attest` class `effect.verify` (§5), carrying
-  `{item, effect, ok, source_of_record, evidence}` — allocated by amending the
-  discriminator table, per DIP-0034's own rule that a new measurement class is
-  never a new event type.
+**Track C — transport** *(the long pole)*
+1. atomic publish (tmp + rename) in `log.py` · 2. `ledger_transport.py` ·
+3. migrate 16 callers *(needs C2)* · 4. commands: `/today`, `/tomorrow`,
+`/process-inbox`, `/wrap-up`, `/continue` *(needs C2)* · 5. delete dead code
+*(needs C3, C4)*
+Verify: a concurrent-append test observes no torn line; every caller migrated is
+a caller that no longer invokes `git` directly (`grep`-assertable); `/wrap-up`
+refuses to close with a non-zero gap count.
+
+**Track D — membership and enforcement**
+1. `member.*` in `events.py` · 2. genesis backfill from `ledger_actors` *(needs
+D1)* · 3. `registry/repositories.yaml` · 4. `core.hooksPath` on the agent
+machines + config-drift detector · 5. Gitea `pre-receive` *(needs D2)*
+Verify: a push writing a non-member's log is rejected server-side on a Gitea
+space; an unregistered repository is refused by the transport module; unsetting
+`core.hooksPath` turns the config-drift detector red.
+
+**Track E — verification**
+1. check isolation — checks run in a checkout the agent never had ·
+2. effect verifiers + `effect.verify` attestation
+Verify: the `touch proof.txt` attack fails against the isolated check; an effect
+with no registered verifier lands in review rather than complete.
+
+**Track F — projection**
+1. snapshots + state root · 2. Phase 1 on one space *(needs A, and a credible
+shadow streak)*
+Verify: fourteen consecutive days of positive counts — events published and
+converged per actor, zero gaps, chain verified, roots in agreement, every
+rostered actor present.
+
+Critical path is **C**. A and D are the widest and least coupled, so they absorb
+parallel effort best. F2 is the only step gated on elapsed time rather than
+work, and it is deliberately last.
 
 Detectors precede the migration deliberately: they are what tell us whether the
 migration worked.
@@ -664,23 +705,19 @@ migration worked.
 ## Open Questions
 - **OQ-1.** Snapshot cadence and format — event count, wall clock, or
   size-triggered?
-- **OQ-2.** *(BLOCKS Phase 1.)* Which machine projects a space, and what happens
-  when two project concurrently? The refuse-to-overwrite guard detects it;
-  nothing resolves it. Phase 1 cannot start for a space until this is answered
-  for that space. Every other open question can be resolved while running.
-- **OQ-3.** Journals are genuinely co-authored (a real conflict occurred
+- **OQ-2.** Journals are genuinely co-authored (a real conflict occurred
   2026-08-10). Split per-actor and merge at read time, or accept conflicts?
-- **OQ-4.** Claim latency equals the sync interval — currently 15 minutes, so
+- **OQ-3.** Claim latency equals the sync interval — currently 15 minutes, so
   two actors can both claim for that long. The HLC resolves it correctly and
   records the loser as a no-op; the cost is duplicated work. Is a shorter
   interval, or an eager push on claim, worth it?
-- **OQ-5.** Do agent-personal spaces participate in the shared ledger, or keep
+- **OQ-4.** Do agent-personal spaces participate in the shared ledger, or keep
   their own?
-- **OQ-6.** Is a satellite transport (rsync of `events/`, or HTTP) worth adding
+- **OQ-5.** Is a satellite transport (rsync of `events/`, or HTTP) worth adding
   for `tris` and `data`, which hold partial checkouts and do not need full space
   history? §9 makes this a configuration change rather than a rewrite, but it is
   not obviously worth doing.
-- **OQ-7.** Atomic publish (§10) costs a temporary file and a rename per event.
+- **OQ-6.** Atomic publish (§10) costs a temporary file and a rename per event.
   At claim/complete frequency that is negligible; if event rate rises, batching
   appends within a bounded window may be needed, which reintroduces a window in
   which facts exist only locally.
