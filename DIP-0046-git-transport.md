@@ -379,6 +379,18 @@ converge(space)                 # receive others' facts
 can_receive(space) / gaps(space)  # readiness and drain state
 ```
 
+**Expected git failures return a structured result; they never raise.** A push
+rejected as non-fast-forward, an offline remote, a missing ref — these are
+outcomes, not exceptions, and every one carries `ok`, a reason, and enough
+context to act. Callers branch on `ok` rather than wrapping every call in
+`try`/`except`, which is what made sixteen call sites each invent their own
+partial error handling and what let `|| true` look reasonable in three of them.
+
+Only *unexpected* failures raise. The distinction matters: a caller that cannot
+tell "the remote is down" from "the repository is corrupt" will treat both the
+same way, and treating them the same way is how a corrupt repository gets
+retried in a loop.
+
 Prime Intellect's `prime-rl` does exactly this: a `MicroBatchSender` /
 `MicroBatchReceiver` pair with `filesystem` and `zmq` implementations chosen by
 `transport.type`, so producers and consumers never learn which is in use. The
@@ -531,6 +543,64 @@ machine joins the fleet.
 What *is* published is the **state root** (§3.7) — a hash, not a state. It
 travels in a `projection.attest` event, so any machine can check agreement
 without holding anyone else's snapshot.
+
+### 13. The code category: isolation and a commit gate
+
+§1 classifies repositories; this states what the **code** category actually
+requires. Industry practice for agents writing code is adopted here in full,
+because unlike the knowledge rules it is answering the same question we have.
+
+**Worktrees, not clones, for agent code work.** Each agent task gets an isolated
+checkout sharing one object store — measured on this installation at 1.3 MB
+versus 6.2 MB for a clone of the same repository, and commits are visible across
+worktrees without a remote round-trip. Branch namespace is `agent/<task-id>`,
+**unique per run**: an independently-built system stranded work by deriving the
+branch from a stable alias while the path varied, so `worktree add -b` failed on
+the second run and silently fell back to editing the user's source tree. Per §6
+that degrade is a failure, not a warning.
+
+Worktrees are for **code only**. They cannot span machines, so they contribute
+nothing to the ledger's problem, which is five machines agreeing.
+
+**A commit-decision gate.** An agent does not decide to commit. When work
+reaches a verdict on a non-empty working tree, the run **pauses** and records a
+pending decision; an operator chooses `approve` / `fix` / `apply` / `skip` /
+`halt`; the choice is persisted as an audit artifact naming the exact
+instruction the resume path executed.
+
+Two properties are the point. The decision is **durable and attributable** —
+"who approved this agent's commit, and what exactly did they approve" is
+answerable afterwards from a file, not from memory. And the default is **stop**:
+an agent that cannot reach an operator does not merge, it waits.
+
+This closes the standing task *"Design a sign-off gate for nightshift/Miles-
+authored features before merge"* (`5-plur`, priority A, created 2026-07-09),
+whose `CONTEXT` has been empty since. It became urgent when agent accounts were
+added to branch-protection bypass and protection was removed from `plur-space`:
+nothing currently stands between an agent and an unreviewed write to a code
+default branch.
+
+**Merge queue** on code repositories with more than one agent contributing.
+Required status checks force every PR to be current with the target branch,
+which under a fleet of agents produces constant rebasing and serialisation — the
+specific problem a merge queue exists to remove.
+
+## Not in scope, and where it belongs
+
+Several ideas worth taking are **not** transport concerns, and are recorded here
+so they are not lost by being out of scope:
+
+| Idea | Belongs to |
+|---|---|
+| Evidence-backed self-improvement — record the *trigger* and *outcome* of each learned rule, not just the rule | PLUR engrams / DIP-0019 |
+| Bounded autonomy — token, turn and wall-clock budgets per run | DIP-0011 (nightshift) |
+| Agent-to-agent messaging scoped to parent/sibling/child | agent-consolidation (DIP-0040) |
+| Harness state as CRUD-able data with rollback; immutable base plus mutable layers | config plane (DIP-0036), layered context (DIP-0002) |
+
+One idea is deliberately **rejected**: branching a log by moving a leaf pointer
+within a single file. It is elegant for a forkable conversation history and
+wrong here — our logs are one linear chain per actor precisely so that two
+writers never touch one file, which is the property §2 depends on.
 
 ## Changes Required
 
@@ -728,11 +798,15 @@ Verify: a push writing a non-member's log is rejected server-side on a Gitea
 space; an unregistered repository is refused by the transport module; unsetting
 `core.hooksPath` turns the config-drift detector red.
 
-**Track E — verification**
+**Track E — verification and the code gate**
 1. check isolation — checks run in a checkout the agent never had ·
-2. effect verifiers + `effect.verify` attestation
+2. effect verifiers + `effect.verify` attestation · 3. commit-decision gate
+(§13) · 4. worktree isolation for agent code work, degrading loudly *(needs E3)*
 Verify: the `touch proof.txt` attack fails against the isolated check; an effect
-with no registered verifier lands in review rather than complete.
+with no registered verifier lands in review rather than complete; a run reaching
+a verdict on a dirty tree pauses and writes a pending decision instead of
+committing; a second run in one workspace gets its own worktree branch and fails
+loudly rather than falling back to the source checkout.
 
 **Track F — projection**
 1. snapshots + state root · 2. Phase 1 on one space *(needs A, and a credible
