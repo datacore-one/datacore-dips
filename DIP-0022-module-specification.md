@@ -237,12 +237,57 @@ inputs:
   blog: "content/blog/"
   knowledge: "3-knowledge/"
 
+# Every function that acts on the outside world (DIP-0047).
+# Declared here, decorated in code — the two must agree, and a test checks it.
+egress:
+  - fn: lib/x_api.py:post_tweet
+    kind: x.post
+  - fn: lib/x_api.py:post_reply
+    kind: x.reply
+exempt:
+  - fn: lib/today_thread.py:_exa_search
+    reason: read-only search, no external side effect
+
 # Post-install guidance
 hooks:
   post_install: |
     echo "Slides module installed."
     echo "Required: Set GEMINI_API_KEY in .datacore/env/.env"
 ```
+
+#### 2.1 Egress declaration (DIP-0047)
+
+A module that posts, sends, files, or trades MUST declare each such function
+under `egress:`, and decorate it with `@attests` from `datacore.ledger`. Calls
+that reach an external service without a side effect — searches, reads, model
+inference — go under `exempt:` with a reason.
+
+**Why both a declaration and a decorator, when either alone looks sufficient:**
+
+The decorator is what actually records the action. The declaration is what makes
+its ABSENCE detectable. A missing attestation produces no error, no gap and no
+anomaly — an unrecorded post is indistinguishable from a post that never
+happened, so nothing in the system can notice it on its own. Code can only be
+audited for what it contains; the manifest states what it should have contained.
+
+The conformance check therefore runs both ways: every `egress:` entry must be
+decorated, and every outbound write found in module code must appear under
+`egress:` or `exempt:`. A new module that starts posting to a new service fails
+the check until it says so.
+
+This is why the wiring is NOT generated from the manifest at load time. A
+runtime that patched functions per the manifest would collapse the two artifacts
+into one, and one artifact cannot detect its own absence.
+
+**Attest chokepoints, not call sites.** Fifteen files in `comms` reference X;
+publishing funnels through two functions, and decorating those two covers all
+fifteen. Where a module has no chokepoint — as Telegram did not, with 27 direct
+senders — introduce one rather than decorating every caller.
+
+Modules MUST reach the ledger via `from datacore.ledger import attest, attests`
+and MUST NOT compute a path to the core themselves. Hand-rolled
+`sys.path.insert` guessing is how attestation silently failed on the one machine
+whose module tree and core tree differ.
 
 ### 3. SKILL.md (Module Entry Point)
 
