@@ -1915,6 +1915,176 @@ _Last audited: 2026-04-25 (final verification pass)_
 
 ---
 
+## Extension: Rotating Credentials
+
+_Added 2026-08-18. Status: Draft — not ratified._
+
+Everything above models a **static credential**: a value minted once, copied to
+the machines that need it, and valid until someone rotates it by hand. For API
+keys and SSH keys that is correct, and the implementation works — a central repo,
+per-instance manifests, `creds sync` on an hourly cron across four instances.
+
+It does not model a **rotating credential**: one whose value changes on its own,
+using a refresh token that is **single-use**. The Claude Code subscription token
+is the example that has cost the most, and it is not in the credential index at
+all — not by oversight, but because there is no shape in the schema it fits.
+
+Applying static machinery to a rotating credential produces a specific, repeatable
+failure, observed continuously from roughly 2026-07 to 2026-08-18.
+
+### Why distribution is the wrong primitive here
+
+`creds sync` distributes a value. A distributed copy of a rotating credential is
+**stale from the moment the source rotates**, and nothing at the destination can
+renew it: the refresh token is single-use, so a second holder attempting refresh
+does not get a fresh credential — it *invalidates* the one the first holder just
+obtained.
+
+On winston this produced five copies of one token:
+
+| Store | Consumer | Can refresh? |
+|---|---|---|
+| `~/.claude/.credentials.json` | `claude -p` | yes — the CLI, in-process |
+| `/etc/datacored.env` | `datacored.service` | no |
+| `~/.config/cos.env` | every `cos_*.sh` (sourced with `set -a`) | no |
+| `~/.hermes/.env` | hermes gateway | no |
+| `~/.datacore/datacore.env` | agents, assorted crons | no |
+
+`cos.env` is the dangerous one: sourced with `set -a`, it **exports** its copy,
+so a stale value there silently overrides the store that can heal. That is why
+the same command succeeded when run by hand and returned `401 OAuth access token
+has been revoked` under cron — a discrepancy that consumed several debugging
+sessions before the export was noticed.
+
+### Why "just pick the authoritative store" is not enough
+
+On 2026-08-17 a change was made asserting the CLI store was authoritative, and
+stripping the environment copy before invoking `claude -p` so the self-refreshing
+store would always win. Within hours the CLI store held an **empty** access token
+while the environment copy remained valid. The observable result was a system
+that looked half-alive: the morning audio briefing delivered (it reads the
+environment copy) while the research digest returned `OAuth session expired and
+could not be refreshed` (it went through the changed path).
+
+The lesson is not that the other store should have been chosen. It is that
+**nothing in the system declares which store owns the credential**, so each
+component — and each person or agent reading the code — picks one, and half of
+them are wrong at any given time. Ambiguity is the defect.
+
+### Why the existing health checks did not catch any of this
+
+Both checks report on file *shape*, never on whether the credential works.
+
+`oauth_health_check.py::check_claude_token` reads the file, finds `expiresAt`
+absent, and returns:
+
+```
+verdict : NO_EXPIRY
+detail  : "no expiresAt (long-lived token?)"
+problem : None
+exit    : 0
+```
+
+That was produced on 2026-08-18 against a credential that could not authenticate
+at all. The parenthetical guess is the whole problem in miniature: *could not
+determine* was rendered as *fine*.
+
+`creds audit` reports `All checks passed` for 35 credentials on the same day, and
+is correct to — it audits the index's internal consistency, which is intact. It
+has no opinion about liveness, and the one credential that was failing is not
+indexed.
+
+**A check whose "healthy" and "could not tell" are the same output is not a
+check.** Three-state reporting — `ok` / `FAIL` / `n-a` — is a requirement, not a
+refinement, and `n-a` must never be counted as a pass.
+
+### Specification
+
+#### 1. Lifecycle is a required field
+
+Every entry in `credential-index.yaml` declares `lifecycle: static | rotating`.
+Existing entries default to `static`, which is what they are; the field is
+additive and no current entry changes meaning.
+
+A `rotating` entry additionally declares:
+
+| Field | Meaning | Why it must be declared |
+|---|---|---|
+| `owner` | the ONE process permitted to refresh | two refreshers racing a single-use token is the core failure |
+| `mint_host` | where the credential can be created at all | browser-derived credentials (`claude /login`, `nlm auth`) can only be minted where a browser is signed in; servers can never self-heal, and today nothing says so |
+| `consumers` | who reads it, and from where | so a fix applied to four of five stores is visibly incomplete |
+| `verify` | a command that proves it works | health must be a call, not a file stat |
+
+#### 2. Rotating credentials are brokered, not distributed
+
+`creds sync` continues to distribute static credentials unchanged. Rotating
+credentials are **excluded from sync** and served by:
+
+```
+creds get <id>            # print a currently-valid value, refreshing if needed
+```
+
+Properties that make it different from reading a file:
+
+- **Exclusive**: takes a lock for the credential's id, so two callers cannot race
+  the single-use refresh. This is the concurrency the current design has no way
+  to express.
+- **Owner-enforced**: only the declared `owner` may refresh. Everyone else waits
+  for the owner's result rather than initiating a second rotation.
+- **Verified**: returns a value that was proven to work, or fails loudly. It never
+  returns a value it merely found.
+
+Consumers call `creds get` instead of reading a path. Five stores collapse to one
+owner plus a cache, and the export-overrides-the-healing-store class of bug
+becomes unrepresentable.
+
+#### 3. `creds doctor` — liveness, three-state, per host
+
+```
+creds doctor [--host all] [--id <credential>]
+```
+
+For each indexed credential: run its declared `verify` command and report
+`ok` / `FAIL` / `n-a`. Unreachable host is `n-a` — never a pass. Absent `verify`
+is `n-a` with the reason "no verify declared", which makes the gap visible instead
+of silently exempting the credential.
+
+This absorbs `oauth_health_check.py`, which becomes the `verify` implementation
+for the Google OAuth entries rather than a parallel checker with its own opinion
+about health.
+
+#### 4. Mint-on-Mac, pull-on-server as declared topology
+
+`mint_host` makes explicit what is currently folklore: `nlm` auth and
+`claude /login` derive from browser cookies and can only be created on the Mac.
+Servers receive; they never mint. Writing it down converts a recurring
+rediscovery into a field a tool can read.
+
+### Migration
+
+1. Add `lifecycle: static` to the 35 existing entries. No behaviour change.
+2. Index the Claude subscription token as the first `rotating` entry, declaring
+   its owner, mint host, five current consumers and a `verify`.
+3. Ship `creds doctor` and run it daily before changing any consumer — the
+   current state must be measurable before it is altered.
+4. Migrate consumers to `creds get` one at a time, most-broken first.
+
+Step 3 precedes step 4 deliberately. Two changes were made to this credential
+path on 2026-08-17 on unverified assumptions about which store was authoritative,
+and both were wrong. Measurement first.
+
+### Open questions
+
+| Question | Status |
+|---|---|
+| Does the datacored adapter's refresh become the `owner`, or does it move to `creds get`? | Open — it is a system service and cannot read a user-owned CLI store, which is the constraint that created the re-implementation in the first place |
+| What wrote the four winston env stores at 16:08 on 2026-08-17? | **Unresolved.** `cos_token_sync` had never succeeded; the old timer is disabled. An unidentified writer is a blocker for declaring any `owner` |
+| Should `creds get` be a daemon rather than a CLI? | Open — a CLI with a lockfile is simpler and probably sufficient |
+| How do Winston/nightshift receive rotating credentials without minting? | Open — likely `creds get` over the Tailscale mesh against the Mac as owner |
+
+
+---
+
 ## References
 
 - [DIP-0001: Contribution Model](DIP-0001-contribution-model.md) - Fork-and-overlay pattern
@@ -1931,3 +2101,4 @@ _Last audited: 2026-04-25 (final verification pass)_
 | 2026-03-04 | 0.2.0 | Added Implementation Status, Current Workaround; formally deferred CLI tooling |
 | 2026-04-23 | 1.0.0 | Multi-instance activation: BlackPi secrets repo, space-scoped split, sync/install scripts, 4 instances |
 | 2026-04-25 | 1.1.0 | Full deployment: Tailscale mesh (5 nodes), all 4 instances bootstrapped and git-syncing, PLUR Hub + Datafund DO + FDS_X aliases added |
+| 2026-08-18 | 1.2.0 | Extension: Rotating Credentials — lifecycle field, broker (`creds get`), liveness `creds doctor`, mint-host topology. Draft, not ratified |
