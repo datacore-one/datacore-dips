@@ -136,6 +136,35 @@ the gap list never again depends on someone grepping and eyeballing. The manual
 audit that motivated this DIP misread one file as a bypass when it was making
 search and inference calls.
 
+## Sibling vocabulary: credential access (added 2026-08-18)
+
+`datacore.ledger` now exports a second frozen set, `CREDENTIAL_KINDS`
+(`credential.read` / `write` / `refresh` / `verify`), alongside `EGRESS_KINDS`.
+
+**Separate on purpose, and it must stay that way.** None of it reaches a third
+party, so it is not egress. More concretely: `egress_scan` requires every
+`EGRESS_KINDS` use to be declared in a module manifest, and credential access
+happens in `.datacore/lib/` — core, not a module — so folding the two sets
+together would demand manifest entries that cannot exist and turn a passing
+conformance gate red for no gain.
+
+`attest()` accepts `ATTEST_KINDS = EGRESS_KINDS | CREDENTIAL_KINDS`, so a kind
+from neither set is still a plain typo. The scan continues to read
+`EGRESS_KINDS` alone and is unaffected: 118 declared/exempted, 0 undeclared,
+verified after the change.
+
+**Why credential reads are attested at all**, when they are not egress: on
+2026-08-17 five copies of one token drifted across a host and nobody could say
+which process had written which store. Reconstructing it took an hour of
+comparing file mtimes, and the answer — an operator's own manual sync run —
+remained a guess until they confirmed it. `credential.write` turns that into a
+query. `read` is included as well as `write` because "which processes actually
+consume this credential" is what decides whether a fix reaching four of five
+stores is complete, and that is otherwise answered by grepping and hoping.
+
+See DIP-0018's rotating-credential extension for the broker those events come
+from.
+
 ## Non-goals
 
 - **Signing.** Attestations are unsigned, consistent with the standing choice

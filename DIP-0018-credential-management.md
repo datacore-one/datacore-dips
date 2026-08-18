@@ -2073,11 +2073,58 @@ Step 3 precedes step 4 deliberately. Two changes were made to this credential
 path on 2026-08-17 on unverified assumptions about which store was authoritative,
 and both were wrong. Measurement first.
 
+### Extension implementation status
+
+_As of 2026-08-18. The extension itself remains Draft; this records what exists._
+
+| Piece | State | Evidence |
+|---|---|---|
+| `lifecycle` field | done | 44 entries; 3 `rotating` (claude-code-oauth, plur-x-oauth2, withings-oauth) |
+| `creds get` broker | done | serves on mac + winston; lock proven (holder 3s → waiter 1.70s / 1.50s) |
+| Lock on refresh | done | exclusive per-credential flock; the single-use race is now unrepresentable |
+| Refuses dead values | done | verified against real bogus tokens: provider 401 → declined, not served |
+| `creds doctor` | done | live calls, ok/FAIL/n-a, scope-aware. **FAIL 0** on mac (ok 8) and winston (ok 7) |
+| Credential attestation | done | `credential.read/write/refresh/verify`, a set separate from EGRESS_KINDS |
+| Non-file stores | done | keychain on macOS, json on Linux, selected by one platform-aware function |
+| Instance-local precedence | done | `local.env` wins, which is how per-agent keys work |
+| First consumer wired | done | `cos_cred()` in cos_llm.sh, broker-served with an announced fallback |
+| Remaining consumers | **open** | winston still holds 4 copies of the Claude token; they persist until each reader calls the broker |
+| `owner` enforcement | **open** | declared in the index, not yet enforced at refresh time |
+
+**One index, not five.** `creds.py` read `.datacore/specs/` (35 entries, last
+updated 2026-04-23) while the synced secrets repo maintained its own. They drifted
+four months and neither tool knew about the other. Consolidated onto the
+secrets-repo copy — the only one that travels to another machine.
+
+**Scoping needed a finer grain than spaces.** `0-personal` held the health inputs
+a briefing reads AND exchange keys, the personal X account and droplet control, so
+scoping an assistant to that space handed it `GATE_API_KEY`. Split into
+`projects/trading`, `projects/jssr-x`, `projects/do-infra`. Winston assembles 25
+credentials against the workstation's 110, with trading, wallets, X accounts and
+the Etsy seller account verifiably excluded.
+
+That split immediately proved the value of declaring dependencies: nightshift's
+trading units were satisfied *by accident* because the keys sat in a space it
+already held. The split would have stripped them on the next hourly sync and
+broken 17 units. Caught by checking, not by a 02:00 failure, and now granted
+explicitly.
+
+**Winston was never an instance.** No secrets repo, no sync, no index, no
+assembled `.env` — every credential hand-placed into five files with no owner.
+That single gap is the root cause of the credential outages from 2026-07 to
+2026-08-18, and it is why the Claude token was absent from the index: the host
+that needed it was outside the system that maintains it.
+
+Winston is onboarded **without a repo clone**. A clone hands a host every space's
+credentials and then assembles a subset, which makes scoping advisory. It receives
+only its assembled set.
+
 ### Open questions
 
 | Question | Status |
 |---|---|
 | Does the datacored adapter's refresh become the `owner`, or does it move to `creds get`? | Open — it is a system service and cannot read a user-owned CLI store, which is the constraint that created the re-implementation in the first place |
+| What wrote the four winston env stores at 16:08 on 2026-08-17? | **RESOLVED** — an operator's own manual `cos_token_sync` run. It exercised the CLI, which refreshed, and propagated. Reconstructing it took an hour of mtimes and stayed a guess until confirmed; `credential.write` attestation makes the same question a query |
 | What wrote the four winston env stores at 16:08 on 2026-08-17? | **Unresolved.** `cos_token_sync` had never succeeded; the old timer is disabled. An unidentified writer is a blocker for declaring any `owner` |
 | Should `creds get` be a daemon rather than a CLI? | Open — a CLI with a lockfile is simpler and probably sufficient |
 | How do Winston/nightshift receive rotating credentials without minting? | Open — likely `creds get` over the Tailscale mesh against the Mac as owner |
@@ -2102,3 +2149,4 @@ and both were wrong. Measurement first.
 | 2026-04-23 | 1.0.0 | Multi-instance activation: BlackPi secrets repo, space-scoped split, sync/install scripts, 4 instances |
 | 2026-04-25 | 1.1.0 | Full deployment: Tailscale mesh (5 nodes), all 4 instances bootstrapped and git-syncing, PLUR Hub + Datafund DO + FDS_X aliases added |
 | 2026-08-18 | 1.2.0 | Extension: Rotating Credentials — lifecycle field, broker (`creds get`), liveness `creds doctor`, mint-host topology. Draft, not ratified |
+| 2026-08-18 | 1.3.0 | Extension implementation status: broker + doctor live on two hosts, index consolidated from five to one, project-level scoping, winston onboarded scoped. Still Draft |
