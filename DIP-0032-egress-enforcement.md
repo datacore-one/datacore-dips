@@ -6,7 +6,8 @@
 | **Title** | Egress Enforcement |
 | **Author** | @datacore-one |
 | **Type** | Infrastructure |
-| **Status** | Partial |
+| **Status** | Draft |
+| **Implementation** | Partial — Phase 1 landed, Phase 2 (hermes-agent) outstanding |
 | **Created** | 2026-07-25 |
 | **Updated** | 2026-07-25 |
 | **Tags** | `security`, `egress`, `agent-safety`, `chief-of-staff`, `approvals` |
