@@ -6,15 +6,27 @@
 | **Title** | Executor Adapters |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Depends** | DIP-0034 (Event Ledger Substrate) — hard dependency for the shadow-accounting half only (`ledger.log.EventLog`, the `spend.record` event type, its fold handler); the executor-abstraction half and the generator half are each independently functional without it — see Compatibility |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-08-03 |
+| **Updated** | 2026-08-27 |
 | **Tags** | `executors`, `provider-registry`, `shadow-accounting`, `spend.record`, `harness-generation`, `datacore-v2` |
 | **Affects** | `.datacore/lib/executors/__init__.py`, `.datacore/lib/executors/base.py`, `.datacore/lib/executors/claude_code.py`, `.datacore/lib/executors/hermes.py`, `.datacore/lib/executors/api.py`, `.datacore/lib/tests/test_executors.py`, `.datacore/lib/gen_claude_agents.py`, `.datacore/lib/tests/test_gen_claude_agents.py`, `.datacore/lib/ledger/fold.py` (`_handle_spend`, consumed not modified), `cos_generate.py`/`cos_reasoning.py` + one nightshift call site (deploy-side, not in this repo — named as follow-up below), `.datacore/modules/nightshift/module.yaml` (deploy-side, stale evaluator names — named as follow-up below) |
 | **Specs** | `.datacore/lib/executors/base.py`, `.datacore/lib/gen_claude_agents.py` |
 | **Agents** | any process that currently shells out to a specific harness CLI directly (candidates for migrating to `get_executor()`: `cos_generate.py`, `cos_reasoning.py`, the nightshift briefing call site owned by the registered `nightshift-orchestrator` agent, and datacore-bench's Layer A/B harness calls per DIP-0025); `registry_gc.py` and `gen_claude_agents.py` as the registry's two lifecycle/build tools; `agent-registry-auditor` as the registered agent that audits DIP-0016 compliance of the generator's own output surface (`.datacore/agents/*.md`) |
 | **Relates to** | `ENG-2026-0718-002` (provider-registry directive this DIP generalizes one layer up), `ENG-2026-0729-016` (ledger-mindset direction — shadow accounting item 3, conservation invariant item 4), DIP-0034 (Event Ledger Substrate — `spend.record` event this DIP is the first live producer of), DIP-0016 (Agent Registry — the schema `gen_claude_agents.py` reads), DIP-0040 (Agent Consolidation — the registry GC pass and evaluator roster this DIP's generator runs downstream of), DIP-0018 (Credential Management — governs executor provider credentials; deferred to, not defined by, this DIP), DIP-0026 (Architectural Primitives — `get_executor()`/`register()` is a named instance of the Adapter Pattern catalogued there), DIP-0036 (Config Plane — the runtime credential/config materialisation surface this DIP's adapters read), DIP-0025 (datacore-bench — named migration candidate) |
+
+> **Ratification note (2026-08-27).** Status moved `Draft` → `Implemented` on the
+> owner's instruction. **No human review was performed on this DIP.** It is recorded
+> here rather than left implicit, because the governance rule in `CLAUDE.base.md` is
+> that `Implemented`/`Accepted` require owner ratification — this satisfies that rule
+> by owner instruction alone, not by review.
+>
+> `Implemented` here means the work this DIP specifies has landed. It does **not**
+> mean every follow-up named in the body is closed; several of these DIPs explicitly
+> record outstanding gates as follow-up work, and those remain open. Read the
+> Implementation/Rollout sections for the per-DIP position rather than inferring it
+> from this status field.
 
 ## Summary
 

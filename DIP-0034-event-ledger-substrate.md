@@ -6,9 +6,9 @@
 | **Title** | Event Ledger Substrate |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-08-03 |
+| **Updated** | 2026-08-27 |
 | **Tags** | `ledger`, `events`, `hash-chain`, `hlc`, `signing`, `datacore-v2` |
 | **Affects** | `.datacore/lib/ledger/` (`hlc.py`, `events.py`, `log.py`, `verify.py`, `fold.py`, `index.py`), `.datacore/lib/ledger_cli.py`, `<space>/.datacore/events/`, `~/.datacore/keys/`, `.datacore/keys/registry.yaml` |
 | **Specs** | `.datacore/lib/ledger/*.py`, `.datacore/lib/ledger_cli.py` |
@@ -16,6 +16,18 @@
 | **Depends** | — (foundation DIP; no dependencies. [DIP-0035](DIP-0035-job-contracts.md), [DIP-0038](DIP-0038-action-loop-cosign.md), and [DIP-0041](DIP-0041-executor-adapters.md) depend on this DIP — see Phase → DIP table in Specification) |
 | **Renumbered from** | DIP-0033 (claimed by a parallel session for "Delivery Verification & Smoke Scenarios" before this DIP landed) |
 | **Relates to** | ENG-2026-0729-016 (ledger-mindset direction), ENG-2026-0729-030 (signing opt-in amendment), ENG-2026-0727-004 (Mac↔box sync failure genre), ENG-2026-0423-001 (nightshift git-lock silent failure), DIP-0011 (Nightshift), DIP-0018 (Credential Management) |
+
+> **Ratification note (2026-08-27).** Status moved `Draft` → `Implemented` on the
+> owner's instruction. **No human review was performed on this DIP.** It is recorded
+> here rather than left implicit, because the governance rule in `CLAUDE.base.md` is
+> that `Implemented`/`Accepted` require owner ratification — this satisfies that rule
+> by owner instruction alone, not by review.
+>
+> `Implemented` here means the work this DIP specifies has landed. It does **not**
+> mean every follow-up named in the body is closed; several of these DIPs explicitly
+> record outstanding gates as follow-up work, and those remain open. Read the
+> Implementation/Rollout sections for the per-DIP position rather than inferring it
+> from this status field.
 
 ## Summary
 

@@ -6,15 +6,27 @@
 | **Title** | Agent Consolidation |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-07-30 |
+| **Updated** | 2026-08-27 |
 | **Tags** | `agents`, `registry`, `lifecycle`, `gc`, `personas-as-data`, `datacore-v2` |
 | **Affects** | `.datacore/lib/registry_gc.py`, `.datacore/lib/tests/test_registry_gc.py`, `.datacore/registry/agents.yaml`, `.datacore/registry/archive/agents-deprecated.yaml`, `.datacore/registry/evaluators.yaml`, `.datacore/4-archive/agents/` (archive destination — corrected; see "Correction: archive destination was harness-visible" in Implementation), `.datacore/lib/agents/evaluator.md`, `.datacore/modules/nightshift/module.yaml` (deploy-side, not in this repo) |
 | **Specs** | `.datacore/lib/registry_gc.py`, `.datacore/registry/evaluators.yaml` |
 | **Agents** | `agent-registry-auditor`, `context-maintainer`, any agent spawned via the registry (`ai-task-executor`, `nightshift-orchestrator`) |
 | **Depends** | [DIP-0016](DIP-0016-agent-registry.md) (schema and both top-level sections this DIP's tooling operates on) |
 | **Relates to** | DIP-0016 (Agent Registry & Discoverability — the schema and both top-level sections this DIP's tooling operates on), DIP-0021 (origin of the `deprecated`/`superseded_by` convention adopted here as canonical; see "Proposed Amendment to DIP-0016" below), DIP-0011 (Nightshift Module — its Implementation Status table documents the 20 `evaluator-*.md` files this DIP archives), DIP-0022 (Module Specification — `module_agents:` ownership and the re-population hazard documented in Integration) |
+
+> **Ratification note (2026-08-27).** Status moved `Draft` → `Implemented` on the
+> owner's instruction. **No human review was performed on this DIP.** It is recorded
+> here rather than left implicit, because the governance rule in `CLAUDE.base.md` is
+> that `Implemented`/`Accepted` require owner ratification — this satisfies that rule
+> by owner instruction alone, not by review.
+>
+> `Implemented` here means the work this DIP specifies has landed. It does **not**
+> mean every follow-up named in the body is closed; several of these DIPs explicitly
+> record outstanding gates as follow-up work, and those remain open. Read the
+> Implementation/Rollout sections for the per-DIP position rather than inferring it
+> from this status field.
 
 ## Summary
 

@@ -6,15 +6,27 @@
 | **Title** | Action Loop + Co-sign |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-08-03 |
+| **Updated** | 2026-08-27 |
 | **Tags** | `action-loop`, `co-sign`, `approvals`, `briefing`, `policy`, `datacore-v2` |
 | **Affects** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py`, `.datacore/keys/approvals_policy.yaml`, future `cos_approval_*` MCP wiring, Telegram dismiss/approve handlers |
 | **Specs** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py` |
 | **Agents** | any process that materializes briefing items into ledger items (`briefing.actions.materialize`); any human approver granting cosign for a side-effecting item |
 | **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate. Non-functional without it: the `item.create`/`approval.grant` event schema, `EVENT_TYPES`, and the Task 5.2b cross-actor HLC ordering fix this DIP's grant→create causality relies on. |
 | **Relates to** | winston-open-gaps item 7 (approvals loop built but never wired), DIP-0037 (Grounded Briefings — the upstream producer of the items this DIP materializes, soft/optional), DIP-0032 (Egress Enforcement — structural precedent for "policy file + fail-closed defaults"), DIP-0009 (GTD Specification — adjacent, disambiguated GTD task-state model, see Specification), DIP-0013 (Meetings Module §5.2 — escalation-detection pattern cited in Open Questions), DIP-0006 (Open Questions Management — superseded into DIP-0013 §4, cited for the same reason), `ENG-2026-0729-030` (signing opt-in amendment — the trust boundary this DIP's co-sign gate operates under) |
+
+> **Ratification note (2026-08-27).** Status moved `Draft` → `Implemented` on the
+> owner's instruction. **No human review was performed on this DIP.** It is recorded
+> here rather than left implicit, because the governance rule in `CLAUDE.base.md` is
+> that `Implemented`/`Accepted` require owner ratification — this satisfies that rule
+> by owner instruction alone, not by review.
+>
+> `Implemented` here means the work this DIP specifies has landed. It does **not**
+> mean every follow-up named in the body is closed; several of these DIPs explicitly
+> record outstanding gates as follow-up work, and those remain open. Read the
+> Implementation/Rollout sections for the per-DIP position rather than inferring it
+> from this status field.
 
 ## Summary
 

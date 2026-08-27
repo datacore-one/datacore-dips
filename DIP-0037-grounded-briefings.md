@@ -6,15 +6,27 @@
 | **Title** | Grounded Briefings |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-08-03 |
+| **Updated** | 2026-08-27 |
 | **Tags** | `briefing`, `grounding`, `hallucination`, `fact-table`, `validation`, `datacore-v2` |
 | **Depends On** | [DIP-0034](DIP-0034-event-ledger-substrate.md) (Event Ledger Substrate — Draft, unratified; `emit_facts` writes into `metric.attest`'s `fact` class — see Relationship to DIP-0034 in Integration) |
 | **Affects** | `.datacore/lib/briefing/` (`fact_table.py`, `render.py`), `.datacore/lib/briefing_grounded.py`, future `cos_generate.py`/`cos_reasoning.py` call sites |
 | **Specs** | `.datacore/lib/briefing/fact_table.py`, `.datacore/lib/briefing/render.py`, `.datacore/lib/briefing_grounded.py` |
 | **Agents** | any process that generates briefing prose via an LLM (`/today`, `cos_generate.py`, `cos_reasoning.py`, nightshift briefing jobs) — see Agent Context below |
 | **Relates to** | `ENG-2026-0728-002` (the motivating incident), [DIP-0035](DIP-0035-job-contracts.md) (Job Contracts — fact-freshness verification), [DIP-0038](DIP-0038-action-loop-cosign.md) (Action Loop + Co-sign — briefing items become ledger items downstream of this DIP's output) |
+
+> **Ratification note (2026-08-27).** Status moved `Draft` → `Implemented` on the
+> owner's instruction. **No human review was performed on this DIP.** It is recorded
+> here rather than left implicit, because the governance rule in `CLAUDE.base.md` is
+> that `Implemented`/`Accepted` require owner ratification — this satisfies that rule
+> by owner instruction alone, not by review.
+>
+> `Implemented` here means the work this DIP specifies has landed. It does **not**
+> mean every follow-up named in the body is closed; several of these DIPs explicitly
+> record outstanding gates as follow-up work, and those remain open. Read the
+> Implementation/Rollout sections for the per-DIP position rather than inferring it
+> from this status field.
 
 ## Summary
 

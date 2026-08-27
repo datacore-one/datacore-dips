@@ -6,15 +6,27 @@
 | **Title** | Job Contracts + Unified Verifier |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-07-30 |
+| **Updated** | 2026-08-27 |
 | **Tags** | `jobs`, `verification`, `manifest`, `artifacts`, `metric-attest`, `datacore-v2` |
 | **Affects** | `.datacore/lib/jobs/` (`manifest.py`, `checks.py`, `manifest.yaml`), `.datacore/lib/job_verify.py` |
 | **Specs** | `.datacore/lib/jobs/*.py`, `.datacore/lib/job_verify.py` |
 | **Agents** | any process operating a scheduled job on mac/box/nightshift; `job_verify.py` itself as the verification runner |
 | **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — hard: event schema, `EventLog`, actor resolution (DIP-0034 is itself unratified/Draft, so this dependency chain is Draft → Draft) |
 | **Relates to** | DIP-0034 (Event Ledger Substrate — `metric.attest` sink), `ENG-2026-0729-016` (ledger-mindset direction, item 2: verification contracts), `ENG-2026-0728-001` (silent-degradation failure genre), `ENG-2026-0423-001` (nightshift git-lock silent failure — same failure genre) |
+
+> **Ratification note (2026-08-27).** Status moved `Draft` → `Implemented` on the
+> owner's instruction. **No human review was performed on this DIP.** It is recorded
+> here rather than left implicit, because the governance rule in `CLAUDE.base.md` is
+> that `Implemented`/`Accepted` require owner ratification — this satisfies that rule
+> by owner instruction alone, not by review.
+>
+> `Implemented` here means the work this DIP specifies has landed. It does **not**
+> mean every follow-up named in the body is closed; several of these DIPs explicitly
+> record outstanding gates as follow-up work, and those remain open. Read the
+> Implementation/Rollout sections for the per-DIP position rather than inferring it
+> from this status field.
 
 ## Summary
 

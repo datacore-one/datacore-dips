@@ -6,15 +6,27 @@
 | **Title** | Config Plane |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-08-03 |
+| **Updated** | 2026-08-27 |
 | **Depends On** | DIP-0035 (Job Contracts — `required_env` schema `doctor()` audits directly); DIP-0034 (Event Ledger Substrate — Rollout Plan phase numbering only, no event type consumed) |
 | **Tags** | `config`, `env`, `secrets`, `doctor`, `datacore-v2` |
 | **Affects** | `.datacore/lib/config_plane.py`, `.datacore/lib/job_verify.py` (`--doctor` flag, `DATACORE_CANONICAL_ENV`), `~/.datacore/datacore.env` (canonical, per machine), legacy sources: `~/.config/cos.env`, `/etc/datacored.env`, `~/.hermes/.env` |
 | **Specs** | `.datacore/lib/config_plane.py`, `.datacore/lib/job_verify.py` |
 | **Agents** | any process reading a job's `required_env`; `job_verify.py --doctor` as the audit surface; `cos-server-setup.sh` (Phase 6 migration) |
 | **Relates to** | DIP-0018 (Credential Management — this DIP is a machine-local consumption view over DIP-0018's stores, not a replacement; see Relationship to DIP-0018), DIP-0034 (Event Ledger Substrate), DIP-0035 (Job Contracts + Unified Verifier — `required_env` is this DIP's own audit input), `ENG-2026-0728-001` (silent-degradation failure genre, item 1: token-refresh sync gap), `ENG-2026-0725-016` (single-refresher-owner pattern for rotating credentials) |
+
+> **Ratification note (2026-08-27).** Status moved `Draft` → `Implemented` on the
+> owner's instruction. **No human review was performed on this DIP.** It is recorded
+> here rather than left implicit, because the governance rule in `CLAUDE.base.md` is
+> that `Implemented`/`Accepted` require owner ratification — this satisfies that rule
+> by owner instruction alone, not by review.
+>
+> `Implemented` here means the work this DIP specifies has landed. It does **not**
+> mean every follow-up named in the body is closed; several of these DIPs explicitly
+> record outstanding gates as follow-up work, and those remain open. Read the
+> Implementation/Rollout sections for the per-DIP position rather than inferring it
+> from this status field.
 
 ## Summary
 
