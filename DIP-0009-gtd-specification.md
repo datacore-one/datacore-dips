@@ -8,7 +8,7 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-04 |
-| **Updated** | 2026-07-24 (v1.1 — canonical state vocabulary; see Part 2 amendment note) |
+| **Updated** | 2026-08-29 (v2.0 DRAFT — seven-state loop, agents-as-workers; pending ratification. Prior: v1.1 2026-07-24) |
 | **Tags** | `gtd`, `task-management`, `org-mode`, `agents` |
 | **Affects** | `org/`, `.datacore/commands/`, `.datacore/agents/`, `.datacore/modules/gtd/` |
 | **Specs** | `org-mode-conventions.md` |
@@ -266,11 +266,99 @@ Regular reviews ensure system integrity.
 > (3) retires `EXECUTING` (`WORKING` is canonical), (4) requires a chokepoint
 > state writer and full requeue coverage.
 
-### Canonical Vocabulary (normative)
+> **Amendment v2.0 (2026-08-29) — DRAFT, pending ratification.** Rulings below
+> were made by Gregor in session on 2026-08-28/29; the amendment text itself
+> awaits his ratification and stays Draft until he marks it otherwise.
+>
+> **Principle: agents and humans are the same class of worker.** The state
+> axis answers exactly one question — *who has the ball* — and it answers it
+> identically for both. Everything else (who is assigned, whether execution
+> is in flight, how an attempt went) is a property, never a state. Humans
+> have no QUEUED/WORKING/FAILED states; therefore neither do agents.
 
-Every task-carrying org file MUST declare this exact header, and parsers MUST
-read per-file `#+SEQ_TODO` headers as the source of truth (falling back to
-this canonical set when a header is absent):
+### Canonical Vocabulary (normative, v2.0)
+
+Every task-carrying org file — **including `projects.org`; the v1.1 exemption
+is revoked** — MUST declare this exact header, and parsers MUST read per-file
+`#+SEQ_TODO` headers as the source of truth (falling back to this canonical
+set when a header is absent):
+
+```org
+#+SEQ_TODO: TODO(t) NEXT(n!) WAITING(w!) REVIEW(r!) | DONE(d!) DEFERRED(f!) CANCELLED(c!)
+```
+
+**Ball semantics:** `TODO`/`NEXT` — the owner · `WAITING` — someone else,
+including anyone the owner delegated to (`:ASSIGNEE:`) · `REVIEW` — the
+task's **owner** must judge delivered work (any actor may enter REVIEW; only
+the owner — human or agent — moves it out) · right of `|` — closed three
+ways: done / benched-with-reason / won't-do.
+
+**v2.0 rulings** (each ratified in session, 2026-08-28/29):
+
+1. **QUEUED retired.** Assignment is a property, not a state: committed work
+   is `NEXT`; the fleet is addressed via `:AI:` + `:APPROVED_BY:` (see the
+   delegation gate, datacore#59), a specific worker via `:ASSIGNEE:`.
+2. **WORKING retired.** In-flight is telemetry: a running CLOCK,
+   `:NIGHTSHIFT_EXECUTOR:`, `:NIGHTSHIFT_STARTED:`. The double-execution
+   lock is the git claim protocol and never was the state keyword.
+3. **FAILED retired.** A failed attempt never closes a task. The task stays
+   `NEXT` with `:NIGHTSHIFT_ATTEMPTS:` incremented and the outcome recorded
+   in telemetry; the **second** consecutive failure escalates to `REVIEW`.
+   (Evidence: enterprise#1058 sat invisible in FAILED until hand-requeued,
+   2026-08-28.)
+4. **DEFERRED is closed** ("done deciding, not now") and gains the `f!`
+   logging cookie — benching decisions deserve timestamps. A well-formed
+   DEFERRED carries a wake trigger: a `SCHEDULED:` date (the nightly sweep
+   wakes past-due entries to `TODO`), or a `:PARK_REASON:` naming an intent
+   lane (flipping that lane's `:SWITCH:` back to `on` wakes its parks).
+   Undated, unconditioned DEFERRED is lint-flagged — that item belongs in
+   `someday.org`, which keeps its distinct GTD role: never-committed maybes,
+   vs DEFERRED's considered-and-benched.
+5. **DEFERRED never dismisses in the ledger.** `item.dismiss` is terminal
+   (DIP-0034) and a benched task must be wakeable: closed-in-org ≠
+   dismissed-in-ledger. Only `DONE` dismisses today. *Open question, not
+   ruled: should `CANCELLED` emit `item.dismiss(kind=cancelled)`?*
+6. **PAUSED does not exist** (`WAITING` covers it; audit 2026-08-28 found
+   zero entries). **ASSIGN retired** (declared once, used never).
+   **DELEGATED rejected**: delegation is `WAITING` + `:ASSIGNEE:` — the GTD
+   waiting-for list. Personal vs organisational spaces differ by *defaults
+   and policy* (in `0-personal`, no `:ASSIGNEE:` means the principal), never
+   by alphabet.
+7. **`projects.org` folds into canon**: `PROJECT`→`TODO`, `ACTIVE`→`NEXT`,
+   `COMPLETED`→`DONE`, `CANCELLED` unchanged. Entity type is carried by the
+   file, not a private state alphabet.
+8. **Shadow vocabulary eliminated.** `:NIGHTSHIFT_STATUS:` is last-attempt
+   telemetry with values drawn from the canon (lowercase): `done`, `review`,
+   `proposal`, `failed`. The values `executing`, `needs_review`, `queued`
+   and `working` are retired everywhere.
+9. **Terminology**: the ledger's `item.owner` field means the current claim
+   **holder** (the worker); the accountable party is the org-level **owner**
+   (`:OWNER:`, defaulting per space). Prose must not conflate them.
+
+**Migration** (one-time, live files only — archives untouched):
+`QUEUED`→`NEXT` · `WORKING`→`NEXT` (stale claims) · `FAILED`→`REVIEW` (one
+human triage pass) · `PROJECT`→`TODO` · `ACTIVE`→`NEXT` · `COMPLETED`→`DONE`.
+
+**Valid transitions (v2.0):**
+- `TODO` → `NEXT`, `WAITING`, `REVIEW`, `DONE`, `DEFERRED`, `CANCELLED`
+- `NEXT` → `TODO`, `WAITING`, `REVIEW`, `DONE`, `DEFERRED`, `CANCELLED`
+- `WAITING` → `TODO`, `NEXT`, `REVIEW`, `DONE`, `DEFERRED`, `CANCELLED`
+- `REVIEW` → `DONE`, `NEXT` (rework), `DEFERRED`, `CANCELLED` — owner only
+- `DEFERRED` → `TODO` (wake: past-due `SCHEDULED:`, lane back on, or human)
+- `DONE`, `CANCELLED` → terminal (`FAILED` no longer exists; `DEFERRED` is
+  closed but wakeable, i.e. done-class, non-terminal — the FAILED-in-v1.1
+  parser pattern)
+
+**Lint (normative):** exactly one `#+SEQ_TODO` string may appear across live
+org files; any heading carrying a retired keyword (`QUEUED WORKING FAILED
+PAUSED ASSIGN PROJECT ACTIVE COMPLETED EXECUTING`) in a live file is a
+violation; undated, unconditioned `DEFERRED` is a warning.
+
+---
+
+> **Historical (v1.1, superseded by v2.0 above — retained for context):**
+
+### Canonical Vocabulary (v1.1, superseded)
 
 ```org
 #+SEQ_TODO: TODO(t) NEXT(n!) WAITING(w!) DEFERRED(f) QUEUED(q) WORKING(W!) REVIEW(r!) | DONE(d!) FAILED(x!) CANCELLED(c!)
@@ -278,6 +366,7 @@ this canonical set when a header is absent):
 
 Exemption: `projects.org` keeps its separate sequence
 (`PROJECT ACTIVE PAUSED | COMPLETED CANCELLED`) — it tracks projects, not tasks.
+*(Both the exemption and the ten-state set are revoked by v2.0.)*
 
 ### State Definitions
 
