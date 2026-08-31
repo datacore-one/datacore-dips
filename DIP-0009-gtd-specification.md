@@ -316,8 +316,18 @@ ways: done / benched-with-reason / won't-do.
    vs DEFERRED's considered-and-benched.
 5. **DEFERRED never dismisses in the ledger.** `item.dismiss` is terminal
    (DIP-0034) and a benched task must be wakeable: closed-in-org ≠
-   dismissed-in-ledger. Only `DONE` dismisses today. *Open question, not
-   ruled: should `CANCELLED` emit `item.dismiss(kind=cancelled)`?*
+   dismissed-in-ledger. **`DONE` and `CANCELLED` both dismiss** — the
+   transition table below already rules both terminal, and DEFERRED
+   explicitly non-terminal, so this follows from the ratified loop rather
+   than adding to it. `CANCELLED` dismisses with `kind="dropped"`, not a new
+   `cancelled` kind: `fold.closure_kind` admits `done | dropped |
+   housekeeping`, and `fold.was_finished()` counts only `done`, so cancelled
+   work must not be allowed to inflate completion stats.
+   (Evidence for ruling it rather than leaving it open: while unruled, the
+   ingest closed only `DONE`, so 33 cancelled tasks across four spaces stayed
+   live in the projection as permanent drift — `all_clean` could never become
+   true and `box-projection-drift` alerted nightly about a condition no run
+   could clear. 2026-08-31.)
 6. **PAUSED does not exist** (`WAITING` covers it; audit 2026-08-28 found
    zero entries). **ASSIGN retired** (declared once, used never).
    **DELEGATED rejected**: delegation is `WAITING` + `:ASSIGNEE:` — the GTD
