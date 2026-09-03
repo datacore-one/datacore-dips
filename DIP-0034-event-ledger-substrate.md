@@ -10,7 +10,7 @@
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-08-27 |
 | **Tags** | `ledger`, `events`, `hash-chain`, `hlc`, `signing`, `datacore-v2` |
-| **Affects** | `.datacore/lib/ledger/` (`hlc.py`, `events.py`, `log.py`, `verify.py`, `fold.py`, `index.py`), `.datacore/lib/ledger_cli.py`, `<space>/.datacore/events/`, `~/.datacore/keys/`, `.datacore/keys/registry.yaml` |
+| **Affects** | `.datacore/lib/ledger/` (`hlc.py`, `events.py`, `log.py`, `verify.py`, `fold.py`, `index.py`), `.datacore/lib/ledger_cli.py`, `<space>/.datacore/events/`, `~/.datacore/keys/` (generated on the first signed write), `.datacore/keys/registry.yaml` (generated on the first signed write by `keys.ensure_keypair`; absent until `DATACORE_LEDGER_SIGN=1`) |
 | **Specs** | `.datacore/lib/ledger/*.py`, `.datacore/lib/ledger_cli.py` |
 | **Agents** | any agent that creates, claims, completes, or verifies a ledger item; any process that spends budget on an agent's behalf |
 | **Depends** | — (foundation DIP; no dependencies. [DIP-0035](DIP-0035-job-contracts.md), [DIP-0038](DIP-0038-action-loop-cosign.md), and [DIP-0041](DIP-0041-executor-adapters.md) depend on this DIP — see Phase → DIP table in Specification) |

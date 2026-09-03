@@ -10,7 +10,7 @@
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-08-27 |
 | **Tags** | `agents`, `registry`, `lifecycle`, `gc`, `personas-as-data`, `datacore-v2` |
-| **Affects** | `.datacore/lib/registry_gc.py`, `.datacore/lib/tests/test_registry_gc.py`, `.datacore/registry/agents.yaml`, `.datacore/registry/archive/agents-deprecated.yaml`, `.datacore/registry/evaluators.yaml`, `.datacore/4-archive/agents/` (archive destination — corrected; see "Correction: archive destination was harness-visible" in Implementation), `.datacore/lib/agents/evaluator.md`, `.datacore/modules/nightshift/module.yaml` (deploy-side, not in this repo) |
+| **Affects** | `.datacore/lib/registry_gc.py`, `.datacore/lib/tests/test_registry_gc.py`, `.datacore/registry/agents.yaml`, `.datacore/registry/archive/agents-deprecated.yaml`, `.datacore/registry/evaluators.yaml`, `.datacore/4-archive/agents/` (archive destination — corrected; see "Correction: archive destination was harness-visible" in Implementation), `.datacore/agents/evaluator.md`, `.datacore/modules/nightshift/module.yaml` (deploy-side, not in this repo) |
 | **Specs** | `.datacore/lib/registry_gc.py`, `.datacore/registry/evaluators.yaml` |
 | **Agents** | `agent-registry-auditor`, `context-maintainer`, any agent spawned via the registry (`ai-task-executor`, `nightshift-orchestrator`) |
 | **Depends** | [DIP-0016](DIP-0016-agent-registry.md) (schema and both top-level sections this DIP's tooling operates on) |
@@ -424,7 +424,7 @@ or a domain-specific one), collapsed into:
   true` for the 6 personas whose own body text says "Core evaluator -
   always runs for every task" (archivist, ceo, coo, critic, cto, user),
   `false` for the other 16 ("Domain evaluator - invoked for ...").
-- **`.datacore/lib/agents/evaluator.md`** — one parameterized agent
+- **`.datacore/agents/evaluator.md`** — one parameterized agent
   definition: load the roster by a given `persona` key, adopt that row's
   name/focus as the evaluation lens, evaluate the given artifact, return
   the standard evaluator output contract.
@@ -443,7 +443,7 @@ is covered.)
 **Known gap, not yet closed: the new `evaluator` agent itself has no
 registry entry.** Verified directly against the live `agents.yaml`: there
 is no `agents: evaluator:` entry and no `module_agents:` entry for
-`.datacore/lib/agents/evaluator.md` — it exists on disk unregistered. This
+`.datacore/agents/evaluator.md` — it exists on disk unregistered. This
 is a real correctness problem, not a hypothetical: once
 `registry_gc.py --apply` archives the 22 `evaluator-*` entries (as it has,
 per Achieved vs Target), `agents.yaml` — DIP-0016's sole source of truth
@@ -762,7 +762,7 @@ this one.
   section)
 - `.datacore/lib/registry_gc.py` (module docstring — full design rationale
   for every guard listed above)
-- `.datacore/registry/evaluators.yaml`, `.datacore/lib/agents/evaluator.md`
+- `.datacore/registry/evaluators.yaml`, `.datacore/agents/evaluator.md`
   (the evaluator consolidation's actual deliverables)
 
 ## Proposed Amendment to DIP-0016
@@ -878,4 +878,4 @@ evaluator panel (14)") names 20 individual `evaluator-{...}.md` files as
 current architecture. Once this section is folded in and DIP-0040's
 evaluator consolidation is treated as ratified, that table is stale and
 needs a follow-up correction pointing at `.datacore/registry/evaluators.yaml`
-+ `.datacore/lib/agents/evaluator.md` instead.
++ `.datacore/agents/evaluator.md` instead.

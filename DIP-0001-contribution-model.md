@@ -10,7 +10,7 @@
 | **Created** | 2025-12-01 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `contribution`, `git`, `privacy`, `fork` |
-| **Affects** | `.gitignore`, `INSTALL.md`, `CATALOG.md` |
+| **Affects** | `.gitignore`, `INSTALL.md`, `.datacore/CATALOG.md` |
 | **Specs** | `privacy-policy.md` |
 | **Agents** | - |
 

@@ -10,7 +10,7 @@
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-08-27 |
 | **Tags** | `action-loop`, `co-sign`, `approvals`, `briefing`, `policy`, `datacore-v2` |
-| **Affects** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py`, `.datacore/keys/approvals_policy.yaml`, future `cos_approval_*` MCP wiring, Telegram dismiss/approve handlers |
+| **Affects** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py`, `.datacore/config/approvals_policy.yaml`, future `cos_approval_*` MCP wiring, Telegram dismiss/approve handlers |
 | **Specs** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py` |
 | **Agents** | any process that materializes briefing items into ledger items (`briefing.actions.materialize`); any human approver granting cosign for a side-effecting item |
 | **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate. Non-functional without it: the `item.create`/`approval.grant` event schema, `EVENT_TYPES`, and the Task 5.2b cross-actor HLC ordering fix this DIP's grant→create causality relies on. |
@@ -92,7 +92,7 @@ see TRUST BOUNDARY below for the exact scope.
 | Can a dismissed item be un-dismissed? | No mechanism exists in the current event vocabulary. Dismissal is fold-level terminal; the only recovery is creating an unrelated new ledger item under a new id — see Open Question 4. |
 | Which event authorizes a gated `item.create`? | `approval.grant`, validated by `guarded_append`'s 8 ordered checks (actor-bound, id-bound, replay-blocked). |
 | Where does an ungranted side-effecting item go? | `MaterializeResult.blocked`; nothing is written to the log, and it reappears on every re-materialize call until granted — see Open Question 3 for the (deferred) escalation path. |
-| Who can gate an `item.create`? | Only the single `policy.approver` named in `.datacore/keys/approvals_policy.yaml`; per-effect approvers are Open Question 2. |
+| Who can gate an `item.create`? | Only the single `policy.approver` named in `.datacore/config/approvals_policy.yaml`; per-effect approvers are Open Question 2. |
 
 ### Related Agents
 
@@ -361,7 +361,7 @@ naming the unknown effect if any isn't registered — unconditionally,
 regardless of whether that effect would have required cosign at all. A
 legitimate non-cosign effect must be explicitly added to a custom
 `known_effects` list to remain usable; the tracked default
-`.datacore/keys/approvals_policy.yaml` now carries `known_effects` equal
+`.datacore/config/approvals_policy.yaml` now carries `known_effects` equal
 to the three default `cosign_effects`.
 
 This is a precondition for wiring, not the wiring itself: Phase 6's real
@@ -470,7 +470,7 @@ the first place.
   `MaterializeResult`, `act`.
 - **New**: `.datacore/lib/ledger/policy.py` — `Policy`, `PolicyError`,
   `load_policy`, `requires_cosign`, `guarded_append`.
-- **New**: `.datacore/keys/approvals_policy.yaml` — tracked, public, default
+- **New**: `.datacore/config/approvals_policy.yaml` — tracked, public, default
   policy (`approver: human`, `cosign_effects: [email.send, payment,
   prod.deploy]`).
 - **Amended**: DIP-0034's `EVENT_TYPES` — `approval.grant` added (already
@@ -497,7 +497,7 @@ the first place.
   calls bypass the gate silently, by construction of `EventLog` itself
   (`EventLog` has no opinion about policy; that opinion lives only in this
   DIP's module).
-- A new tracked config surface: `.datacore/keys/approvals_policy.yaml` —
+- A new tracked config surface: `.datacore/config/approvals_policy.yaml` —
   editable by an operator to change the approver or the cosign-gated effect
   set, without code changes.
 
@@ -571,7 +571,7 @@ Additive. No existing `EventLog`, `fold`, or `read_events` behavior changes —
 `guarded_append` is a new wrapper callers opt into; code that still calls
 `EventLog.append` directly continues to work exactly as before (ungated, as
 it always was), it simply does not get the enforcement this DIP adds. A
-space with no `.datacore/keys/approvals_policy.yaml` file behaves under the
+space with no `.datacore/config/approvals_policy.yaml` file behaves under the
 documented default policy (`approver=human`,
 `cosign_effects={email.send, payment, prod.deploy}`) rather than erroring —
 adopting this DIP requires no migration for spaces that have never used
@@ -581,7 +581,7 @@ are new functions with no prior callers to break.
 ## Security Considerations
 
 - **Public-repo constraint.** Both `~/Data` and this dips repo are public (or
-  public-adjacent). `.datacore/keys/approvals_policy.yaml` is policy, not key
+  public-adjacent). `.datacore/config/approvals_policy.yaml` is policy, not key
   material — it names an approver identity string and a set of effect tags,
   no secrets, and is tracked deliberately so the policy itself is auditable.
 - **See the TRUST BOUNDARY section above** — the substantive security caveat

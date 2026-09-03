@@ -10,9 +10,15 @@
 | **Created** | 2025-12-01 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `scaffolding`, `knowledge`, `projects`, `modules` |
-| **Affects** | `datacore-org/`, `spaces/`, `projects/` |
-| **Specs** | SCAFFOLDING.base.md (template in `datacore-org/`) |
+| **Affects** | `[0-9]-*/` (spaces), `[0-9]-*/2-projects/` (projects), `[0-9]-*/SCAFFOLDING.base.md` |
+| **Specs** | `[0-9]-*/SCAFFOLDING.base.md` |
 | **Agents** | `create-space`, `scaffolding-auditor` |
+
+> **Layout note (2026-09-02).** The Affects/Specs fields above named
+> `datacore-org/`, `spaces/` and `projects/` — the pre-DIP-0015 layout,
+> which has not existed for some time. Spaces are numbered directories
+> (`[0-9]-*/`) and projects live at `[space]/2-projects/`. Only the
+> paths changed; the pattern this DIP specifies is unaltered and live.
 
 ## Summary
 
