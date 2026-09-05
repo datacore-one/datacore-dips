@@ -8,9 +8,9 @@
 | **Type** | Architecture |
 | **Status** | Draft |
 | **Created** | 2026-08-13 |
-| **Updated** | 2026-08-13 |
+| **Updated** | 2026-09-06 |
 | **Tags** | `identity`, `actors`, `ledger`, `git`, `provenance`, `ssh` |
-| **Affects** | `.datacore/registry/infrastructure.yaml`, `.datacore/lib/fleet_status.py`, `.datacore/lib/hooks/log_ownership_guard.py`, `.datacore/lib/ledger/log.py`, every machine's `~/.ssh/config`, `git config --global`, per-agent GitHub accounts |
+| **Affects** | `.datacore/registry/infrastructure.yaml`, `.datacore/registry/principals.yaml`, `.datacore/lib/actor_identity.py`, `.datacore/lib/v2_verify.py`, `.datacore/lib/fleet_status.py`, `.datacore/lib/hooks/log_ownership_guard.py`, `.datacore/lib/ledger/log.py`, every machine's `~/.datacore/identity.env`, `git config --global`, per-agent GitHub accounts |
 | **Specs** | `.datacore/registry/infrastructure.yaml` (`servers.<name>.access.actor`) |
 | **Relates to** | DIP-0046 (Git Transport — authorization, where this DIP is authentication), DIP-0034 (Event Ledger Substrate — per-writer logs keyed by actor), DIP-0035 (Job Contracts — `--machine` selector) |
 
@@ -112,6 +112,65 @@ rebase, a push range legitimately contains other actors' commits. Blaming the
 courier both blocks honest work and trains agents to reach for
 `SKIP_PRE_PUSH=1`, disabling the check for the case it exists to catch.
 
+### 6. One resolver, and the hostname is a lookup key, never the answer
+
+Twenty-four sites resolved identity on their own with
+`DATACORE_ACTOR or gethostname()`, disagreeing on case and on domain
+stripping, and every one fell back to the hostname. One laptop wrote under
+`mac`, `Mac`, `Mac.home` and `air-23.local`; the executor on nightshift wrote
+under its hostname. `.datacore/lib/actor_identity.py` is the one resolver:
+
+1. `DATACORE_ACTOR` in the environment (a unit drop-in, a test);
+2. `~/.datacore/identity.env` — the machine's declaration, written once by
+   the host's installer;
+3. `servers.<name>.access.actor` in the infrastructure registry where
+   `access.hostname` or the server name equals this hostname;
+4. nothing: the short hostname, said once on stderr, so an undeclared machine
+   still writes (an event lost is worse than an event misfiled) but never
+   silently. `this_actor(strict=True)` raises `UndeclaredActor` instead.
+
+Every writer, sealer, verifier and adapter in `.datacore/lib` calls it; the
+nightshift and chief-of-staff modules call it through the root lib and keep
+the old expression only as a fallback for an older root. The daily checklist
+reports `identity declared` as FAIL when the actor equals the hostname, `n-a`
+when it is inferred from the registry (correct today, fragile), OK when
+declared.
+
+### 7. Principals: a writer log belongs to someone
+
+`registry/principals.yaml` binds each writer log to a principal — human,
+agent, executor or migration — with the git identities that may append to it,
+its GitHub account, its host, what it owns, which executors write for it, its
+charter, its contracts, its memory scope, and (when decided) its budget and
+permission mode. A field not yet decided is null and stays null until the
+owner decides it. Two writers may belong to one principal: `miles` and
+`nightshift` on the same machine are the bot's log and the executor's log,
+both Miles's; the executor declares its own actor in a unit drop-in
+(`Environment=DATACORE_ACTOR=nightshift`) rather than inheriting the
+machine's.
+
+### 8. Authorship is verified per log, from the day it is declared
+
+A per-writer hash chain is tamper-evident, not authenticated: any account that
+can push can append to any log. The checklist's `writer logs authored by
+their principal` reads, for every `<space>/.datacore/events/<writer>.jsonl`,
+the non-merge commits that touched it since 2026-09-05 and fails when an
+author email is outside the principal's `emails`. Merge commits are couriers,
+not authors, and are not counted. Run against the whole tree on 2026-09-05
+it passed on 46 logs and found two earlier courier commits made by autosave
+before the rule existed (0-personal/nightshift by winston, 6-meridian/mac by
+miles); they are on the record in the architecture audit of that date and are
+not re-flagged.
+
+### 9. Provenance on the event
+
+The actor says which writer; it does not say which agent definition, on which
+model, through which auth path. `completed` lifecycle events from the
+executor now carry `model` and `auth`. Role (the venture hat a principal
+wears) and the agent's registry version follow in the same field set; an
+event without them is not wrong, it is merely less answerable.
+
+
 ## Consequences
 
 - A probe must read the registry, never guess. `fleet_status.py` reports `?`
@@ -120,6 +179,10 @@ courier both blocks honest work and trains agents to reach for
 - Gitea and PLUR are **not yet aligned**: both still collapse every agent into
   a single `gregor` identity, so attribution is correct on GitHub and lost
   everywhere else. That is the next gap this DIP implies but does not close.
+- A principal without a charter, a contract and a scoreboard row is a name,
+  not yet a principal. The product description of 2026-09-05 ("the contract
+  of being a principal") lists the ten things; sections 6–9 here cover the
+  first of them.
 
 ## Open questions
 
@@ -133,6 +196,9 @@ courier both blocks honest work and trains agents to reach for
 
 ## Status notes
 
-The specification above is implemented and verified as of 2026-08-13. It stays
-**Draft** until owner ratification, per the governance rule that
-`Implemented`/`Accepted` requires review rather than self-certification.
+Sections 1–5 were implemented and verified on 2026-08-13. Sections 6–9 were
+implemented on 2026-09-05/06 (datacore PR #106, nightshift PR #6,
+chief-of-staff PR #18; identity declared on all five machines, the checklist
+green on the box). The DIP stays **Draft** until owner ratification, per the
+governance rule that `Implemented`/`Accepted` requires review rather than
+self-certification.
