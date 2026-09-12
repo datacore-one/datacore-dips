@@ -1087,6 +1087,22 @@ and destination before acknowledgment. This applies when committing on the
 current branch as well as through an isolated publication worktree. Applicable
 hooks still run; changes they introduce are not implicitly approved outputs.
 
+An output declaration does not authorize pre-existing parent history. Before
+automatic publication, every commit absent from the freshly observed destination
+must have explicit publication authority for that destination. Verified local
+commits retain durable provenance across rejected pushes and process restarts;
+an unchanged output cannot grant provenance to an existing unverified commit.
+Changing the destination repository or branch requires new authority. Incomplete
+or rewritten local history cannot establish that all outgoing ancestors were
+checked. Initializing a new remote with pre-existing history requires an explicit
+reconciliation step, not an implicit side effect of publishing one selected file.
+
+The publisher binds the transport destination it verified and conditionally
+updates the observed remote generation. If that generation changes, integration
+rechecks outgoing authority against its newly fetched base. A removed remote
+ancestor cannot be republished merely because an earlier observation included it.
+These requirements apply to standalone, task, batch and report publication alike.
+
 An interrupted or rejected commit must not silently become an accepted base on
 retry. The publisher records its intent durably before mutating commit state.
 If the result cannot be verified, automatic publication refuses until retained
@@ -1125,6 +1141,18 @@ for retry. Rollback owns only mutations attempted by the transaction: watching
 an input neither authorizes restoring it nor requires an unrelated writer's
 later change to be undone before owned outputs can be rolled back. Independent
 changes to files the transaction actually modified still require reconciliation.
+
+| Outgoing-history clarification record | Detail |
+| --- | --- |
+| Previous requirement | The publisher verified selected content, one parent and an immutable commit, without defining authorization for that parent's previously unpublished ancestors. |
+| Problem | Both a new selected output and a no-op retry could publish unrelated older commits. A later remote rewind or destination change could change which historical data the operation discloses. |
+| Corrected requirement | Check all outgoing commits against a fresh destination and retain destination-bound provenance for verified local commits. Recheck after remote races and bind the transport endpoint and generation. |
+| Reason | File ownership and immutable identity do not authorize all reachable Git history. Rejected pushes must remain retryable without approving unrelated work. |
+| Implementation impact | Durable Git verification refs, whole-outgoing-history validation, explicit conditional push and a shared integration authorization check. |
+| Compatibility impact | Earlier unpublished commits lacking provenance require explicit reconciliation. Existing remote history remains an acknowledged base; ordinary verified retries are preserved. Automatic remote initialization is excluded. |
+| Tests affected | Same/off-branch changed and unchanged outputs, unverified intermediate parents, failed push followed by a new process, destination substitution, remote rewind, hooks and incomplete history. |
+| Runtime/deployment impact | All automatic file publishers need compatible core code and persistent private Git state. Existing pending histories must be reconciled before activation; this is not OS isolation or a distributed execution fence. |
+| Status | Proposed clarification; current runtime compliance is not asserted. |
 
 | Preserved-move clarification record | Detail |
 | --- | --- |
