@@ -1109,6 +1109,33 @@ conflict, unavailable dependency or rejecting hook retains work and reports an
 unacknowledged result. A local durable commit and a published result remain
 separate outcomes.
 
+Publication of a file move requires an explicit pair: the source's captured Git
+version and the destination containing the preserved bytes. A missing file is
+never an implicit request to delete it. A newer source, an independently changed
+archive, a reappearing source, or a transformation that changes the preserved
+bytes refuses publication. Repeated publication of an already committed move
+still requires remote acknowledgement. Ordinary file-output declarations do not
+acquire deletion authority.
+
+When local routing acknowledges or removes its input before remote publication,
+the same recoverable transaction must retain the producer's publication intent.
+After an interruption, recovery runs before that intent is treated as committed
+or the source is considered processed. A failed push retains the intent and data
+for retry. Rollback owns only mutations attempted by the transaction: watching
+an input neither authorizes restoring it nor requires an unrelated writer's
+later change to be undone before owned outputs can be rolled back. Independent
+changes to files the transaction actually modified still require reconciliation.
+
+| Preserved-move clarification record | Detail |
+| --- | --- |
+| Previous requirement | Publication named existing output files and retained rejected commits, without a source/destination deletion precondition or durable routing-to-publication intent. |
+| Problem | A broad sweep can publish unrelated deletions; excluding missing paths cannot publish a legitimate archive move; an interrupted acknowledgement can lose its retry obligation. Read-only inputs in an undo journal can also strand dependent outputs. |
+| Corrected requirement and reason | Bind each move to the exact prior source version and preserved archive, retain publication intent with local acknowledgement, and distinguish watched inputs from rollback-owned mutations. This preserves data without inventing deletion authority. |
+| Implementation impact | Explicit move receipts reuse verified commits and normal hooks; routing records actual writes and moves in private durable state; recovery precedes source discovery and pending-intent reads. |
+| Compatibility impact | Normal existing-file publication is unchanged. Conflicting moves and lossy archive filters refuse. This is an in-repository processed-report move, not an implementation of future permanent-archive delivery or disposal in DIP-0017. |
+| Tests affected | Same/off-branch moves, unchanged retries after failed push, stale source and archive versions, normal hook/filter changes, unrelated staged work, source/intent interruption, watched-only changes and historical recovery journals. |
+| Runtime/deployment impact | Producers and publishers require compatible installed libraries and private recovery storage. Receipts remain cooperative controls and provide neither credential isolation nor cross-host executor fencing. |
+
 | Clarification change record | Detail |
 | --- | --- |
 | Previous requirement | The acknowledgement amendment required an immutable candidate and normal hooks without specifying current-branch commits, retry after an unverified local commit, or merge construction during retry. |
