@@ -1078,6 +1078,47 @@ results; none implicitly proves the others. In particular, immediate claim push
 reduces propagation latency but does not establish cross-host exclusivity or
 fence a stale executor.
 
+#### Local commit verification and retry — proposed clarification, 2026-09-12
+
+An output declaration defines the paths the producer may publish. An inventory
+may narrow this declaration; missing declarations or unrelated dirty files do
+not broaden it. A local commit is checked against the captured content, parent
+and destination before acknowledgment. This applies when committing on the
+current branch as well as through an isolated publication worktree. Applicable
+hooks still run; changes they introduce are not implicitly approved outputs.
+
+An interrupted or rejected commit must not silently become an accepted base on
+retry. The publisher records its intent durably before mutating commit state.
+If the result cannot be verified, automatic publication refuses until retained
+state has been reconciled. Neither elapsed time nor the absence of the original
+process establishes approval. These are cooperative repository controls, not a
+credential or OS security boundary.
+
+Recovery content remains reachable independently of the writer's current index
+and ordinary Git housekeeping. A JSON record naming an object is insufficient:
+unreferenced objects may be pruned after subsequent staging. Required captured
+objects and recovery refs are flushed before hooks or later mutations can make
+them the only retained version. A failed attempt with unchanged refs can release
+its publication reservation while preserving altered working-file versions and
+the corresponding recovery record. Reclamation is an explicit separate action.
+
+Remote convergence constructs and verifies a merge independently of the writer's
+checkout and index. Both captured parents and the resulting content must match
+the intended merge before a compare-and-swap updates the remote. A remote race,
+conflict, unavailable dependency or rejecting hook retains work and reports an
+unacknowledged result. A local durable commit and a published result remain
+separate outcomes.
+
+| Clarification change record | Detail |
+| --- | --- |
+| Previous requirement | The acknowledgement amendment required an immutable candidate and normal hooks without specifying current-branch commits, retry after an unverified local commit, or merge construction during retry. |
+| Problem | Hooks or concurrent writers can expand the committed result; a rejected local commit can become the next retry's base; shared-checkout convergence can publish unvalidated merge content. |
+| Corrected requirement and reason | Verify declared content and parent before acknowledgment, preserve unresolved publication intent across interruptions, and construct verified convergence merges independently. This prevents a failure from becoming implicit authorization. |
+| Implementation impact | Producer declarations, independent expected-tree verification, private durable publication state with reachable recovery captures, explicit object/ref flushes, and one shared merge/lease implementation. |
+| Compatibility impact | An ambiguous attempt stops unattended publication and requires reconciliation; ordinary rejecting hooks with unchanged refs remain retryable. Writer branches, staged work and file contents are retained during remote convergence. |
+| Tests affected | Hook-expanded commits, altered content, late commits, retry after rejection, process interruption, linked-worktree contention, recovery after restaging/pruning, effective Git durability settings, executable-bit compatibility, merge hooks, remote races and dirty-checkout preservation. |
+| Runtime/deployment impact | All applicable callers and installed libraries must support the same contract. A filesystem worktree or local reservation does not establish cross-host execution ownership or independent credential isolation. |
+
 | Change record | Detail |
 | --- | --- |
 | Previous requirement | §3 described immediate claim publication, append-only writer ownership and retry by content hash without defining the exact publication scope or event acknowledged. |
