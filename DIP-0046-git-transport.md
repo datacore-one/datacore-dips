@@ -8,12 +8,12 @@
 | **Type** | Architecture |
 | **Status** | Draft |
 | **Created** | 2026-08-11 |
-| **Updated** | 2026-08-11 |
+| **Updated** | 2026-09-12 |
 | **Tags** | `git`, `transport`, `ledger`, `sync`, `provenance`, `detectors` |
 | **Affects** | `.datacore/lib/` (sync scripts), `.datacore/githooks/`, `.datacore/hooks/`, `.datacore/modules/nightshift/lib/`, `.datacore/modules/chief-of-staff/server/lib/`, 10+ module `*-hook` commands, `/today`, `/tomorrow`, `/wrap-up`, `/continue`, `/process-inbox`, and — in separate repositories — `datacore-mcp` (GTD write tools) and `datacore-app` (no ledger awareness today) |
 | **Specs** | `.datacore/lib/jobs/manifest.yaml` (detector contracts) |
 | **Agents** | `nightshift-orchestrator`, `journal-coordinator`, `wrap-up-executor` |
-| **Relates to** | DIP-0011 (Nightshift — the `git push`-as-lock this replaces), DIP-0034 (Event Ledger Substrate — reserves this migration for its own DIP; **this DIP obliges an amendment adding `member.*` event types**), DIP-0044 (Actor Identity — authentication, where this DIP is authorization), DIP-0035 (Job Contracts — detector contracts), DIP-0043 (Org Projection), DIP-0018 (Credential Management), ENG-2026-0423-001, ENG-2026-0729-009, ENG-2026-0804-033, ENG-2026-0811-005 |
+| **Relates to** | DIP-0011 (Nightshift — the `git push`-as-lock this replaces), DIP-0034 (Event Ledger Substrate — reserves this migration for its own DIP; membership uses the flat file in §11; no `member.*` amendment is required), DIP-0044 (Actor Identity — authentication, where this DIP is authorization), DIP-0035 (Job Contracts — detector contracts), DIP-0043 (Org Projection), DIP-0018 (Credential Management), ENG-2026-0423-001, ENG-2026-0729-009, ENG-2026-0804-033, ENG-2026-0811-005 |
 
 ## Summary
 
@@ -141,10 +141,13 @@ lost when a projection stops being tracked:
   and it ends at Phase 1 for that file. The ledger holds the history, but folded
   JSONL is not a readable diff.
 
-Mitigation is deliberately weak and deliberately explicit: a **weekly tracked
-snapshot** of the projection is committed to the space as
-`org/next_actions.weekly.org` — human-readable, diffable, and never read by any
-program. It is an archive, not a source. Anything that reads it is a bug.
+The readable restore point belongs under **`.datacore/checkpoints/`**, outside
+`org/`. A second Org rendering beside authored files repeats task IDs and is
+not safely excluded by ordinary `org/*.org` consumers. A readable view alone
+does not preserve the event history: the checkpoint also needs its complete
+source event snapshot and integrity metadata. It is a backup, never input to
+ordinary task ingestion. Restore verification reads the saved artifact in a
+disposable environment; it must not regenerate a replacement before testing it.
 
 ### 3. Transport rules for facts
 
@@ -533,7 +536,7 @@ separating them resolves it:
 | Fact | Question it answers | Where it lives |
 |---|---|---|
 | **deployment** | which actor names may run on machine M | `infrastructure.yaml` — machine-shaped, correct as-is, retained |
-| **membership** | which actors may write to space S | a **fact in S's own log** |
+| **membership** | which actors may write to space S | S's tracked `.datacore/members.yaml` |
 
 Membership is a **flat, git-tracked file** in the space:
 `<space>/.datacore/members.yaml`, listing actor names.
@@ -562,7 +565,7 @@ membership a fact argued *against* it once followed through.
 
 **Placement.** DIP-0044 answers *what key proves you are `data`*; membership
 answers *which spaces `data` may write to*. Authentication and authorization
-stay separate on purpose, so this is not folded into DIP-0044. The `member.add`
+stay separate on purpose, so this is not folded into DIP-0044. Flat-file
 membership needs no new event types at all — the amendment obligation on
 DIP-0034 is withdrawn.
 
@@ -610,6 +613,25 @@ travels in a `projection.attest` event, so any machine can check agreement
 without holding anyone else's snapshot.
 
 ### 13. The code category: isolation and a commit gate
+
+**Implementation distinction (audit clarification).** The current
+`commit_gate.py` output inventory is not the operator-approval gate specified
+below. It selects declared dirty paths and records unrelated changes; it cannot
+establish who approved a code change or prove that any commit was published.
+The existing undeclared-output compatibility path is an open implementation
+safety issue, not satisfaction of Track E3. The operator approval/resume workflow
+remains proposed work under this Draft.
+
+An output inventory must preserve literal repository-relative filenames and
+report an unavailable inventory as failure. A rename includes its removed path;
+it does not authorize deletion merely because the new name was declared.
+Inventory records must distinguish permitted paths from verified publication.
+Acknowledged records are unique, complete, durable and private to the storage
+owner. Retries and simultaneous records must retain earlier evidence; timestamp
+and task metadata cannot select filesystem destinations. Incomplete writes are
+retained for recovery and must not be reported as completed records. These
+storage properties do not establish an independent execution or credential
+security boundary.
 
 §1 classifies repositories; this states what the **code** category actually
 requires. Industry practice for agents writing code is adopted here in full,
@@ -839,7 +861,7 @@ Verify: a commit whose `Datacore-Event` names no event fails the cross-check; a
 model-authored Conventional Commits prefix is refused by the renderer.
 
 **Track C — transport** *(the long pole)*
-1. atomic publish (tmp + rename) in `log.py` · 2. `ledger_transport.py` ·
+1. serialized append with file durability and torn-tail recovery in `log.py` (§10) · 2. `ledger_transport.py` ·
 3. migrate 16 git callers *(needs C2)* · 4. migrate **org writers** *(needs C2)* ·
 5. delete dead code *(needs C3, C4)*
 
@@ -859,14 +881,18 @@ ledger. Measured surface:
 
 The last two are separate repositories and are the reason C is the critical
 path: this DIP cannot be finished inside one repo.
-Verify: a concurrent-append test observes no torn line; every caller migrated is
+Verify: concurrent writers preserve every acknowledged event; an interrupted
+append preserves the valid prefix and reports or recovers only an incomplete
+tail. Read-only readers may observe a partial last line and must not interpret
+it as an event. Every caller migrated is
 a caller that no longer invokes `git` directly (`grep`-assertable); `/wrap-up`
 refuses to close with a non-zero gap count.
 
 **Track D — membership and enforcement**
-1. `member.*` in `events.py` · 2. genesis backfill from `ledger_actors` *(needs
-D1)* · 3. `registry/repositories.yaml` · 4. `core.hooksPath` on the agent
-machines + config-drift detector · 5. Gitea `pre-receive` *(needs D2)*
+1. owner-maintained `.datacore/members.yaml` (§11) · 2. validate existing
+membership against deployed identities *(needs D1)* · 3. `registry/repositories.yaml` ·
+4. `core.hooksPath` on the agent machines + config-drift detector ·
+5. Gitea `pre-receive` *(needs D2)*
 Verify: a push writing a non-member's log is rejected server-side on a Gitea
 space; an unregistered repository is refused by the transport module; unsetting
 `core.hooksPath` turns the config-drift detector red.
@@ -875,7 +901,9 @@ space; an unregistered repository is refused by the transport module; unsetting
 1. check isolation — checks run in a checkout the agent never had ·
 2. effect verifiers + `effect.verify` attestation · 3. commit-decision gate
 (§13) · 4. worktree isolation for agent code work, degrading loudly *(needs E3)*
-Verify: the `touch proof.txt` attack fails against the isolated check; an effect
+Verify: an existence-only check is demonstrated insufficient by `touch proof.txt`;
+an outcome/content check must reject fabricated output (§5). A separate checkout
+establishes the checked commit, not an OS or credential boundary. An effect
 with no registered verifier lands in review rather than complete; a run reaching
 a verdict on a dirty tree pauses and writes a pending decision instead of
 committing; a second run in one workspace gets its own worktree branch and fails
@@ -910,7 +938,113 @@ migration worked.
   for `tris` and `data`, which hold partial checkouts and do not need full space
   history? §9 makes this a configuration change rather than a rewrite, but it is
   not obviously worth doing.
-- **OQ-6.** Atomic publish (§10) costs a temporary file and a rename per event.
-  At claim/complete frequency that is negligible; if event rate rises, batching
-  appends within a bounded window may be needed, which reintroduces a window in
-  which facts exist only locally.
+- **OQ-6 — corrected 2026-09-11.** §10 requires serialized append, not a
+  whole-log temporary copy and rename per event. Batching may be considered if
+  measured append/flush cost warrants it, but a caller must not receive a
+  durable-success acknowledgement before the required flush completes. Local
+  durability and successful remote publication are separate results.
+
+
+## Audit amendment — 2026-09-11
+
+This amendment resolves contradictory instructions; **Status remains Draft**.
+It does not ratify the Org migration or claim that deployment is verified.
+
+| Previous requirement | Problem | Corrected requirement | Implementation / compatibility impact | Verification |
+|---|---|---|---|---|
+| Header and Track D required `member.*` genesis events | §11 explicitly withdrew that design | Track D uses the owner-maintained membership file | No new event vocabulary or historical rewrite | Membership rejection tests and actual server-hook checks remain required |
+| Track C and OQ-6 required whole-log temporary copy + rename | §10 explicitly rejected it; parallel implementations could lose concurrent appends | Stable-lock append, durable acknowledgement, valid-prefix preservation | Preserve existing event hashes and sequence history | Concurrent append, torn-tail and crash/recovery tests |
+| Track E claimed `touch proof.txt` fails because of checkout isolation | §5 correctly states an existence check accepts fabricated content | Test the outcome; describe a checkout as a reproducibility boundary | No claim of independent OS identity or credential isolation | Fabricated artifact negative test against the actual outcome verifier |
+| §2 placed a second rendering in `org/` and treated a readable projection as the recovery artifact | Normal task globs can ingest duplicate IDs; Org cannot carry every event, field and terminal history | Keep backups outside `org/`, preserve source history and verify the saved artifact | Retain legacy Org-only backups during format upgrade; no event history rewrite | Corrupted saved artifact, full-payload restore, interrupted publication and lost-live-log tests |
+
+### Projection preservation contract
+
+For a space explicitly operating in generated mode, the local Org file is a
+cache with an editable surface. A prior generated value is not an authored
+change. Ingestion must compare local edits against the last rendered base;
+unchanged cache fields cannot overwrite newer ledger fields received by sync.
+Disjoint edits may merge, while conflicting edits must remain visible and
+preserved. A missing or corrupt base cannot silently make either conflicting
+version authoritative.
+
+An ingestion, receive or publication failure must stop dependent destructive
+projection. Projection must refuse unrepresented headings, body text, properties
+or other authored content, even when the heading ID already exists in the
+ledger. The source precondition, replacement, and saved local base must use a
+recoverable transaction. A failed or interrupted write must not acknowledge
+success or leave a truncated Org file. Initial activation and reversal must
+check these same conditions and honor a refusal before changing mode.
+
+These requirements address data-preservation defects, not a change that excuses
+loss. Existing event history stays intact. Installations without a projection
+base require verified reconciliation before their first replacement. Regression
+coverage must include stale caches after remote updates, disjoint and divergent
+edits, missing IDs, failed ingest, interrupted writes, and migration rollback.
+
+### Concurrent edits and compatibility
+
+Two hosts can prepare changes before either receives the other's events. The
+base therefore travels with an automatic edit; reading the latest local fold
+immediately before append is insufficient. The reference implementation uses a
+versioned `_merge` precondition on `item.update` and `item.dismiss`: changed
+fields carry their previous values and distinguish absent fields from null.
+Disjoint dictionary edits merge recursively. Divergent values or intervening
+lifecycle changes preserve the proposed event as an explicit conflict rather
+than silently selecting a replacement. A terminal transition checks the whole
+observed item, so an old DONE edit cannot hide newer work.
+
+Unresolved conflicts prevent regenerated output and execution of the affected
+item. Explicit reconciliation names the conflicting event hashes and supplies
+a fresh base; neither retries nor an ordinary update implicitly resolve them.
+Historical updates without the versioned precondition retain their historical
+interpretation. This is a protocol compatibility change: all active readers and
+writers of generated spaces must be upgraded and checked before conditional
+edits are enabled there. The canonical append path requires an explicit
+`.datacore/ledger-edit-protocol` marker containing `1` for this version. The
+marker is an activation acknowledgement after fleet verification, not proof
+that an old process was upgraded. An old reader ignoring the precondition is
+unsafe; inactive/returning hosts must upgrade before resuming participation.
+
+### Checkpoint preservation
+
+A successful checkpoint acknowledges a durable pair: the readable Org view and
+the complete saved event snapshot with integrity metadata. Verification restores
+that snapshot in disposable storage and checks its state root and chains. It
+reports an older valid restore point separately from corruption; it must not
+claim to have restored current state when the saved checkpoint predates it.
+Lost or rewound live history cannot replace the last known good backup. Legacy
+Org-only checkpoints remain retained when the snapshot format is introduced.
+Snapshot checksums detect accidental changes; they are not authentication of an
+untrusted backup source. Backup publication must also respect §3's writer
+ownership rule; multiple hosts may not rewrite one shared checkpoint file.
+
+### Migration preparation and literal content
+
+A missing Org ID or a similar title is not evidence that an independent ledger
+item can be discarded. Preparation must retain unmatched items, reconcile only
+explicit authored Phase 0 edits, and reject stale source/state plans. Generated
+Phase 1 files must use three-way ingestion and cannot be treated as authoritative
+Phase 0 preparation input. Projection may add independent ledger items while
+preserving all source content; deduplication and terminal closure require
+explicit evidence and retain original history.
+
+Shadow comparisons must check notes, properties, section content, inherited
+tags, timestamps and file preamble, not just a tuple of task labels. Another
+file containing the same ID cannot exempt this source from preservation checks.
+Source/example blocks and authored comments are data; legacy metadata repairs
+must not delete drawer-like examples or rewrite quoted dates. Ambiguous parsed
+IDs or missing IDs fail verification rather than producing an empty clean set.
+
+Checkpoint pairs use `.datacore/checkpoints/<declared-writer>/next_actions.org`
+and `ledger.json`, so distinct writers cannot replace one shared restore point.
+The declaration must identify a safe, unique writer. The saved snapshot is the
+complete recovery artifact; Org-view diagnostics separately report the fidelity
+of supported editable fields and do not claim to recover ledger-only authority
+or history.
+
+| Previous requirement | Problem | Corrected requirement | Implementation / compatibility impact | Verification |
+| --- | --- | --- | --- | --- |
+| Preparation retired absent and same-title items as housekeeping | Absence/similarity cannot distinguish duplicates from independent valid work | Retain unmatched work; apply explicit source edits with source/state preconditions | Removes inferred destructive cleanup; retained items may appear in the generated list | Unmatched/twin preservation, stale-source and stale-ledger rejection, conditional closure and retry tests |
+| Shared checkpoint path | Independent hosts could overwrite each other's recovery artifacts | Separate checkpoint pairs per declared writer | Legacy backup retained on first format upgrade | Two writers retain independent complete restore points |
+| Task-label-only shadow comparison and blanket body repair | Notes/properties could disappear while the diagnostic was clean; examples were interpreted as metadata | Full parsed-content comparison and literal-block preservation | Existing incomplete/drifted sources fail safely and require reconciliation | Body, properties, section notes, duplicate IDs, literal drawers/dates and authored-comment tests |
+| Current output-inventory helper labelled as E3; records labelled allowed paths as committed | Inventory selection is neither operator approval nor proof of publication; timestamp filenames overwrite retry evidence | Distinguish current inventory from proposed approval workflow; unique durable private records and literal paths | Version 2 inventory records use `allowed` and `publication_verified: false`; historical records remain intact, and undeclared-output publication remains an open safety issue | Literal filenames, rename/deletion boundaries, inventory failure, concurrent records, interruption recovery, private permissions and no false publication receipt |
