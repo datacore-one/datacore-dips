@@ -1048,3 +1048,42 @@ or history.
 | Shared checkpoint path | Independent hosts could overwrite each other's recovery artifacts | Separate checkpoint pairs per declared writer | Legacy backup retained on first format upgrade | Two writers retain independent complete restore points |
 | Task-label-only shadow comparison and blanket body repair | Notes/properties could disappear while the diagnostic was clean; examples were interpreted as metadata | Full parsed-content comparison and literal-block preservation | Existing incomplete/drifted sources fail safely and require reconciliation | Body, properties, section notes, duplicate IDs, literal drawers/dates and authored-comment tests |
 | Current output-inventory helper labelled as E3; records labelled allowed paths as committed | Inventory selection is neither operator approval nor proof of publication; timestamp filenames overwrite retry evidence | Distinguish current inventory from proposed approval workflow; unique durable private records and literal paths | Version 2 inventory records use `allowed` and `publication_verified: false`; historical records remain intact, and undeclared-output publication remains an open safety issue | Literal filenames, rename/deletion boundaries, inventory failure, concurrent records, interruption recovery, private permissions and no false publication receipt |
+
+### Publication acknowledgement — amendment under review, 2026-09-12
+
+**Status: proposed amendment; this DIP remains Draft.** These requirements make
+the transport and preservation guarantees testable. They do not ratify a claim
+ownership protocol or assert that an active installation has been upgraded.
+
+A publication operation identifies an immutable candidate commit and one full
+destination ref. It must not implicitly publish other branches, annotated tags,
+or submodule repositories because of local Git configuration. The operation
+validates and sends the same candidate; moving a local branch or tracking ref
+does not authorize sending different work. Normal applicable publication hooks
+still run. A rejected push retains local work for explicit reconciliation.
+
+Publishing a writer log must preserve the complete byte prefix already present
+at the observed remote destination. A successful fast-forward alone does not
+prove this: a child commit can truncate its parent's file. A stale or divergent
+log is refused without rewriting either version. A failed fetch cannot silently
+substitute a cached destination. Retry must re-evaluate the actual remote base.
+
+An acknowledgement used to admit work binds the durable append's space, writer,
+log and exact event bytes to the immutable published candidate. A branch or actor
+selection made after append is insufficient. Missing, malformed or invalid-chain
+candidate content cannot acknowledge that append, including on a no-change retry.
+Publication failure stops execution that requires this acknowledgement. Local
+flush, remote publication, fold acceptance and execution ownership are distinct
+results; none implicitly proves the others. In particular, immediate claim push
+reduces propagation latency but does not establish cross-host exclusivity or
+fence a stale executor.
+
+| Change record | Detail |
+| --- | --- |
+| Previous requirement | §3 described immediate claim publication, append-only writer ownership and retry by content hash without defining the exact publication scope or event acknowledged. |
+| Problem | Matching-ref/tag defaults can publish unrelated material; a fast-forward child can truncate a log; branch changes can publish another log while reporting claim success. |
+| Corrected requirement and reason | Bind publication to one validated commit/ref and append receipt; preserve the remote byte prefix; distinguish transport from ownership so success has an objectively testable meaning. |
+| Implementation impact | Central explicit push arguments, isolated normal-hook commits, observed/fetched remote base validation, append-only comparison, captured append receipts and immutable candidate verification. |
+| Compatibility impact | Event bytes and historical chains are unchanged. Unsafe truncated/divergent log publication and ambiguous acknowledgement now refuse; retained state requires reconciliation. Explicit local-only mode remains a separate contract. |
+| Tests affected | Configured matching refs/tags/submodules, stale log truncation, failed fetch, rejecting hooks, branch/actor changes, event removal, forked chains, failed flush and idempotent receipt retry. |
+| Runtime/deployment impact | Active publishers and admission paths require matching code and verification. Candidate test success is not active deployment evidence; required independent isolation and cross-host ownership remain separate work. |
