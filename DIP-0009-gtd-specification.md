@@ -1340,6 +1340,49 @@ generators serialize generation and publication. Current counts and decisions
 come from input data, without embedding historical business assertions into
 the generator. Source text must not become executable report markup.
 
+#### Input integrity and identity clarification (proposed audit amendment)
+
+The following clarification records the implementation contract under review;
+it does not ratify the separate v2.0 task-state draft or assert fleet rollout.
+
+- Only absent optional sources may mean no data. Unreadable, aliased, malformed
+  or concurrently changed sources must stop generation without replacing the
+  previous report. Missing parser dependencies are errors. Reads never repair,
+  rewrite or discard source bytes.
+- Graph namespaces use the stable `space.name` from DIP-0015, not the local
+  numeric folder prefix. Current physical paths and historical numeric prefixes
+  are read-only compatibility references when they resolve unambiguously to an
+  existing stable identity. Duplicate space or intent identities require repair.
+- Within a source space, a bare intent reference resolves locally before the
+  installation graph. `space-name:intent-id` explicitly crosses spaces;
+  `@root:intent-id` explicitly names the installation graph. A missing declared
+  reference remains unplaced/reported; keyword inference must not substitute a
+  different intent. Inference with a source space considers that space and the
+  installation graph, and refuses equally specific ambiguous matches.
+- `SERVES` plus tree ancestry must form a DAG. Cycles are invalid input.
+  High leverage requires reaching more than one distinct level-1 intent;
+  missing links and redundant links to the same intent do not establish it.
+- Active-work coverage includes review and retryable legacy execution states,
+  and per-file declared TODO states. Completed, cancelled and explicitly
+  deferred work are not active coverage. This supports existing v1.1 files
+  without silently migrating their state vocabulary to the v2.0 draft.
+- A dated work-evidence report uses recorded completion/decision dates.
+  Undated evidence is reported separately and must not prove inactivity.
+  Repeated completed-task identities cannot inflate completion counts.
+- A lane gate is an admission decision, not a best-effort score. Queue,
+  pending, speculative and direct execution paths share the gate. The executor
+  rechecks current inputs before each model invocation/retry. Unreadable gate
+  evidence holds work; a process-lifetime cache cannot preserve an old ON state.
+  This check controls new invocations; it cannot revoke effects of an invocation
+  already in progress or provide OS/credential isolation.
+- Combined outlines use the same private durable publication path as reviews.
+  The stdout forms are owner-context CLI output and must not be forwarded to
+  another space or an unauthorized log collector.
+
+Intent tag bindings follow the scoped interpretation in DIP-0014's proposed
+intent-binding clarification. Tags describe meaning; they do not authorize an
+executor or choose an agent.
+
 ### 9.1 Structure
 
 The Intent Graph has five levels of granularity:
@@ -2807,6 +2850,36 @@ This section provides essential information for agents working with GTD tasks an
 - **Runtime/deployment impact:** Provision private state for the authorized
   identity and verify the real filesystem boundary. Retain and assess existing
   shared reports separately. Repository tests alone do not close deployment.
+
+### Intent-input and gate clarification change control — 2026-09-13
+
+- **DIP:** 0009 Part 9, with DIP-0014 tag interpretation and DIP-0015 identity.
+- **Previous requirement:** Space identity and multi-intent prioritization
+  existed, but machine-readable graph references, incomplete-input behavior,
+  coverage of review/retry states and gate freshness were not fully specified.
+- **Problem:** Read failures became empty evidence, folder order changed
+  identity/meaning, broken links inflated priority, completed evidence ignored
+  its date filter, and pending/direct paths could bypass a stale cached gate.
+- **Corrected requirement:** The explicit input/identity/gate invariants in
+  Part 9.0 and DIP-0014's intent-binding clarification.
+- **Reason:** Align the implementation with stable identity, complete evidence
+  and current standing decisions, while keeping uncertainties visible.
+- **Implementation impact:** Bounded snapshot parsing without source mutation;
+  scoped references/maps; DAG checks; complete active-state coverage; accurate
+  dated evidence; private outline publication; common queue/executor gate.
+- **Compatibility impact:** Historical ordinal references remain readable
+  when unambiguous. Invalid or ambiguous sources now refuse review/admission;
+  explicit broken references remain unplaced. Default completed-work reports
+  retain all-time behavior; an explicit `--since` now filters dated evidence and
+  reports undated records separately. No source rewriting or v2.0 promotion.
+- **Tests affected:** Malformed/read-failure and alias cases; directory-swap
+  and file-replacement races; duplicate identities and cycles; local/root tag
+  resolution; custom and retryable task states; failed-report preservation;
+  dated/undated evidence; queue-route bypasses and direct-executor refusal.
+- **Runtime/deployment impact:** Matched core/CoS/Nightshift installations must
+  preserve canonical identity and verify actual parsing, private publication
+  and current gate decisions. Runtime rollout and the CoS producer remain
+  pending; passing repository tests cannot mark this amendment fleet-audited.
 
 ### Related Agents
 

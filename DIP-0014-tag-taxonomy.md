@@ -190,6 +190,54 @@ Both tags are independent. A task can have `:research:` without `:AI:` (human re
 
 ## Part 3: Distributed Registries
 
+### Intent-binding clarification — proposed audit amendment, 2026-09-13
+
+The historical Implemented status remains unchanged. This clarification is
+proposed with the audit changes and requires the accompanying code/tests and
+deployment evidence; it is not an assertion of a completed fleet audit.
+
+An optional `intent: <reference>` on a tag entry describes strategic meaning
+for DIP-0009 reviews and priority scoring. It neither routes an agent nor grants
+execution authority. Readers support the current keyed-section representation
+and the `tags / category / list of id records` representation below.
+
+Each space registry applies only within that source space. A shared tag name
+in two spaces must not let directory traversal order select the meaning of
+both. Root-system intent bindings have the highest priority, consistent with
+the registry priority table. A space-specific binding supplies a meaning only
+where the system registry has not bound that tag. In an aggregate without a
+source space, local tag bindings are unavailable for inference.
+
+References use stable space identity and local-first resolution from DIP-0009.
+An unresolved explicit binding remains unresolved; keyword guessing must not
+conceal it. Duplicate/conflicting bindings or invalid input stop a complete
+review instead of being omitted. These rules do not require implementing future
+module/project tag features that are not in the current intent reader.
+
+**Normative change control:**
+
+- **Previous requirement:** Registry priority and space scope were specified,
+  but the meaning, resolution and failure behavior of an `intent` extension
+  were not defined. The generic merge example also applied lower-priority
+  space values last.
+- **Problem:** The implementation globally merged every space's bindings,
+  silently dropped the documented list representation and swallowed input
+  failures. Tasks could acquire another space's meaning or disappear from
+  coverage without a reported error.
+- **Corrected requirement:** Source-local interpretation, system precedence,
+  explicit reference resolution and complete-or-error input handling above.
+- **Reason:** Make the implemented semantic extension objectively verifiable
+  without confusing semantics with authorization or agent routing.
+- **Implementation impact:** The shared intent reader keeps separate maps and
+  validates both documented representations. Current generic metadata validation
+  remains a separate concern; this amendment does not claim it was all audited.
+- **Compatibility impact:** Source files are retained. Ambiguous/invalid input
+  now needs explicit repair; no automatic migration or silent overwrite occurs.
+- **Tests affected:** Two-space collisions, root precedence, list-format
+  bindings, unresolved references, ordinal changes and malformed input.
+- **Runtime/deployment impact:** Install the matched core and Nightshift
+  releases, then qualify actual parsing, gate refusal and private reports.
+
 ### Registry Locations
 
 Registries are hidden in `.datacore/` folders:
@@ -763,8 +811,8 @@ import yaml
 
 def load_tags():
     registries = [
-        '.datacore/tags.yaml',
-        f'{space}/.datacore/tags.yaml'
+        f'{space}/.datacore/tags.yaml',
+        '.datacore/tags.yaml'  # highest-priority system values applied last
     ]
     tags = {}
     for reg in registries:
