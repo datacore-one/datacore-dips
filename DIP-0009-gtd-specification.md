@@ -1443,6 +1443,34 @@ for recovery. Equal-time conflicting outcomes need explicit reconciliation.
 These records remain cooperative observations, not independent proof that an
 executor had authority or that its reported work was correct.
 
+Completion recording requires the persisted task identity and full cadence
+binding, its completed GTD state, approved attempt outcome and completion time,
+and a durable output bound to the same task and execution. In a Phase-1 space,
+the ledger is authoritative: its ownership lifecycle `completed` still awaits
+review and must not be confused with the effective GTD state `DONE`. Cadence
+consumers use the same effective-state interpretation as the Org projector.
+Unresolved task-edit conflicts cannot establish completed work.
+
+Execution outputs are new, durable artifacts in the persisted task's source
+space. A missing or inconsistent space cannot fall back to another inbox.
+Retry or a concurrent writer cannot overwrite an existing artifact. Task and
+execution IDs and the produced-content hash are serialized as metadata values;
+caller text cannot introduce metadata fields. The controller's explicit output
+publication path owns Git staging and publication. An optional reviewer-list
+failure is recorded as unverified metadata without discarding a valid produced
+deliverable or inventing reviewers.
+
+Before advancing cadence history, the recorder retains an immutable private
+proof connecting task, execution, binding, completion time, source and artifact
+hash. A retry accepts identical evidence; conflicting evidence is held.
+Failure after proof publication retains that proof for retry/reconciliation.
+Only the completed binding's delta is merged; failed or pending-review attempts
+do not advance successful-run history. Nested legacy dates can be promoted to
+observations without dropping their date or another binding. Activity counters
+must understand both representations and must not count the same identified
+execution twice. Legacy records and outputs without this evidence are preserved
+but do not themselves establish independently verified execution.
+
 Unresolved Git conflict syntax outside literal Org blocks must stop task review,
 mutation and projection reconciliation. Reading both sides as ordinary tasks is
 not a valid way to resolve conflicting intent or completion evidence.
@@ -3013,6 +3041,46 @@ This section provides essential information for agents working with GTD tasks an
   completion, heartbeat callers and recovery before claiming installed
   conformance. These remain deployment requirements, not a claim of completed
   runtime verification. Historical DIP status and the v2.0 draft are unchanged.
+
+### Completion artifact evidence change control — 2026-09-13
+
+- **DIP:** 0009 cadence and Nightshift execution properties; related ledger
+  implementation and the still-proposed DIP-0043 / DIP-0046 migration model.
+  These references do not promote unmerged proposals to current requirements.
+- **Previous requirement:** Task completion properties, output files and
+  cadence run dates existed, without an exact evidence relationship or
+  artifact publication/retry contract.
+- **Problem:** Failed attempts, substituted bindings and missing artifacts
+  could establish completed cadence history. Output paths could fall back to
+  another space, overwrite prior work or serialize caller text as metadata.
+  Ownership lifecycle state and GTD task state could be conflated.
+- **Corrected requirement:** Persisted task/output binding, common effective
+  GTD state, private immutable completion proof, no-overwrite publication and
+  full-binding observation delta as specified above.
+- **Reason:** Completion and downstream scheduling require preserved evidence
+  of the particular work recorded, rather than a success-shaped return value.
+- **Implementation impact:** Core bounded no-clobber publication and canonical
+  effective task state; Nightshift output metadata/source validation and honest
+  completion-hook failure; Ventures evidence recorder and shared observation
+  interpretation for overdue calculations and activity reporting.
+- **Compatibility impact:** Historical files remain untouched. New reports
+  include task identity and execution identity; old artifacts lacking required
+  evidence require explicit reconciliation before new verified completion can
+  be recorded from them. Existing task IDs remain stable; new execution IDs
+  are independent of clock precision. Failed attempts no longer postpone a
+  successful cadence run. Ambiguous flat role/name history is held.
+- **Tests affected:** Actual capture/output/task-completion/record/retry pipeline
+  in authored and ledger-authoritative spaces; awaiting-review lifecycle;
+  metadata substitution; missing artifacts; stale or changed output; private
+  proof and history partial failure; legacy date upgrade; activity counters;
+  concurrent no-clobber publication and directory swaps.
+- **Runtime/deployment impact:** Qualify the matching versions, private proof
+  storage, durable output filesystem and source-space access in the installed
+  controller. A crash during no-clobber link publication can leave a complete,
+  unacknowledged temporary hard link requiring reconciliation; it cannot be
+  treated as successful acknowledgement or removed indiscriminately. Heartbeat
+  execution and completion callers still require alignment and verification.
+  No fleet conformance or historical DIP-status promotion is asserted here.
 
 ### Related Agents
 
