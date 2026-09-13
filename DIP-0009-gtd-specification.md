@@ -15,6 +15,11 @@
 | **Agents** | `gtd-inbox-processor`, `ai-task-executor`, `queue-optimizer` |
 | **Supersedes** | `.datacore/gtd-spec.md` |
 
+**Amendment status (2026-09-13):** The intent-review privacy clarification below
+is proposed in the audit amendment PR, with implementation and deployment
+verification tracked separately. The historical Implemented header does not
+ratify the v2.0 draft identified in Updated, nor certify this amendment's rollout.
+
 ## Summary
 
 This DIP defines the comprehensive GTD (Getting Things Done) implementation for Datacore, including:
@@ -1305,9 +1310,35 @@ Org-mode's agenda is its most powerful feature — structured queries over all t
 
 ## Part 9: Intent Graph (Strategy Layer)
 
-The Intent Graph is Datacore's strategic planning layer, connecting **why** (vision) to **what** (tasks). Every task should trace back to at least one intent. The graph lives as a document within the Datacore system space and is reviewed during GTD review cycles.
+The Intent Graph is Datacore's strategic planning layer, connecting **why** (vision) to **what** (tasks). Every task should trace back to at least one intent. Each graph retains its source-space ownership and is reviewed during GTD review cycles.
 
-**Source document:** `2-datacore/1-tracks/ops/Intent-Graph.md`
+**Historical example document:** `2-datacore/1-tracks/ops/Intent-Graph.md` described
+one system-space graph. It is not an authorized destination for an aggregate of
+personal and other teams' strategic data. Machine-readable sources currently
+include `.datacore/intents.org` and each discovered space's `org/intents.org`.
+An owner's combined view is a derived report, not a replacement source of truth.
+
+### 9.0 Review privacy and publication amendment
+
+An execution identity may combine graphs only from spaces it is authorized to
+read. A report combining those spaces is private to that owner/security context;
+membership in one contributing team does not authorize reading the aggregate.
+Do not publish it into a convenient shared space, repository, log, or telemetry
+stream. Application routing does not substitute for OS/credential isolation.
+
+The current CLI uses private, non-repository runtime state outside the data and
+installed-code trees. Its output argument selects only a filename within that
+private review namespace. A destination alias, shared permissions or an unsafe
+existing output fails without overwriting or relocating user data. Existing
+shared documents require separate review; a software upgrade must not delete
+them or rewrite their Git history automatically.
+
+Report publication must expose a complete file. Failure before publication
+preserves the previous report; successful durable acknowledgement requires
+flushing the file and directory on the supported filesystem. Concurrent report
+generators serialize generation and publication. Current counts and decisions
+come from input data, without embedding historical business assertions into
+the generator. Source text must not become executable report markup.
 
 ### 9.1 Structure
 
@@ -1325,7 +1356,8 @@ Leaves (Level 4) feed into `next_actions.org` as GTD projects and tasks. Every t
 
 ### 9.2 Dimensions
 
-The five intents span complementary dimensions:
+The original example's five intents span complementary dimensions; these are
+illustrative, not five mandatory nodes across every owner's combined graph:
 
 | # | Intent | Dimension |
 |---|--------|-----------|
@@ -2713,7 +2745,7 @@ Alternative designs considered:
 - **AI task delegation:** Tasks tagged `:AI:technical:` require human review before execution, preventing autonomous changes to infrastructure or security-sensitive systems
 - **Org file access:** All `.org` files are classified as PRIVATE per `privacy-policy.md` — they never sync to public repositories
 - **CLOCK data:** Time tracking entries in LOGBOOK drawers contain work pattern information and are treated as private
-- **Intent Graph:** Strategic intent data (`Intent-Graph.md`) reveals business priorities — restricted to personal space
+- **Intent Graph:** Strategic data retains its source-space permissions. A combined owner review is private to that owner/security context and cannot be published into a contributing team space (Part 9.0).
 - **Nightshift execution:** AI agents execute with scoped permissions per DIP-0011; no filesystem access beyond designated output directories
 
 ## Open Questions
@@ -2746,7 +2778,35 @@ This section provides essential information for agents working with GTD tasks an
 | What are the terminal states? | `DONE` and `CANCELLED` — never modify |
 | How are AI tasks tagged? | `:AI:`, `:AI:research:`, `:AI:content:`, `:AI:data:`, `:AI:pm:` |
 | What triggers archival? | Terminal state + >30 days old |
-| Where is the intent graph? | `2-datacore/1-tracks/ops/Intent-Graph.md` |
+| Where is the intent graph? | Source-owned `.datacore/intents.org` and space `org/intents.org`; combined reviews use private runtime state (Part 9.0) |
+
+### Intent-review amendment change control — 2026-09-13
+
+- **DIP:** 0009, Part 9 and related security/quick-reference text.
+- **Previous requirement:** The graph lived in the system space, while Security
+  Considerations restricted strategic data to personal space. The quick
+  reference named one physical system-space document without a sharing scope.
+- **Problem:** Two incompatible placement instructions allowed an owner-wide
+  aggregate to be published to readers authorized for only one source space.
+  The implemented generator also repeated fixed counts and historical private
+  business assertions independently of current input.
+- **Corrected requirement:** Preserve source-space ownership; keep combined
+  reviews in owner-private state; enforce the output boundary, literal source
+  rendering and durable, serialized publication. Derive assertions from data.
+- **Reason:** Resolve a privacy contradiction and preserve complete reviews
+  through failed generation or interrupted storage, rather than treating
+  convenient paths as authorization.
+- **Implementation impact:** `intent_review.py` uses the shared private-state
+  boundary and atomic-write/lock helpers. Shared reports are not modified.
+- **Compatibility impact:** `--out` now accepts a filename in private state;
+  arbitrary export paths fail. The data-root path distinguishes installations.
+  This does not change the source Org files or ratify the v2.0 GTD draft.
+- **Tests affected:** Original shared-write, arbitrary-output and write-failure
+  regressions; path/permission/alias variants; concurrent generation admission;
+  installed date-helper behavior; current-data rendering.
+- **Runtime/deployment impact:** Provision private state for the authorized
+  identity and verify the real filesystem boundary. Retain and assess existing
+  shared reports separately. Repository tests alone do not close deployment.
 
 ### Related Agents
 
