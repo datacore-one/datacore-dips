@@ -368,6 +368,15 @@ remain proposed/deferred while this DIP is Draft. Existing MCP code includes a
 runtime export and some health/symlink reporting; that is partial implementation,
 not proof that all guarantees in this draft are deployed.
 
+Read-only delegates may reuse the runtime's `findPython()` selection. An invalid
+explicit `DATACORE_PYTHON` must fail without selecting another interpreter. The
+delegate's executable path belongs to the installed module, never the data root
+or tool arguments. Requests, outputs and subprocess lifetimes must be bounded;
+the child receives only its required environment. Invalid evidence, missing
+dependencies and execution failures must remain failed tool calls, without raw
+source values in model-facing diagnostics. A Python version probe alone does
+not establish dependency compatibility or a security boundary.
+
 ## Audit Change Record — 2026-09-13
 
 **Previous requirement:** §4 described an always-resolvable global re-export;
@@ -401,3 +410,34 @@ Zod 3/4 and JSON Schema rejection; restart and installed-dependency checks.
 **Runtime/deployment impact:** Reconcile and verify selected module/package
 paths in each service context before cutover. This source amendment alone does
 not close runtime isolation or dependency drift findings.
+
+### Shared reader follow-up — 2026-09-13
+
+**Previous requirement:** The runtime export supplied package bindings without a
+shared interpreter selection contract. Venture tools independently parsed data.
+
+**Problem:** Agent tools could omit retained hypothesis layouts, read a different
+configured source, infer a venture from ambiguous directory suffixes or disclose
+parser values. Different surfaces could therefore make inconsistent decisions.
+
+**Corrected requirement and reason:** Use installed canonical evidence readers
+and explicit failure/selection semantics above so tools observe the evidence
+used by orchestration. This extends the proposed DIP-0009 evidence amendment;
+it does not promote either proposal to implemented/audited status.
+
+**Implementation impact:** MCP exposes its existing interpreter selector in
+both runtime formats. Ventures delegates its four read-only tools through a
+bounded isolated Python invocation, sharing discovery, configuration, hypothesis
+and budget readers. No request-time dependency installation or data-root import.
+
+**Compatibility impact:** Tool names remain stable. Unique historical selectors
+remain valid; ambiguous inventories require reconciliation. The installed MCP
+package must actually expose the new helper; a version label alone is no proof.
+
+**Tests affected:** Real ESM/CommonJS exports, explicit interpreter failure,
+configured sources, mixed layouts, nested spaces, ambiguous selectors, aliases,
+malformed input, source diagnostic canaries and data-directory code substitution.
+
+**Runtime/deployment impact:** Install and qualify matching core, Ventures,
+Python dependencies and MCP artifacts before activation. Local tool integration
+does not establish OS isolation or active fleet conformance.
