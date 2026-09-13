@@ -1375,6 +1375,31 @@ it does not ratify the separate v2.0 task-state draft or assert fleet rollout.
   evidence holds work; a process-lifetime cache cannot preserve an old ON state.
   This check controls new invocations; it cannot revoke effects of an invocation
   already in progress or provide OS/credential isolation.
+- A CoS freshness receipt means a complete review of the declared task
+  sources against readable current intent inputs. The reviewer records an
+  attempt before mutation; failure or interruption holds machine execution
+  even if an older successful receipt is still within its age limit. This
+  applies to previously approved machine tasks too: prior approval does not
+  bypass current freshness or a concrete execution contract. Consumers
+  require matching completed attempt and success records with a review ID,
+  declared actor, timestamp and supported contract version. The previous
+  successful record is retained on failure. These are cooperative records;
+  independent filesystem/credential boundaries must prevent worker forgery.
+- Review first validates a complete plan. Each changed task is then committed
+  through the recoverable, ledger-aware core writer against its reviewed
+  source version. Generated Phase-1 task files must agree with authoritative
+  ledger state before a decision; stale projections cannot authorize work.
+  A later failure retains earlier committed decisions and never attests a
+  completed sweep. Retry re-evaluates remaining work. The private per-run
+  audit record connects reviewed source hashes, decision, actor, task ID,
+  application readback and outcome; `COS_REVIEW_ID` connects changed tasks to
+  that record. Detailed records and aggregate reports remain owner-private.
+- Lane wake-up uses the exact `PARK_INTENT` identity, not a substring found
+  in explanatory prose. Approval of intent alignment does not dispatch work
+  missing `SURFACE` or `DONE_WHEN` (legacy `ACCEPTANCE_CRITERIA` is equivalent);
+  existing dispatch tags are removed in that
+  case. The daily service must report failed/held review or allocation
+  components rather than advertising a successful orchestration run.
 - Combined outlines use the same private durable publication path as reviews.
   The stdout forms are owner-context CLI output and must not be forwarded to
   another space or an unauthorized log collector.
@@ -2880,6 +2905,41 @@ This section provides essential information for agents working with GTD tasks an
   preserve canonical identity and verify actual parsing, private publication
   and current gate decisions. Runtime rollout and the CoS producer remain
   pending; passing repository tests cannot mark this amendment fleet-audited.
+
+### Delegation review evidence change control — 2026-09-13
+
+- **DIP:** 0009 Part 9, with DIP-0015 identity and DIP-0044 actor provenance.
+- **Previous requirement:** CoS review freshness constrained execution, but a
+  timestamp did not distinguish complete review, partial failure or a crash.
+  Automatic task mutation did not specify its relationship to generated
+  ledger projections and retained review evidence.
+- **Problem:** Invalid inputs could still produce a fresh timestamp; direct
+  file saves bypassed authoritative task updates; stale review decisions and
+  substring-based wake-up could change the wrong work; successful briefing
+  publication obscured failed delegation/allocation components.
+- **Corrected requirement:** The complete-attempt, conditional task-update,
+  private audit-trail and explicit outcome invariants in Part 9.0.
+- **Reason:** A successful receipt must represent work actually reviewed and
+  durably committed, with enough retained evidence to investigate retries and
+  partial failures. This does not claim exclusive cross-host execution or OS
+  isolation; those require the separately specified runtime boundary.
+- **Implementation impact:** Shared versioned receipt reader; one review
+  lock; plan-before-mutation; core task adapter and ledger preconditions;
+  private per-run evidence; exact lane identities; honest component status.
+- **Compatibility impact:** Legacy timestamp-only receipts are unverified by
+  the new executor. Install matched core/CoS/Nightshift versions and complete
+  a new review before resuming machine-originated work. Preserve older
+  receipts/tasks. Legacy freeform park reasons require a dated wake or an
+  explicitly reconciled lane identity. Aggregate reports move to private
+  runtime storage, with their actual destination returned to the caller.
+- **Tests affected:** Malformed sources; canonical nested spaces; stale task
+  and ledger state; partial writes/retry; actor and review-ID readback;
+  malformed/legacy/mismatched/future receipts; publication failure/directory
+  swap; missing dispatch fields; orchestration component failure.
+- **Runtime/deployment impact:** Qualify private report/audit storage, review
+  source access and matched receipt behavior in the installed environment.
+  Repository remediation is in progress. No historical status or v2.0 draft
+  is promoted; no fleet audit completion is asserted by this amendment.
 
 ### Related Agents
 
