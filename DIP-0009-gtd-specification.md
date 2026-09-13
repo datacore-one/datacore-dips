@@ -1487,6 +1487,32 @@ the declared shard was not acknowledged. Literal dot-prefixed paths retain
 their identity during knowledge/code routing. Failed publication retains local
 completion evidence and remains eligible for a publication retry.
 
+Continuous heartbeats are proposal producers. They capture configured signals
+through the same protected task writer as cadences, without launching a model,
+granting approval or writing completed-run history. Signal identity binds the
+venture, trigger, observed signal and revision; a host filesystem path is not
+part of that identity. Repeated pending signals cannot starve later candidates.
+Role documents and external signal text remain bounded, literal review input.
+They cannot inject another Org task or confer additional execution privileges.
+
+Daily and continuous CoS scheduling use one review-before-allocation path.
+Allocation requires a completed current review; review failure invalidates
+freshness while preserving previous evidence. Operator controls apply to both
+entry points and are rechecked before allocation. Intent-approved work held for
+an incomplete execution contract returns to the current review after correction;
+the earlier approval does not make it permanently invisible or bypass that
+review. Continuous review does not regenerate the daily briefing.
+
+Controller commands report incomplete work with a nonzero result. Health uses
+validated completion timestamps and component outcomes, not filesystem mtimes
+or merely the absence of a free-form error. Invalid, ambiguous or future run
+evidence cannot establish health. Diagnostics do not export input values.
+One venture's failed observation or capture must remain visible without
+starving independent ventures, and a dry tick must not write progress or health.
+Production scheduling still requires qualified controller admission, supported
+runtime dependencies and independently enforced credential boundaries; these
+application rules do not establish an OS boundary.
+
 Unresolved Git conflict syntax outside literal Org blocks must stop task review,
 mutation and projection reconciliation. Reading both sides as ordinary tasks is
 not a valid way to resolve conflicting intent or completion evidence.
@@ -3126,6 +3152,45 @@ This section provides essential information for agents working with GTD tasks an
   bounded signal ingestion and installed worker isolation are separate open
   verification requirements; this amendment does not claim their completion.
   Historical DIP status and unmerged/future DIP classifications are unchanged.
+
+### Proposed continuous orchestration amendment (2026-09-13)
+
+- **DIP:** 0009 Part 9; related 0011 and 0041 execution-admission amendments.
+- **Previous requirement:** Cadence generators entered review, but the standalone
+  heartbeat could launch an executor directly; continuous CoS review did not
+  share the daily allocation path. CLI success and file recency could stand in
+  for completed orchestration. Contract-held approvals were skipped thereafter.
+- **Problem:** Signals bypassed review/admission, pending work could starve
+  later signals, failed review could appear healthy, and clarified work could
+  remain stranded. Dry ticks mutated state; one capture failure stopped peers.
+- **Corrected requirement:** Protected proposal capture, common current review
+  and allocation, recoverable contract holds, trustworthy health/exit evidence,
+  independent per-venture continuation, and effect-free dry ticks as above.
+- **Reason:** Scheduling must retain and review work while exposing failures;
+  a separate cadence must not create a second execution authority.
+- **Implementation impact:** Ventures fixed producer entry points share the
+  core capture transaction. CoS daily and lightweight review reuse one gate;
+  CLI policy/state overrides and completion health agree with service results.
+  Corrected contract-held proposals are reviewed against current intent.
+- **Compatibility impact:** Existing task identities and evidence are retained.
+  Heartbeats queue reviewable proposals instead of launching Claude directly.
+  Operators must schedule the reviewed controller for continuous execution.
+  Failures and disabled runs can now return nonzero where they formerly returned
+  zero. Optional Nightshift absence remains visible in daily component state;
+  continuous allocation requires the module to be installed.
+- **Tests affected:** Malicious role/signal input; disabled triggers; repeat,
+  concurrent and interrupted capture; host-location-independent signal identity;
+  pending-candidate starvation; policy changes during review; incomplete receipts;
+  restored execution contracts under changed intent; stale/future/aliased health;
+  dry-run and per-venture failure behavior. The audit also exercised actual
+  capture/review/allocation/failure/recovery in authored and authoritative-ledger
+  temporary spaces without launching a model.
+- **Runtime/deployment impact:** Install matching core, Ventures, CoS and
+  Nightshift code, configure the lightweight review entry point and qualify
+  continuous scheduling through the admitted controller. Current runtime rollout,
+  shared state-writer preservation and credential isolation remain separate open
+  requirements. No implemented/audited status promotion or runtime conformance
+  is asserted by this proposed amendment.
 
 ### Related Agents
 
