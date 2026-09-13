@@ -1595,6 +1595,27 @@ payment/execution authority. External effects still require the execution site's
 admission and the applicable approval; local file exclusion is not cross-host
 coordination. No claim of atomicity with an external payment provider is made.
 
+Hypothesis evidence has one bounded reader and preserved mutation path across
+venture observation, app authoring and portfolio views. Supported historical
+board, flat-list and mixed representations retain all rows and extension data;
+identities are unique across the complete document. Unknown states stay explicit
+and cannot authorize execution or become an assumed active/proposed state.
+Configured source locations apply to every caller. Invalid or ambiguous evidence
+requires reconciliation; it must not become an empty successful observation.
+Archived hypotheses remain in the source history but are excluded from active
+views. Monetary budgets and experiment counts are not measured sample sizes.
+
+Mutations preserve authored YAML comments and history, refuse shared mutable
+aliases, serialize cooperating local writers and verify bounded durable
+publication. A supplied operation identity binds to one request in the entire
+source. Identical retries do not append another effect or undo later updates;
+conflicting or duplicated retained identities hold without rewriting the source.
+Historical records without operation identities remain readable. Mutation
+history declares the writer; this declaration is not an OS identity attestation.
+Caller authentication and the app mutation gate remain necessary. Local file
+exclusion does not establish cross-host exclusive execution.
+
+
 Unresolved Git conflict syntax outside literal Org blocks must stop task review,
 mutation and projection reconciliation. Reading both sides as ordinary tasks is
 not a valid way to resolve conflicting intent or completion evidence.
@@ -3418,6 +3439,41 @@ This section provides essential information for agents working with GTD tasks an
   an explicit actor and qualified journal retention. These are application
   diagnostics; OS isolation, controller admission and active service qualification
   remain separate requirements. No active runtime or audited status is asserted.
+
+### Proposed hypothesis evidence preservation amendment (2026-09-13)
+
+- **DIP:** 0009 Part 9; related 0011 execution and 0044 identity requirements.
+- **Previous requirement:** Venture observations and app hypothesis authoring
+  feed task review and human decisions. The text did not define cross-format
+  preservation, consistent source selection or retry-history semantics.
+- **Problem:** Parallel readers dropped board/flat evidence, the app writer could
+  truncate valid data or replace malformed input, aliases could couple histories,
+  and repeated requests could create duplicate hypotheses. Readers also inferred
+  proposed states and sample counts unsupported by the source.
+- **Corrected requirement:** Use the bounded, preserved and unambiguous evidence
+  contract above; distinguish absent data from invalid data, and declared history
+  from verified execution. A daily legacy check date is not proof that current
+  hypothesis evidence has been reviewed.
+- **Reason:** Agent orchestration must act on the same retained evidence shown to
+  reviewers, with traceable changes and recoverable failures.
+- **Implementation impact:** Shared Ventures hypothesis store and reader, app
+  delegation and installed sibling imports, preserved budget YAML, explicit
+  status mutation admission and client operation identities. Round-trip YAML is
+  validated against the existing safe interpretation before publication.
+- **Compatibility impact:** Valid historical representations, metadata and
+  comments are retained. Ambiguous IDs, mutable aliases, invalid source values
+  and conflicting retries require reconciliation. Operation IDs are optional
+  for historical callers; automatic retry safety requires reusing one identity.
+  Source statuses remain visible and sample counts require explicit sample data.
+- **Tests affected:** Mixed and legacy layouts, malformed/aliased sources,
+  configured paths, duplicate IDs, failed/short/interrupted publication, retained
+  comments and month history, concurrent operations, lost-response retries,
+  stale retries, writer attribution, app admission and matching reader views.
+- **Runtime/deployment impact:** Deploy matching core, Ventures and app artifacts;
+  the hashed runtime profile includes ruamel.yaml 0.19.1 for preservation. Verify
+  installed module imports, credentials and state paths before activation. This
+  amendment does not claim active deployment, distributed ownership, OS isolation
+  or an implemented/audited status promotion.
 
 ### Related Agents
 
