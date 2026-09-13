@@ -1471,6 +1471,22 @@ must understand both representations and must not count the same identified
 execution twice. Legacy records and outputs without this evidence are preserved
 but do not themselves establish independently verified execution.
 
+The heartbeat obeys the same completion contract. Model response text such as
+`CADENCE_COMPLETED` is untrusted commentary and cannot advance cadence or
+hypothesis progress. An issue scan is an observation, not acknowledgement that
+work was captured or completed. Legacy seen-issue lists remain preserved but
+cannot establish completion; durable task identity must own suppression/retry.
+Unavailable input is reported as unavailable, never as an empty successful scan.
+
+Attempt text and learning are retained in private immutable runtime evidence.
+Publishing learning to another service requires a separately authorized scoped
+path. Cadence synchronization publishes only the current actor's declared shard
+through the installed core publication mechanism. It cannot autosave unrelated
+files, execute a transport found in data directories, or report success when
+the declared shard was not acknowledged. Literal dot-prefixed paths retain
+their identity during knowledge/code routing. Failed publication retains local
+completion evidence and remains eligible for a publication retry.
+
 Unresolved Git conflict syntax outside literal Org blocks must stop task review,
 mutation and projection reconciliation. Reading both sides as ordinary tasks is
 not a valid way to resolve conflicting intent or completion evidence.
@@ -3081,6 +3097,35 @@ This section provides essential information for agents working with GTD tasks an
   treated as successful acknowledgement or removed indiscriminately. Heartbeat
   execution and completion callers still require alignment and verification.
   No fleet conformance or historical DIP-status promotion is asserted here.
+
+### Proposed heartbeat evidence amendment (2026-09-13)
+
+- **DIP:** 0009 Part 9; related 0011 and proposed 0046 publication semantics.
+- **Previous requirement:** Cadence completion was tied to task/output evidence,
+  but the standalone heartbeat still accepted response prose, consumed issue
+  observations before task capture and exported unverified learning text.
+- **Problem:** Interrupted work could disappear from monitoring; unrelated
+  hypotheses could be marked checked; broad convergence could publish unrelated
+  drafts. Dot-directory classification also silently omitted cadence shards.
+- **Corrected requirement:** One persisted completion contract, read-only signal
+  observation, private attempt evidence and explicitly acknowledged publication
+  of the writer's shard. Input failure must remain visible.
+- **Reason:** Auditability must connect observed signals to retained work and
+  actual completion; a successful subprocess or model statement is insufficient.
+- **Implementation impact:** Heartbeat post-processing delegates to the shared
+  completion recorder and bounded core publication; core routing preserves
+  literal dot-prefixed paths and rejects parent/absolute path aliases.
+- **Compatibility impact:** Historical issue lists, logs and learning records
+  remain intact. Legacy prose-only completions no longer advance progress.
+  Existing uncompleted signals may surface again for durable task reconciliation.
+- **Tests affected:** Repeated issue observations, scan errors, prose-only
+  completion, private learning, completion/publication retry, malformed
+  acknowledgements, and real local-remote publication with unrelated staged work.
+- **Runtime/deployment impact:** Install the matching core and Ventures versions
+  and provide private writable evidence storage. Continuous execution admission,
+  bounded signal ingestion and installed worker isolation are separate open
+  verification requirements; this amendment does not claim their completion.
+  Historical DIP status and unmerged/future DIP classifications are unchanged.
 
 ### Related Agents
 
