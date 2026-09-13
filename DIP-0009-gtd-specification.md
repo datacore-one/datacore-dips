@@ -1408,6 +1408,45 @@ Intent tag bindings follow the scoped interpretation in DIP-0014's proposed
 intent-binding clarification. Tags describe meaning; they do not authorize an
 executor or choose an agent.
 
+#### Cadence capture and history clarification (proposed audit amendment)
+
+Cadence declaration, task capture, execution and verified completion are
+different events. Creating or queuing a task must not advance a cadence's
+completed-run timestamp. A partially failed capture batch retains its successful
+captures and reports its failures; it cannot report all requested work as run.
+
+Cadence generators capture proposals into the space inbox through the canonical
+recoverable, ledger-aware Org writer. Proposals carry `ORIGIN=cadence`, stable
+occurrence identity and the complete role/cadence/frequency binding. Generation
+does not set `APPROVED_BY` or the `AI` dispatch tag. Rich context is useful review
+input, but it does not grant approval or establish `SURFACE`. The existing CoS
+review and execution-admission requirements still apply. This supersedes the
+generator exception that inferred a clarified next action from rich properties.
+
+A capture retry must inspect durable task identity and existing pending work,
+including a prior day's still-open task and authoritative ledger captures not
+yet projected. Different roles, frequencies or distinct unnormalized names
+cannot collapse into one binding. A completed occurrence cannot be recreated
+merely because its derived Org entry was removed. Ambiguous legacy bindings
+require reconciliation; neither heading substrings nor cadence name alone are
+proof of an identical task. Local serialization and occurrence deduplication
+are not cross-host execution locks; DIP-0011's execution admission applies.
+
+Cadence history readers reduce recognized legacy and current locations without
+rewriting them. Missing history can mean never run; malformed, ambiguous,
+aliased or unreadable history must hold scheduling and preserve original bytes.
+An invalid peer shard cannot be skipped while claiming a complete history.
+Writers merge under local exclusion, preserve independent observations, compare
+timestamps by instant and publish through durable bounded replacement. An
+interruption between the durable actor shard and derived view retains the shard
+for recovery. Equal-time conflicting outcomes need explicit reconciliation.
+These records remain cooperative observations, not independent proof that an
+executor had authority or that its reported work was correct.
+
+Unresolved Git conflict syntax outside literal Org blocks must stop task review,
+mutation and projection reconciliation. Reading both sides as ordinary tasks is
+not a valid way to resolve conflicting intent or completion evidence.
+
 ### 9.1 Structure
 
 The Intent Graph has five levels of granularity:
@@ -2940,6 +2979,40 @@ This section provides essential information for agents working with GTD tasks an
   source access and matched receipt behavior in the installed environment.
   Repository remediation is in progress. No historical status or v2.0 draft
   is promoted; no fleet audit completion is asserted by this amendment.
+
+### Cadence evidence change control — 2026-09-13
+
+- **DIP:** 0009 Parts 3 and 9, with DIP-0011 execution admission and DIP-0034
+  / DIP-0043 / DIP-0046 ledger authority and projection semantics.
+- **Previous requirement:** Cadences were declared in venture configuration;
+  rich generator output was treated as an already clarified next action.
+  The distinction between queuing and recorded completion, retry identity and
+  corrupt cadence history was not specified precisely.
+- **Problem:** Task generation could self-dispatch or falsely advance completed
+  history; a partial batch could mark unwritten work as run. Name-only identity,
+  fallback raw writes and permissive history recovery could duplicate work or
+  discard evidence. Unresolved Org conflicts could become ordinary task input.
+- **Corrected requirement:** The proposal, identity, preserved-history and
+  unresolved-conflict invariants in the Part 9.0 cadence clarification.
+- **Reason:** Orchestration must be reviewable against durable evidence and
+  preserve ambiguity for reconciliation instead of inventing success.
+- **Implementation impact:** Shared protected capture and history paths,
+  explicit origin, ledger-aware idempotency, no raw fallback, no completed
+  timestamp on capture, and shared unresolved-source validation.
+- **Compatibility impact:** Newly generated cadence proposals enter inbox
+  without dispatch tags. Existing approved tasks remain subject to normal
+  current review gates; this amendment does not bulk-edit historical work.
+  Preserve legacy logs and IDs. Ambiguous pending bindings and malformed
+  history hold scheduling until reconciled; upgrades must not erase them.
+- **Tests affected:** Partial batch failure, rich-property readback, retries,
+  concurrent capture and history writes, terminal ledger replay, malformed
+  peer history, stale writes, alias and directory-swap attacks, unresolved
+  conflict refusal and preservation of literal examples.
+- **Runtime/deployment impact:** Install matching core and Ventures code with
+  private writable runtime state. Qualify CoS capture-to-review, execution
+  completion, heartbeat callers and recovery before claiming installed
+  conformance. These remain deployment requirements, not a claim of completed
+  runtime verification. Historical DIP status and the v2.0 draft are unchanged.
 
 ### Related Agents
 
