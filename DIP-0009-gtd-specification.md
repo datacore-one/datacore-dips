@@ -1559,6 +1559,22 @@ Validation diagnostics name invalid fields without copying input values.
 These checks validate configuration and proposals; they do not establish durable
 spend accounting, execution admission or an OS-level credential boundary.
 
+Cadence observation, scheduling, budget-month selection and captured daily
+occurrence identities use the same UTC calendar. Host-local midnight cannot
+advance or delay the scheduler relative to the identity it captures. An explicit
+historical date used for analysis does not change the production occurrence clock.
+
+Crew self-reports use the declared writer; a producer cannot silently identify
+itself as a fixed default agent. Reports are bounded diagnostic evidence, not
+execution attestations. Unknown statuses, invalid sources, conflicting or
+regressing timestamps and failed publication cannot become successful health.
+Valid legacy extension fields survive updates; invalid evidence remains intact.
+Per-venture failures do not prevent independent reports, and budget holds remain
+blocked. The heartbeat preserves old append logs without extending them; the
+service journal retains process diagnostics while authoritative task/ledger and
+completion records retain work evidence. An empty scan still publishes a current
+crew diagnostic; a dry tick publishes nothing.
+
 Venture budget evidence preserves acknowledged spending across month boundaries.
 Rollover starts a new month's counters while retaining complete prior-month
 records, opening balances and extension metadata. A future month, malformed
@@ -3367,6 +3383,41 @@ This section provides essential information for agents working with GTD tasks an
   cooperating writers on one host; independent OS isolation and execution-site
   admission remain required. No active-host verification or DIP status promotion
   is asserted by this amendment.
+
+### Proposed heartbeat reporting and calendar amendment (2026-09-13)
+
+- **DIP:** 0009 cadence/orchestration evidence; attribution aligns with the current
+  actor implementation and Draft 0044 without promoting that DIP's status.
+- **Previous requirement:** Heartbeat status fed the portfolio and crew panels.
+  The producer identified itself as a fixed agent and used a raw append log;
+  the shared report writer silently downgraded invalid statuses to success and
+  swallowed publication failures. Calendar scheduling used each host's local day
+  while occurrence identity and completion evidence used UTC.
+- **Problem:** Another actor could appear to have done work, budget holds could
+  appear idle, invalid reports could be overwritten, aliases could redirect
+  writes and concurrent fixed temporary filenames could collide. Calendar
+  disagreement could advance or delay cadence observation across hosts.
+- **Corrected requirement:** Declared attribution, bounded preserved diagnostics,
+  explicit publication/validation failure, monotonic unambiguous timestamps,
+  visible holds, independent reporting and the shared UTC calendar above.
+- **Reason:** Orchestration and auditability require truthful attribution and
+  consistent time semantics; diagnostic success must follow verified publication.
+- **Implementation impact:** The core crew-report writer validates identity,
+  status, source and extensions, serializes durable publication and verifies
+  readback. Heartbeat delegates to that writer and the venture actor-shard writer,
+  removes its independent append path and keeps holds/failures visible.
+- **Compatibility impact:** Existing display fields and valid extension metadata
+  remain available. A self-report can only name its declared actor; invalid/stale
+  sources require reconciliation. Old append logs remain untouched. Calendar
+  defaults become UTC, matching occurrence IDs and stored completion timestamps.
+- **Tests affected:** Attribution and path substitution, invalid status/JSON,
+  duplicate/non-finite fields, preserved legacy metadata, stale and equal-time
+  conflicts, publication failure, report isolation, empty/dry ticks, budget holds,
+  peer continuation and hosts straddling local midnight at the same UTC instant.
+- **Runtime/deployment impact:** Deploy matching core and Ventures modules with
+  an explicit actor and qualified journal retention. These are application
+  diagnostics; OS isolation, controller admission and active service qualification
+  remain separate requirements. No active runtime or audited status is asserted.
 
 ### Related Agents
 
