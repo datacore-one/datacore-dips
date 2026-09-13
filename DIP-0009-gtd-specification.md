@@ -1559,6 +1559,26 @@ Validation diagnostics name invalid fields without copying input values.
 These checks validate configuration and proposals; they do not establish durable
 spend accounting, execution admission or an OS-level credential boundary.
 
+Venture budget evidence preserves acknowledged spending across month boundaries.
+Rollover starts a new month's counters while retaining complete prior-month
+records, opening balances and extension metadata. A future month, malformed
+record, ambiguous category or non-finite/negative amount requires reconciliation;
+it cannot be interpreted as zero spending. Entry dates must match their month.
+All consumers select the configured source under the venture boundary. When
+canonical and legacy files coexist, the canonical source must preserve the
+legacy evidence; a custom source does not silently fall back to another ledger.
+
+Budget publication is bounded, durable and locally serialized, with a comparison
+against the snapshot read before mutation. A stale publisher must reload and
+reconcile; it cannot overwrite acknowledged entries or historical months.
+Interrupted publication retains the previous or complete new document, and an
+identical publication retry does not duplicate spending. Callers that retry
+spend recording supply a stable operation identity; conflicting reuse is held.
+A budget check evaluates a snapshot. It neither reserves funds nor grants
+payment/execution authority. External effects still require the execution site's
+admission and the applicable approval; local file exclusion is not cross-host
+coordination. No claim of atomicity with an external payment provider is made.
+
 Unresolved Git conflict syntax outside literal Org blocks must stop task review,
 mutation and projection reconciliation. Reading both sides as ordinary tasks is
 not a valid way to resolve conflicting intent or completion evidence.
@@ -3310,6 +3330,43 @@ This section provides essential information for agents working with GTD tasks an
   reporting sources, dependency state and installed-controller qualification
   remain separate open verification requirements. No status promotion or active
   runtime conformance is asserted by this amendment.
+
+### Proposed venture budget evidence amendment (2026-09-13)
+
+- **DIP:** 0009 orchestration evidence, using the existing module/data boundaries
+  in 0015 and 0022. This defines preservation and failure semantics missing from
+  the venture budget helper; it does not implement a new payment service.
+- **Previous requirement:** Monthly budget checks guide venture scheduling. The
+  helper reset entries when the month differed and saved a complete snapshot;
+  concurrency, recovery, malformed input and legacy-source conflicts were not
+  defined. Callers selected different default or configured ledger locations.
+- **Problem:** Loading an old month, recording a new spend and saving destroyed
+  earlier entries. Two valid snapshots could overwrite each other's spending.
+  Future months and invalid numeric/category values could reset or bypass limits.
+- **Corrected requirement:** Preserve complete monthly history and opening
+  balances; validate bounded evidence; reject stale publication and conflicting
+  source files; support explicit retry identity and durable acknowledgment as
+  above. Separate snapshot checks from actual external-spend admission.
+- **Reason:** Budget health and orchestration must not infer available resources
+  by discarding history, accepting invalid values or choosing an unrelated file.
+- **Implementation impact:** Shared budget reader/resolver, preserved archives,
+  serialized compare-and-publish with readback, append-only entry preservation,
+  stable optional operation identities and explicit reconciliation errors.
+- **Compatibility impact:** The current-month API and valid legacy records remain
+  readable. Older months are retained under history; unknown metadata survives.
+  Existing opening balances are preserved without inventing missing entries.
+  Unloaded/stale replacement, historical edits and ambiguous sources are refused.
+  An absent file remains an uninitialized empty record, not proof that no external
+  spending has occurred. Acknowledged observations do not certify provider costs.
+- **Tests affected:** Rollover and repeated rollover, extension/opening-balance
+  preservation, stale and simultaneous snapshots, interruption before/after
+  publication, identical/conflicting retries, aliases, invalid/future evidence,
+  category/date/amount validation, fractional totals and legacy-source conflicts.
+- **Runtime/deployment impact:** Matching readers/writers must be deployed and
+  actual legacy sources reconciled before rollout. The local lock protects
+  cooperating writers on one host; independent OS isolation and execution-site
+  admission remain required. No active-host verification or DIP status promotion
+  is asserted by this amendment.
 
 ### Related Agents
 
