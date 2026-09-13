@@ -1432,6 +1432,14 @@ require reconciliation; neither heading substrings nor cadence name alone are
 proof of an identical task. Local serialization and occurrence deduplication
 are not cross-host execution locks; DIP-0011's execution admission applies.
 
+Observation forwards every overdue binding to that shared capture path. It
+must not pre-filter by cadence name or a partial queue snapshot. An already
+pending binding yields `already_queued`, allowing later distinct candidates to
+be considered. Pending-work counters are diagnostics: they parse task records,
+ignore terminal tasks and prose examples, reject invalid or aliased sources,
+and use authoritative ledger state in Phase 1, including unprojected captures.
+Such a count cannot grant approval or suppress work before identity validation.
+
 Cadence history readers reduce recognized legacy and current locations without
 rewriting them. Missing history can mean never run; malformed, ambiguous,
 aliased or unreadable history must hold scheduling and preserve original bytes.
@@ -3474,6 +3482,30 @@ This section provides essential information for agents working with GTD tasks an
   installed module imports, credentials and state paths before activation. This
   amendment does not claim active deployment, distributed ownership, OS isolation
   or an implemented/audited status promotion.
+
+### Pending cadence observation follow-up (2026-09-13)
+
+- **DIP:** 0009 Part 9 proposed cadence amendment; related 0011 and 0043.
+- **Previous requirement:** Shared capture binds role, cadence and frequency and
+  holds ambiguous legacy identity. Observation still had a separate name-only
+  suppression rule and an unstructured tag-count diagnostic.
+- **Problem:** A queued cadence could hide another role or frequency with the
+  same name before capture, and incomplete legacy identity appeared idle.
+  Prose and completed tasks inflated counts; unsafe aliases were followed.
+- **Corrected requirement and reason:** Capture alone determines duplication;
+  diagnostic counts use validated current task evidence. This prevents an early
+  observation shortcut from bypassing the existing full-identity invariant.
+- **Implementation impact:** Remove the heartbeat prefilter, retain every due
+  candidate and read bounded Org or authoritative ledger records for counts.
+- **Compatibility impact:** Queued due work may produce `already_queued`
+  instead of `idle`. No duplicate task, execution grant or completion is added.
+  Incomplete legacy bindings remain intact and require reconciliation.
+- **Tests affected:** Same-name roles/frequencies, all-file pending work,
+  completed/prose examples, aliases, duplicate IDs, full capture retries and
+  unprojected ledger work behind a stale Org view.
+- **Runtime/deployment impact:** Install the matched Ventures candidate with
+  the existing core. Source tests do not establish active runtime conformance;
+  implemented/audited status is unchanged.
 
 ### Related Agents
 
