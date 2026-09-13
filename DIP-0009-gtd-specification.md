@@ -1513,6 +1513,31 @@ Production scheduling still requires qualified controller admission, supported
 runtime dependencies and independently enforced credential boundaries; these
 application rules do not establish an OS boundary.
 
+Heartbeat state uses declared actor identities, bounded validated records and
+locally serialized publication. A caller-controlled legacy actor value cannot
+choose an arbitrary filesystem destination. Corrupt, duplicate-key, aliased,
+non-finite or conflicting observations are preserved and hold reduction or
+mutation; they cannot be skipped while presenting a complete healthy view.
+Stale or ambiguous timestamps cannot overwrite a newer observation. Shards are
+cooperative observations; multiple hosts must not share one mutable writer
+shard, and local serialization does not provide cross-host exclusion.
+
+A host becoming stale is not evidence that its pending decisions were resolved.
+The reduced view retains those decisions. An empty snapshot default does not
+remove existing decisions; explicit updates belong to the source decision's
+writer or to a separately authorized reconciliation. Conflicting same-ID
+decisions require reconciliation. Pending counts must match retained records.
+Legacy observations keep their declared actor or an explicit `legacy` identity;
+they are not attributed to the current actor merely to refresh their age.
+
+Migration and normal publication use the same canonical state implementation.
+Migration discovers canonical declared spaces, including nested spaces, and
+loads installed module code independently of the data root. Preview writes no
+state. Apply preserves the legacy observation before replacing its derived view,
+and retries do not duplicate it. A failure after durable shard publication leaves
+that shard recoverable even when the view could not be refreshed. Invalid source
+records and unavailable installed code yield an explicit failed/held result.
+
 Unresolved Git conflict syntax outside literal Org blocks must stop task review,
 mutation and projection reconciliation. Reading both sides as ordinary tasks is
 not a valid way to resolve conflicting intent or completion evidence.
@@ -3191,6 +3216,42 @@ This section provides essential information for agents working with GTD tasks an
   shared state-writer preservation and credential isolation remain separate open
   requirements. No implemented/audited status promotion or runtime conformance
   is asserted by this proposed amendment.
+
+### Proposed heartbeat state preservation amendment (2026-09-13)
+
+- **DIP:** 0009 cadence/orchestration clarification; related 0011 and actor
+  attribution in the 0044 draft. Existing DIP status classifications are retained.
+- **Previous requirement:** Legacy heartbeat state used per-writer shards, but
+  reduction could omit malformed peers and age out pending decisions after 48h;
+  updates and migrations directly replaced files and inferred writer aliases.
+- **Problem:** An idle host or default snapshot could make unresolved work
+  disappear. Corrupt state could be overwritten; a legacy actor could redirect
+  migration writes, and concurrent writers shared temporary paths. Migration
+  discovery and source selection differed from normal state publication.
+- **Corrected requirement:** Declared identity, preserved bounded observations,
+  explicit decision updates, local exclusion, durable bounded publication and
+  common canonical migration as specified above.
+- **Reason:** Liveness and the absence of recent observations cannot establish
+  resolution, authorize path selection or justify destroying source evidence.
+- **Implementation impact:** Ventures heartbeat state has one storage path for
+  normal writes, decisions and migration. Core migration delegates to the
+  matching installed writer and canonical space catalog. Invalid evidence holds
+  work and produces a failure result without exporting input values.
+- **Compatibility impact:** Existing bytes are retained on invalid input. Valid
+  legacy records migrate under their original/legacy attribution; stale decisions
+  may reappear for explicit reconciliation. Invalid hostname-derived identities
+  must be reconciled to declared writers. Old tests that required silent skipping,
+  age-based deletion or destructive recovery are replaced with preservation
+  assertions; valid timestamp ordering and legacy read compatibility remain tested.
+- **Tests affected:** Stale peer decisions, snapshot defaults, explicit writer
+  updates, malformed/duplicate/conflicting records, path aliases, legacy traversal,
+  concurrent field preservation, shard/view partial failure, stale/future clocks,
+  migration preview/apply/retry and installed-code selection.
+- **Runtime/deployment impact:** Install matching core and Ventures versions with
+  private lock storage and qualify filesystem durability, declared writer topology,
+  continuous services and credential isolation. Application checks and temporary
+  installation probes do not certify active hosts. Runtime rollout and the final
+  fresh audit remain open; no DIP is promoted to implemented/audited by this text.
 
 ### Related Agents
 
