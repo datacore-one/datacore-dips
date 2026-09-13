@@ -1538,6 +1538,27 @@ and retries do not duplicate it. A failure after durable shard publication leave
 that shard recoverable even when the view could not be refreshed. Invalid source
 records and unavailable installed code yield an explicit failed/held result.
 
+Venture discovery uses the canonical space catalog, including marked nested
+spaces. Invalid configurations and duplicate venture identities cannot become
+a successful partial inventory. A legacy venture directory outside that catalog
+requires a preserved space-declaration migration; it must not silently vanish
+from monitoring. Filtering disabled ventures does not remove identity ambiguity.
+
+Discovery, heartbeat, portfolio status and cadence scheduling use the same bounded configuration
+validation. Known policy fields retain their declared types; autonomy is an
+integer in the supported range, and budget values are finite and nonnegative
+under the existing allocation-sum constraint. Configured file references remain
+relative to their venture. Duplicate YAML keys, recursive values and excessive
+expanded structure are refused; supported extension metadata remains preserved.
+Cadence declarations use supported frequencies and distinct, nonempty binding
+names. An explicit empty heartbeat-trigger list disables observations; disabled
+sources are not read or queried. Unknown or malformed triggers cannot implicitly
+enable work or hide it. Runtime dependencies for these validators are declared
+and installed under the qualified core dependency profile.
+Validation diagnostics name invalid fields without copying input values.
+These checks validate configuration and proposals; they do not establish durable
+spend accounting, execution admission or an OS-level credential boundary.
+
 Unresolved Git conflict syntax outside literal Org blocks must stop task review,
 mutation and projection reconciliation. Reading both sides as ordinary tasks is
 not a valid way to resolve conflicting intent or completion evidence.
@@ -3252,6 +3273,43 @@ This section provides essential information for agents working with GTD tasks an
   continuous services and credential isolation. Application checks and temporary
   installation probes do not certify active hosts. Runtime rollout and the final
   fresh audit remain open; no DIP is promoted to implemented/audited by this text.
+
+### Proposed venture configuration amendment (2026-09-13)
+
+- **DIP:** 0009 cadence/orchestration clarification; canonical space discovery
+  comes from 0015 and module configuration from 0022. This does not introduce
+  an autonomous-venture requirement from unrelated proposed DIPs.
+- **Previous requirement:** Discovery selected ordinal directories and skipped
+  invalid venture files. The model validated some fields, while heartbeat and
+  cadence callers reread raw YAML and applied different assumptions.
+- **Problem:** Nested ventures could be omitted, malformed inventory could look
+  empty, duplicate venture identity could collapse captured work, and non-finite,
+  negative or ambiguous policy values bypassed controls. Recursive/duplicate
+  YAML and source aliases were accepted; diagnostics copied input values.
+- **Corrected requirement:** Canonical complete inventory, unique venture
+  identity, bounded and shared typed validation, scoped source references and
+  private diagnostics as specified above.
+- **Reason:** Every orchestration entry point must interpret the same policy;
+  inconsistent parsing must not select a different authority or omit work.
+- **Implementation impact:** Venture loaders share model invariants and bounded
+  unique-key source reads. Discovery validates canonical spaces and identities;
+  heartbeat, cadence and portfolio readers consume validated snapshots. Portfolio
+  reports use configured evidence paths and report unavailable evidence as failure. Missing legacy
+  declarations are reported for reconciliation rather than inferred silently.
+- **Compatibility impact:** Valid model serialization and extension fields are
+  preserved. Invalid configurations remain on disk and hold work; operators must
+  correct ambiguous policy values or declare legacy spaces. The budget allocation
+  constraint already existed; previously bypassing readers now enforce it.
+- **Tests affected:** Nested/legacy discovery, duplicate identities, malformed
+  input, boolean autonomy, non-finite/negative budgets, file references, aliases,
+  recursive/expanded YAML, diagnostic privacy, model/schema round trips and
+  supported cadence bindings, disabled-trigger source access, and actual
+  sense/capture/contract-hold/clarify/review/allocation integration.
+- **Runtime/deployment impact:** Deploy matching module and core versions, then
+  reconcile actual configuration. Budget persistence, remaining observation and
+  reporting sources, dependency state and installed-controller qualification
+  remain separate open verification requirements. No status promotion or active
+  runtime conformance is asserted by this amendment.
 
 ### Related Agents
 
