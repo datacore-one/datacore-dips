@@ -8,7 +8,7 @@
 | **Type** | Architecture |
 | **Status** | Draft |
 | **Created** | 2026-08-13 |
-| **Updated** | 2026-09-06 |
+| **Updated** | 2026-09-12 |
 | **Tags** | `identity`, `actors`, `ledger`, `git`, `provenance`, `ssh` |
 | **Affects** | `.datacore/registry/infrastructure.yaml`, `.datacore/registry/principals.yaml`, `.datacore/lib/actor_identity.py`, `.datacore/lib/v2_verify.py`, `.datacore/lib/fleet_status.py`, `.datacore/lib/hooks/log_ownership_guard.py`, `.datacore/lib/ledger/log.py`, every machine's `~/.datacore/identity.env`, `git config --global`, per-agent GitHub accounts |
 | **Specs** | `.datacore/registry/infrastructure.yaml` (`servers.<name>.access.actor`) |
@@ -80,13 +80,53 @@ Hostnames were renamed to Star Trek locations precisely because they **cannot
 be mistaken for an agent or a role**: `bridge`, `engineering`, `transporter`,
 `holodeck`, `mac`.
 
-### 3. `ssh_user` and `service_user` must be equal
+### 3. Administration and runtime identities — amendment under review
+
+**Amendment status: Proposed.** The equality requirement below described an
+operational workaround. It does not establish correct access or isolation and
+must not prevent least-privilege service deployment.
+
+- `ssh_user` declares the administration/access identity. `service_user`
+  declares the execution identity. They MAY differ. A machine explicitly
+  configured as local (`ssh_alias: '-'`) need not declare an SSH identity.
+- Both applicable identities MUST be explicit, valid account names. An empty,
+  unreadable or ambiguous registry MUST NOT produce a passing declaration check.
+- Runtime inspection MUST establish which OS identity actually executes the
+  service and whether that identity has the intended filesystem and credential
+  access. Administrative reachability is not evidence of runtime permission.
+- Actor names and Git author metadata provide attribution. Neither establishes
+  an OS or credential boundary. Where policy requires one security context to
+  lack another's credentials or privileges, deployment MUST enforce that
+  boundary independently of the actor declaration and test denied access.
+- A declaration-only check MUST state its scope. Equal account names, different
+  account names, and a passing registry check are each insufficient evidence of
+  runtime isolation. This amendment does not require separate OS identities for
+  personas that intentionally share one authorized security context.
+
+#### Historical equality rule
+
+The previous requirement was: **`ssh_user` and `service_user` must be equal.**
+Its incident rationale is retained for traceability:
 
 They differed only on hermes, and that single divergence produced three wrong
 diagnoses in one session — reading gregor-owned repos as root reported Tris's
 repos as "not git repos". Both are now `gregor` fleet-wide; `/root/Data` became
 `/home/gregor/Data` as a consequence, since the path existed only because the
 service user was root.
+
+#### Identity amendment change record
+
+| Field | Record |
+|---|---|
+| Previous requirement | SSH and service users must be equal. |
+| Problem | Equality was a workaround for probes running as the wrong user, and rejects legitimate privilege separation. Missing identities could pass, while registry agreement says nothing about actual privileges. |
+| Corrected requirement | Declare administration and runtime identities independently, inspect the actual runtime identity, and enforce required credential/privilege boundaries independently of actor metadata. |
+| Reason | Preserve reliable diagnostics and least privilege without treating provenance as authentication or process isolation. |
+| Implementation impact | The identity checklist validates applicable declarations instead of account equality; runtime probes and deployments must verify the executing identity and effective access. |
+| Compatibility impact | Existing equal-user declarations remain valid. Separate service identities become supported declarations. Missing, malformed and duplicate configuration is refused rather than reported as aligned. |
+| Tests affected | Separate-user declarations, explicit local-only access, missing/ambiguous registry, invalid account/actor names; actual UID and negative filesystem/credential access tests. |
+| Runtime/deployment impact | No account is renamed and no existing credentials are removed by this specification change. Required isolation must be deployed and verified separately; candidate fixtures are not active-deployment evidence. |
+| Status | Proposed correction; repository checks are under remediation and active deployment/isolation reconciliation remains open. |
 
 ### 4. Agents commit as themselves
 
