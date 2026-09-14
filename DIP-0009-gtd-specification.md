@@ -21,6 +21,21 @@ the audit amendment PR, with implementation and deployment
 verification tracked separately. The historical Implemented header does not
 ratify the v2.0 draft identified in Updated, nor certify this amendment's rollout.
 
+
+**Compatibility decision (2026-09-14, proposed audit amendment):** New workflow
+policies are explicit opt-ins, disabled by default. `DATACORE_REVIEW_BEFORE_EXECUTION=1`
+adds strict review freshness/contract gating; `DATACORE_CADENCE_PROPOSALS=1`
+selects proposal-only cadence/heartbeat production. `DATACORE_INSTANCE_BOUND_EXECUTION=1`
+selects the parked experimental allocation model, tracked in
+[core issue #192](https://github.com/datacore-one/datacore/issues/192); it is not
+approved for deployment or inclusion in main. Earlier audit prose that treats
+these additions as mandatory must be read within that opt-in scope. Data
+preservation, truthful completion, private output, operator controls and exact
+authority checks remain safety invariants. Unknown-effect retry policy remains
+pending a separate owner decision. No implemented/audited status is asserted for
+the parked proposal or any unverified deployment.
+
+
 ## Summary
 
 This DIP defines the comprehensive GTD (Getting Things Done) implementation for Datacore, including:

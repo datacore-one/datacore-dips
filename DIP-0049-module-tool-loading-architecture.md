@@ -441,3 +441,14 @@ malformed input, source diagnostic canaries and data-directory code substitution
 **Runtime/deployment impact:** Install and qualify matching core, Ventures,
 Python dependencies and MCP artifacts before activation. Local tool integration
 does not establish OS isolation or active fleet conformance.
+
+### Compatibility clarification — 2026-09-14
+
+This Draft does not require renamed module callables or migration of valid
+user-space data. DIP-0022 defines default names and one selected canonical data
+context with space > personal > global code precedence. Multi-scope names require
+`DATACORE_SCOPED_MODULE_NAMES=1`; the default is `0`. Health may report an installed
+module as not selected or overridden without claiming that its handlers loaded.
+Installed Python/core coupling in full MCP mode requires matched deployment
+qualification; the naming option does not remove that dependency. No draft
+rollout is newly declared implemented or audited by this clarification.

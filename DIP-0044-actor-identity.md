@@ -14,6 +14,21 @@
 | **Specs** | `.datacore/registry/infrastructure.yaml` (`servers.<name>.access.actor`) |
 | **Relates to** | DIP-0046 (Git Transport — authorization, where this DIP is authentication), DIP-0034 (Event Ledger Substrate — per-writer logs keyed by actor), DIP-0035 (Job Contracts — `--machine` selector) |
 
+
+**Compatibility decision (2026-09-14, proposed audit amendment):** New workflow
+policies are explicit opt-ins, disabled by default. `DATACORE_REVIEW_BEFORE_EXECUTION=1`
+adds strict review freshness/contract gating; `DATACORE_CADENCE_PROPOSALS=1`
+selects proposal-only cadence/heartbeat production. `DATACORE_INSTANCE_BOUND_EXECUTION=1`
+selects the parked experimental allocation model, tracked in
+[core issue #192](https://github.com/datacore-one/datacore/issues/192); it is not
+approved for deployment or inclusion in main. Earlier audit prose that treats
+these additions as mandatory must be read within that opt-in scope. Data
+preservation, truthful completion, private output, operator controls and exact
+authority checks remain safety invariants. Unknown-effect retry policy remains
+pending a separate owner decision. No implemented/audited status is asserted for
+the parked proposal or any unverified deployment.
+
+
 ## Summary
 
 Every machine answers to four or five different names, and no two conventions

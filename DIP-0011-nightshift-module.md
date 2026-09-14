@@ -12,6 +12,21 @@
 | **Module** | nightshift |
 | **Depends On** | DIP-0002, DIP-0009, DIP-0010, Datacortex module |
 
+
+**Compatibility decision (2026-09-14, proposed audit amendment):** New workflow
+policies are explicit opt-ins, disabled by default. `DATACORE_REVIEW_BEFORE_EXECUTION=1`
+adds strict review freshness/contract gating; `DATACORE_CADENCE_PROPOSALS=1`
+selects proposal-only cadence/heartbeat production. `DATACORE_INSTANCE_BOUND_EXECUTION=1`
+selects the parked experimental allocation model, tracked in
+[core issue #192](https://github.com/datacore-one/datacore/issues/192); it is not
+approved for deployment or inclusion in main. Earlier audit prose that treats
+these additions as mandatory must be read within that opt-in scope. Data
+preservation, truthful completion, private output, operator controls and exact
+authority checks remain safety invariants. Unknown-effect retry policy remains
+pending a separate owner decision. No implemented/audited status is asserted for
+the parked proposal or any unverified deployment.
+
+
 ## Summary
 
 Nightshift is an autonomous task execution module that processes `:AI:` tagged tasks with quality gates, multi-persona evaluation, context enhancement, and comprehensive analytics. It runs locally or on a server, with identical user experience.
