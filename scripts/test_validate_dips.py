@@ -1,6 +1,7 @@
 """Stdlib-only regression checks for diagnostics emitted by CI."""
 import contextlib
 import io
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,18 @@ import validate_dips
 
 
 class HygieneDiagnostics(unittest.TestCase):
+    def test_catalog_statuses_match_referenced_headers(self):
+        root = Path(__file__).resolve().parents[1]
+        rows = re.findall(r'\| \[\d{4}\]\((DIP-[^)]+)\) \| [^|]+\| ([^|]+)\|',
+                          (root / 'README.md').read_text())
+        self.assertTrue(rows)
+        for filename, catalog_status in rows:
+            with self.subTest(dip=filename):
+                head = (root / filename).read_text()[:2500]
+                status = re.search(r'\*\*Status\*\*\s*\|\s*([^|\n]+)', head).group(1).strip()
+                self.assertEqual(catalog_status.strip(), status)
+
+
     def test_detected_values_never_enter_diagnostics(self):
         samples = [
             'AKIA' + 'ABCDEFGHIJKLMNOP',

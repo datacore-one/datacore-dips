@@ -8,7 +8,7 @@
 | **Type** | Architecture |
 | **Status** | Draft |
 | **Created** | 2026-08-13 |
-| **Updated** | 2026-09-12 |
+| **Updated** | 2026-09-14 |
 | **Tags** | `identity`, `actors`, `ledger`, `git`, `provenance`, `ssh` |
 | **Affects** | `.datacore/registry/infrastructure.yaml`, `.datacore/registry/principals.yaml`, `.datacore/lib/actor_identity.py`, `.datacore/lib/v2_verify.py`, `.datacore/lib/fleet_status.py`, `.datacore/lib/hooks/log_ownership_guard.py`, `.datacore/lib/ledger/log.py`, every machine's `~/.datacore/identity.env`, `git config --global`, per-agent GitHub accounts |
 | **Specs** | `.datacore/registry/infrastructure.yaml` (`servers.<name>.access.actor`) |
@@ -17,9 +17,11 @@
 ## Summary
 
 Every machine answers to four or five different names, and no two conventions
-agreed. This DIP makes **one canonical actor per machine**, recorded in the
-registry, and requires that nothing derive an actor from a hostname, an SSH
-alias, or a git author name ever again.
+agreed. This DIP defines **one declared default actor per installation**, with
+explicit per-process writer overrides for separately registered executors.
+Actor provenance is not an authorization or OS-isolation boundary. Strict
+callers require declarations; the legacy non-strict diagnostic fallback is
+described separately below and cannot establish execution authority.
 
 ## Motivation
 
@@ -51,10 +53,13 @@ from whichever name was nearest — and they disagree.
 
 ## Specification
 
-### 1. One canonical actor, recorded once
+### 1. One declared default, with explicit process writers
 
-`servers.<name>.access.actor` is the single source of truth. Nothing may infer
-an actor from `hostname`, an SSH alias, a git author name, or a directory path.
+`servers.<name>.access.actor` declares the installation default. A service may
+declare a distinct registered writer through its explicit process configuration.
+Resolution follows section 6; strict consumers refuse a missing declaration.
+Hostname, SSH alias, Git author name and directory path do not independently
+authorize an actor or grant access to a principal's credentials.
 
 ```yaml
 servers:
@@ -242,3 +247,17 @@ chief-of-staff PR #18; identity declared on all five machines, the checklist
 green on the box). The DIP stays **Draft** until owner ratification, per the
 governance rule that `Implemented`/`Accepted` requires review rather than
 self-certification.
+
+
+### Actor resolution clarification — proposed (2026-09-14)
+
+Previous text simultaneously required one actor per machine, forbade every
+inference, specified a non-strict hostname fallback, and assigned two writers
+to one machine. The corrected distinction is an installation default versus
+explicit process writers, and diagnostic provenance versus authority. Existing
+non-strict compatibility resolution remains supported and warns on fallback;
+strict admission/authorization must use independently validated declarations.
+No account, key or log is renamed. Existing actor and principal resolution
+regressions remain applicable; runtime authority and credential isolation must
+be tested separately. This clarification remains Draft and does not promote
+existing cooperative checks into an independent security boundary.
