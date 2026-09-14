@@ -8,15 +8,16 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-04 |
-| **Updated** | 2026-08-29 (v2.0 DRAFT — seven-state loop, agents-as-workers; pending ratification. Prior: v1.1 2026-07-24) |
+| **Updated** | 2026-09-14 (proposed audit amendments; v2.0 DRAFT of 2026-08-29 — seven-state loop, agents-as-workers; pending ratification. Prior: v1.1 2026-07-24) |
 | **Tags** | `gtd`, `task-management`, `org-mode`, `agents` |
 | **Affects** | `org/`, `.datacore/commands/`, `.datacore/agents/`, `.datacore/modules/gtd/` |
 | **Specs** | `org-mode-conventions.md` |
 | **Agents** | `gtd-inbox-processor`, `ai-task-executor`, `queue-optimizer` |
 | **Supersedes** | `.datacore/gtd-spec.md` |
 
-**Amendment status (2026-09-13):** The intent-review privacy clarification below
-is proposed in the audit amendment PR, with implementation and deployment
+**Amendment status (2026-09-14):** The audit clarifications below, including
+intent-review privacy, preservation and execution controls, are proposed in
+the audit amendment PR, with implementation and deployment
 verification tracked separately. The historical Implemented header does not
 ratify the v2.0 draft identified in Updated, nor certify this amendment's rollout.
 
@@ -3506,6 +3507,94 @@ This section provides essential information for agents working with GTD tasks an
 - **Runtime/deployment impact:** Install the matched Ventures candidate with
   the existing core. Source tests do not establish active runtime conformance;
   implemented/audited status is unchanged.
+
+### Operator cadence controls and preserved policy edits (proposed, 2026-09-13)
+
+Cadence production, review and execution are separate stages. A pause is an
+execution restriction, not a deletion of queued work or an approval grant.
+All new executor launches, including direct entry and retries, must re-read
+current controls. The bound task's `VENTURE` and complete `CADENCE` metadata
+identify a venture cadence independently of its editable display title. A
+venture/cadence pause applies to all its roles and frequencies. Historical
+full-title and bare-cadence pause forms remain supported. This does not promise
+that an already running external operation can be revoked or rolled back.
+
+All readers and writers of the selected CoS `policies.yaml` must use one
+validated interpretation. Only an absent optional source selects defaults.
+Malformed, duplicate-key, aliased, special-file, oversized or structurally
+ambiguous evidence must remain unchanged and must not authorize execution.
+Known control fields retain their types; unrelated settings, comments, quoted
+values and existing override extensions survive a successful edit.
+
+An edit holds a stable private lock across read, validation and publication.
+Publish complete validated output by durable replacement; do not truncate the
+source in place. A failed edit must not be acknowledged, including failure to
+flush the containing directory. Changes detected before publication are held
+for reconciliation. Concurrent supported writers must use the same transaction.
+This is local cooperative exclusion, not distributed locking or protection from
+another process that can bypass filesystem permissions. Runtime rollout must
+bind all consumers to the intended policy source and security context.
+
+**Normative change record:**
+
+- **DIP:** 0009, related 0011 and 0041; this clarification remains proposed.
+- **Previous requirement:** Paused cadences and operator overrides were consumed
+  by independent queue/UI paths without a complete preservation or launch-time
+  contract.
+- **Problem:** UI edits could replace malformed policy with defaults or truncate
+  controls on interruption. Direct execution and retries could omit per-cadence
+  pauses, while title parsing lost multiword cadence identity.
+- **Corrected requirement / reason:** Preserve the entire policy and enforce
+  its current restrictions at every launch using bound task identity. An error
+  cannot erase restrictions or become permission.
+- **Implementation impact:** Core policy parser and durable transaction; one
+  shared authored-YAML codec; CoS/app delegation to the transaction; task-local
+  Nightshift control context rechecked by CLI and batch launch paths.
+- **Compatibility impact:** Invalid existing controls require reconciliation;
+  they are retained. Unrelated override extensions and legacy pause forms stay
+  supported. Existing operations are not represented as automatically cancelled.
+- **Tests affected:** Malformed/aliased sources, comment and extension retention,
+  concurrent writers, interrupted replacement, durability failure, direct
+  execution, changed controls before launch and context cleanup after refusal.
+- **Runtime/deployment impact:** Deploy matching core, CoS, Ventures and app
+  artifacts and bind the selected private policy path for every consumer.
+  Candidate tests do not certify active deployment or promote DIP status.
+
+### CoS execution acknowledgement and fallback (proposed, 2026-09-14)
+
+A submitted agent request without a verified terminal result has an unknown
+outcome. Partial streamed text, end-of-stream, timeout, transport failure and
+an error message are not completion evidence. An authentication marker in CLI
+output does not prove that no earlier tool or external operation ran.
+
+Automatic backend fallback is allowed only when the previous path is known
+not to have submitted work, or the operation has an independently enforced
+duplicate-safe contract. Unknown agent outcomes must propagate through both
+the ordinary fallback chain and quality escalation. They require reconciliation
+before another execution; they must not replace an acknowledged briefing with
+partial output or a synthetic successful result. Normal completed results and
+known pre-submission unavailability retain their existing behavior.
+
+**Normative change record:**
+
+- **DIP:** 0009, related 0041; this clarification remains proposed.
+- **Previous requirement:** Briefing availability and recovery prose did not
+  distinguish an unavailable executor from an unacknowledged submitted request.
+- **Problem:** Broad error fallback could submit a second agent execution after
+  the first had already acted. Partial stream output could be published as final.
+- **Corrected requirement / reason:** Require explicit completion evidence and
+  carry unknown outcome through all retry layers, preventing duplicate effects
+  and false acknowledgement.
+- **Implementation impact:** Typed unknown-outcome errors in the CoS app SDK
+  and CLI adapters; outer fallback and escalation propagate those errors.
+- **Compatibility impact:** Some previously automatic retries now stop for
+  reconciliation. Confirmed pre-submission fallback remains available.
+- **Tests affected:** Stream exception/error/EOF/partial-EOF, explicit completion,
+  outer backend fallback, quality escalation, CLI authentication text, retained
+  prior briefing, and hermetic pre-submission CLI test fixtures.
+- **Runtime/deployment impact:** Deploy the matching app adapter and verify its
+  executor binding. These application semantics do not establish independent OS
+  isolation, external idempotency, or completion across a process crash.
 
 ### Related Agents
 
