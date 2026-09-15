@@ -1436,7 +1436,7 @@ recoverable, ledger-aware Org writer. Proposals carry `ORIGIN=cadence`, stable
 occurrence identity and the complete role/cadence/frequency binding. Generation
 does not set `APPROVED_BY` or the `AI` dispatch tag. Rich context is useful review
 input, but it does not grant approval or establish `SURFACE`. The existing CoS
-review and execution-admission requirements still apply. This supersedes the
+review requirements still apply. This supersedes the
 generator exception that inferred a clarified next action from rich properties.
 
 A capture retry must inspect durable task identity and existing pending work,
@@ -1446,7 +1446,9 @@ cannot collapse into one binding. A completed occurrence cannot be recreated
 merely because its derived Org entry was removed. Ambiguous legacy bindings
 require reconciliation; neither heading substrings nor cadence name alone are
 proof of an identical task. Local serialization and occurrence deduplication
-are not cross-host execution locks; DIP-0011's execution admission applies.
+are not cross-host execution locks. No mechanism in this DIP establishes
+cross-host exclusion; that invariant is unresolved and must be selected and
+verified before anything relies on it.
 
 Observation forwards every overdue binding to that shared capture path. It
 must not pre-filter by cadence name or a partial queue snapshot. An already
@@ -1533,9 +1535,9 @@ or merely the absence of a free-form error. Invalid, ambiguous or future run
 evidence cannot establish health. Diagnostics do not export input values.
 One venture's failed observation or capture must remain visible without
 starving independent ventures, and a dry tick must not write progress or health.
-Production scheduling still requires qualified controller admission, supported
-runtime dependencies and independently enforced credential boundaries; these
-application rules do not establish an OS boundary.
+Production scheduling still requires supported runtime dependencies and
+independently enforced credential boundaries; these application rules do not
+establish an OS boundary, and no mechanism in this DIP supplies one.
 
 Heartbeat state uses declared actor identities, bounded validated records and
 locally serialized publication. A caller-controlled legacy actor value cannot
