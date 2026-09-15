@@ -28,11 +28,6 @@
 > Implementation/Rollout sections for the per-DIP position rather than inferring it
 > from this status field.
 
-> **Proposed audit amendment (2026-09-12):** the execution-admission section
-> below is proposed and awaits the normal DIP review/ratification process.
-> The historical Implemented status applies to the previously ratified adapter
-> contract; it does not claim that this amendment is deployed or ratified.
-
 
 **Compatibility decision (2026-09-14, proposed audit amendment):** New workflow
 policies are explicit opt-ins, disabled by default. `DATACORE_REVIEW_BEFORE_EXECUTION=1`
@@ -440,92 +435,6 @@ secondary agent directory) or reconsider whether the generator's premise
 applies to this topology at all — this DIP does not resolve that question,
 it only names it precisely enough that nobody re-runs the generator
 against the real tree by accident.
-
-## Proposed: execution admission for replicated delegations (2026-09-12)
-
-### Scope and invariant
-
-An executor adapter starts a requested invocation; it does not establish
-cross-host ownership. An actor/assignee identifies a principal, not a unique
-process or installation. The offline ledger in [DIP-0034](DIP-0034-event-ledger-substrate.md)
-can therefore contain concurrent claims. A local policy lock cannot turn that
-replicated record into a distributed execution lock.
-
-For the automated ledger consumer, one execution-bound delegation may receive
-**at most one durable admission at its designated installation**. This is an
-admission guarantee, not exactly-once delivery of arbitrary external effects.
-The controller must commit consumption outside synced Data before invoking
-an adapter. Restoring, copying or renaming Data must not restore admission.
-
-The same canonical authority implementation serves the core consumer and the
-allocation controller in [DIP-0011](DIP-0011-nightshift-module.md). Their ledger
-records remain different contracts; they do not maintain competing database
-implementations. Worker processes must be independently unable to modify the
-controller's installation configuration, credentials or consumption state.
-This requirement is about a security context, not one OS user per persona.
-
-### Creation and immutable routing
-
-An executable delegation carries `execution_installation` (the provisioned,
-canonical UUID) and `execution_space` (the canonical space marker name).
-Its identity is `delegation-` followed by the lowercase SHA-256 hex digest of
-the UTF-8 JSON array `[normalized_creation_title, execution_space,
-execution_installation]`, using compact separators and unescaped Unicode.
-Title normalization is lowercase with whitespace runs collapsed and ends
-trimmed, as in the existing briefing deduplication contract.
-
-Binding the installation into the identity prevents another host from changing
-a replicated creation's target while retaining the same execution identity.
-Both routing fields are immutable after creation, including before a claim.
-The consumer checks the original creation and its identity, the current
-payload, the current canonical space marker, and the administrator-provisioned
-installation. Conflicting creations or a missing/invalid binding refuse
-execution. Pre-claim edits to other allowed fields remain content-bound by the
-claim and any required approval; they do not change the original routing.
-
-The producer accepts an explicit installation chosen upstream. It does not
-infer security authority from an agent hint, hostname, local directory prefix,
-or environment-supplied installation UUID. Existing planning and dismissal
-records retain their identities and data. Adding or changing routing in a
-subsequent briefing must not silently resurrect the same observed proposal.
-
-### Interruption, retry and completion
-
-1. Validate the selection and creation binding against the current ledger.
-2. Record a policy-checked claim. A failed claim grants no execution permission.
-3. Durably consume the delegation in the installation's existing-only authority
-   store. Failed or uncertain consumption grants no execution permission.
-4. Recheck exact ownership, then invoke the adapter.
-5. Commit a completion or review result only through the canonical policy path,
-   which verifies the current owner, complete payload hash, designated
-   installation and exact consumption token while holding the local policy lock.
-
-A crash after consumption, provider error, timeout, or failed artifact check
-must not automatically release the delegation for another invocation. It
-remains visible for reconciliation, even if no effect was ultimately performed.
-Missing, corrupt or lost authority state refuses execution rather than creating
-a new empty database. A prior claim/release also prevents automatic retry.
-
-There is no lease, automatic expiry, reset or takeover. Before authorizing
-replacement work, an operator must establish that the old worker is stopped,
-reconcile uncertain effects, and create a distinct execution authorization.
-Cloning a complete provisioned host identity or restoring its authority to an
-older snapshot is not a supported recovery procedure. A deployment needing
-live ownership transfer must supply fencing or another verified coordination
-model; eventual ledger arbitration alone is insufficient.
-
-### Normative change record
-
-| Field | Record |
-| --- | --- |
-| Previous requirement | Adapter invocation and shadow accounting were specified; principal assignment and local claims did not define an exclusive execution installation or durable retry boundary. |
-| Problem | Separate hosts/processes can execute the same replicated delegation, and a failed response or restored Data can permit repeated effects. |
-| Corrected requirement | Explicit installation-bound delegation identity, canonical shared durable admission outside Data, immutable routing, no automatic retry/transfer, and receipt-checked result writes. |
-| Reason | Define an objectively testable admission invariant without treating offline ledger convergence as distributed locking. |
-| Implementation impact | Core `execution_admission.py` is canonical; Nightshift retains a compatibility entrypoint. `ledger_execution.py` gates `ledger_claim.py`; briefing producers preserve explicit routing and policy protects bound results. |
-| Compatibility impact | Preserve old events, data and planning behavior. Unbound legacy items cannot run unattended; do not automatically upgrade or replay them. Upgrade producer, consumer and core dependency together. |
-| Tests affected | Disconnected stores, copied/renamed Data, simultaneous processes, partial claim/consumption failures, retargeting, stale ownership, forged receipts, producer round trips and repeat materialization. |
-| Runtime/deployment impact | Provision the designated controller, isolate workers, preserve authority state, reconcile old in-flight work, and qualify the active entrypoints before enabling execution. Repository tests alone do not close deployment verification. |
 
 ## Integration
 
