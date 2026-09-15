@@ -8,9 +8,24 @@
 | **Type** | Module |
 | **Status** | Implemented |
 | **Created** | 2025-12-10 |
-| **Updated** | 2026-07-13 |
+| **Updated** | 2026-09-12 |
 | **Module** | nightshift |
 | **Depends On** | DIP-0002, DIP-0009, DIP-0010, Datacortex module |
+
+
+**Compatibility decision (2026-09-14, proposed audit amendment):** New workflow
+policies are explicit opt-ins, disabled by default. `DATACORE_REVIEW_BEFORE_EXECUTION=1`
+adds strict review freshness/contract gating; `DATACORE_CADENCE_PROPOSALS=1`
+selects proposal-only cadence/heartbeat production. `DATACORE_INSTANCE_BOUND_EXECUTION=1`
+selects the parked experimental allocation model, tracked in
+[core issue #192](https://github.com/datacore-one/datacore/issues/192); it is not
+approved for deployment or inclusion in main. Earlier audit prose that treats
+these additions as mandatory must be read within that opt-in scope. Data
+preservation, truthful completion, private output, operator controls and exact
+authority checks remain safety invariants. Unknown-effect retry policy remains
+pending a separate owner decision. No implemented/audited status is asserted for
+the parked proposal or any unverified deployment.
+
 
 ## Summary
 
@@ -491,6 +506,54 @@ requires_action: acknowledge
 
 ## Journal Integration
 
+### Preservation and concurrent writers — amendment under review
+
+**Amendment status: Proposed (2026-09-12).** The examples below describe
+execution reports, not permission to replace unrelated journal content. This
+clarification makes their preservation requirements explicit. It does not
+certify an installed writer or convert local locking into cross-host safety.
+
+1. Appending an execution report MUST retain prior authored content. A report
+   is stored completely or the writer reports failure. Metadata, code examples,
+   quotations and unrelated sections MUST NOT be reinterpreted as the target
+   section merely because they contain its name.
+2. A generated daily briefing may replace its own exact section. Capture that
+   section before generation; if another writer changes it before publication,
+   refuse the stale replacement. Concurrent changes to unrelated sections must
+   be preserved. Ambiguous duplicate target sections require reconciliation,
+   not deletion by heuristic. The briefing producer owns this generated
+   section; authored session notes belong in separate sections.
+3. Section extraction for delivery MUST stop at the next actual top-level
+   section. It must not send later journal notes as part of a briefing. The
+   implementation uses CommonMark heading boundaries and leading YAML
+   frontmatter; literal headings inside code, quotations and HTML are content.
+4. All writers of the same installed source MUST share a transaction and
+   recovery protocol, or an equivalent independently enforced writer boundary.
+   Core wrap-up, write-back, Nightshift summaries and daily briefings cannot use
+   independent locks and claim mutual exclusion. Current local transactions
+   require one shared `DATACORE_STATE`; this is a deployment prerequisite, not
+   a distributed lock. Other hosts and direct file editors need an enforced
+   ownership/synchronization arrangement before concurrent safety is claimed.
+5. Publication MUST preserve complete previous data across interrupted writes
+   and participate in recovery before another mutation. An unacknowledged
+   transaction can be rolled back; recovery MUST refuse to overwrite a third
+   version written outside that transaction. Failed durability checks must be
+   surfaced. Local durable publication is distinct from a verified Git push.
+
+### Journal amendment change record
+
+| Field | Record |
+|-------|--------|
+| Previous requirement | Execution reports are appended to space/personal journals; replacement, syntax boundaries and writer coordination were implicit. |
+| Problem | Whole-file writes lost updates; substring/fence heuristics dropped summaries, damaged metadata/examples and selected later notes for briefing delivery. Separate locks did not coordinate core and module writers. |
+| Corrected requirement | Preserve source outside the owned section, reject stale/ambiguous replacements, parse actual Markdown boundaries, and share recoverable writer coordination. |
+| Reason | Journals contain authored source data, not disposable generated output. |
+| Implementation impact | Core `markdown_sections.py` and `journal_store.py`; Nightshift summary/briefing writers use the existing core transaction protocol. Fully derived doing-journal output uses atomic replacement. |
+| Compatibility impact | Existing files are retained. Duplicate sections, malformed metadata, unclosed generated blocks and stale replacements now require correction/retry instead of heuristic rewriting. Core and Nightshift must be upgraded together. |
+| Tests affected | Literal headings, exact source preservation, section extraction, stale-generation preconditions, independent-process coordination, interrupted publication and crash/restart recovery. |
+| Runtime/deployment impact | Reconcile writer identities, shared transaction state and all direct write paths; qualify actual filesystem durability and recovery. Noncooperating/cross-host writers remain an open enforcement requirement. |
+| Status | Proposed clarification with candidate code; no deployed-conformance or global-concurrency claim. |
+
 ### Space Journal Entry
 
 `1-teamspace/journal/2025-12-11.md`:
@@ -684,9 +747,110 @@ Users can override per-task:
 
 ---
 
+## Canonical alias compatibility — proposed correction
+
+**Amendment status: Proposed (2026-09-12).** This corrects the blanket alias
+refusal in the preceding discovery amendment, preserving its boundary invariant.
+
+| Field | Record |
+|---|---|
+| Previous requirement | The earlier audit amendment refused every space alias during automated discovery. |
+| Problem | A legacy link to the same independently discovered canonical space stopped automation despite adding neither data nor authority. Removing the link could break existing references unnecessarily. |
+| Corrected requirement | Ignore redundant links to already validated canonical spaces inside discovery bounds; return each canonical path once. Refuse aliases whose work would otherwise be missed or whose target crosses the root, skipped-directory or depth boundary. Never traverse an alias to discover new spaces. |
+| Reason | Preserve DIP-0015 stable identity and nonbreaking discovery without allowing an alias to supply authority or hide work. |
+| Implementation impact | Complete canonical discovery before classifying collected aliases; all automated users share that result. |
+| Compatibility impact | Retain legacy compatibility links and all underlying data; unsupported aliases still require repair. |
+| Tests affected | Redundant links, canonical identity/count and containing-space resolution; external, skipped-directory and beyond-depth targets; allocation and projection behavior. |
+| Runtime/deployment impact | Verify affected installed layouts and consumer access without deleting aliases or moving valid space data. |
+
 ## Git Synchronization Protocol
 
-### Branch Strategy: Single Branch (main)
+### Publication and workspace ownership — amendment under review
+
+**Amendment status: Proposed.** This amendment corrects the unsafe checkout and
+claim assumptions in the historical procedure below. Candidate implementations
+exist for publication and workspace retirement; startup integration, effect
+coordination and deployed conformance remain to be verified. DIP-0046 is design
+context, not an independent assertion that its proposed features are current.
+
+1. The destination of a publication is explicit and independent of the shared
+   checkout's current branch. A health check MUST NOT take ownership of another
+   writer's branch, index or working files. Startup, retry and recovery MUST NOT
+   stage unrelated work, switch a shared checkout, bypass hooks, or delete data
+   merely to make an execution or synchronization attempt proceed.
+   Task-run preparation captures each selected repository's default branch and
+   acknowledged commit after synchronization. It does not cut a day branch or
+   implicitly approve older run refs. Task, batch and report publication share
+   that captured parent or a successor verified as the same run's own output;
+   an unrelated local commit cannot become an implicitly approved ancestor.
+   Per-run destination bindings are released on normal exit and failure.
+2. Publication binds immutable source and destination commit identities. An
+   integration uses a private index/worktree, preserves configured hooks, and
+   verifies the resulting content and parents before a conditional remote
+   update. Another writer advancing the destination causes refusal or a fresh
+   integration/review; it MUST NOT cause replacement of that writer's history.
+   File publication validates and commits the same captured bytes, applying the
+   destination's configured Git encoding and clean filters. A declared output
+   that is missing is a failure, not an implicit successful deletion or omission.
+3. Repository category and publication destination are validated independently
+   of the hosting provider. Code requiring review MUST NOT enter an automatic
+   knowledge-publication path because its remote does not support that review
+   mechanism. Review/approval binds the reviewed commit, and merge revalidates
+   that identity. Opening a review is not an acknowledgement of a merge.
+4. Failure to publish, including an uncertain push acknowledgement, remains
+   visible and retryable without discarding local work. An empty task queue does
+   not imply that all earlier work was published. A commit count or elapsed time
+   is insufficient authority to delete a run ref; any authorized consumption
+   must be conditional on the exact generation being consumed.
+5. A clean Git status is not proof of writer quiescence and does not account for
+   late ignored files. Automatic workspace retirement MUST preserve uncertain
+   files and commits. Permanent reclamation requires established writer
+   quiescence and an explicit disposition of retained data. Deployments MUST
+   account for retained workspace storage instead of treating retirement as
+   completed reclamation. Recovery data MUST reside in persistent private
+   storage associated with the repository; an OS temporary directory alone
+   does not meet restart/recovery retention requirements.
+6. Git publication and task execution ownership are distinct. A task timestamp,
+   local lock, or a successful push to an executor's branch MUST NOT be described
+   as cross-host exclusive execution. A supported deployment must specify and
+   verify either exclusive effects/commits or duplicate-safe effects/commits.
+   Expiry alone cannot authorize transfer while the old executor can still
+   affect protected state. Transfer requires fencing or verified quiescence;
+   deployments without either MUST NOT automatically reclaim execution ownership.
+
+### Publication amendment change record
+
+The startup clarification above is also **Proposed**; it does not certify
+current deployed behavior or approve retained historical branches.
+
+| Field | Task-run preparation clarification |
+|---|---|
+| Previous requirement | Startup selected a shared day branch, parked existing changes, and merged earlier runs into the default branch. File-level publication checks did not define ownership of already-unpublished parent commits. |
+| Problem | Preparation could publish another writer's draft, bypass hooks, or merge code before review; a batch publisher could bypass the task publisher's captured parent. |
+| Corrected requirement | Read-only preparation, explicit acknowledged default destinations, one parent-ownership check for task/batch/report publication, and explicit review/recovery of historical refs. |
+| Reason | A path list describes a new tree delta; it does not authorize every ancestor that a Git push would also disclose. |
+| Implementation impact | Remove automatic parking/checkout/merge/ref-pruning paths. Bind run destinations and their verified tips through a shared publication primitive. |
+| Compatibility impact | Dirty, unsynchronized or unexpected source history is preserved and requires reconciliation. Startup no longer resumes or publishes historical run branches implicitly. Explicit verified recovery remains supported. |
+| Tests affected | Preserve the historical dirty-work, conflict, repeated-run, remote-only, dangling-ref and rejected-push scenarios; assert unchanged original files/index/refs. Add late-checkout, unpublished-parent, batch-bypass and failed-scope tests. |
+| Runtime/deployment impact | All publication callers must use the same installed binding contract. Active installations and pending history require separate qualification and reconciliation; this is not an OS boundary or cross-host execution fence. |
+
+| Field | Record |
+|---|---|
+| Previous requirement | Shared HEAD on the default branch, automatic stash/checkout repair, and timestamp-based claim/commit/push described as a distributed lock. |
+| Problem | Checkout/index ownership was not established; unrelated writes could be included or removed. Per-executor branches and elapsed time do not exclude another host or fence a delayed worker. Relative hook paths could stop applying in a private checkout. Re-reading validated paths could publish different bytes, and temporary recovery directories could be removed by the OS. |
+| Corrected requirement | Explicit destinations, captured generations, isolated integration, preserved hooks, conditional publication, visible retry outcomes, data-preserving retirement and an independently specified execution/effect ownership model. |
+| Reason | Preserve data and authorization while separating repository transport from executor ownership. The existing single-branch procedure cannot provide those guarantees by itself. |
+| Implementation impact | Shared Git lifecycle helpers, private Nightshift/Chief of Staff publication, immutable knowledge-file capture and persistent private recovery storage; startup, transport and executor coordination must conform independently. |
+| Compatibility impact | Existing commits, run refs and retained work remain recoverable. Shared-HEAD repair and implicit hook bypass cease to be supported recovery behavior. Pending work may require explicit reconciliation. |
+| Tests affected | Shared index/checkout preservation, simultaneous independent clones, stale source/base, rejected or uncertain push, hook refusal/mutation/path resolution, late ignored writes, open descriptors, retry and recovery; file substitution, clean filters, missing outputs, persistent recovery location and ownership. |
+| Runtime/deployment impact | Qualify supported Git and hook configuration, executor/effect ownership and retained-storage reclamation. Repository tests and isolated host fixtures do not establish active deployment conformance. |
+| Status | Proposed correction with partial candidate implementation; remaining startup, coordination and deployment gaps are not waived. |
+
+### Historical branch strategy: single branch (main)
+
+The following procedure records the former implementation and its rationale.
+Its shared-checkout mutation requirements conflict with the proposed ownership
+amendment above and must not be used as a justification for unsafe recovery.
 
 Local and server both work on `main` with atomic operations protocol.
 
@@ -776,7 +940,12 @@ nightshift: batch-start 2025-12-10    # Beginning run
 nightshift: batch-end 2025-12-10      # Run complete
 ```
 
-### Task Claiming (Distributed Lock)
+### Historical task claiming (does not establish a distributed lock)
+
+This sketch does not establish a cross-host coordination primitive. In
+particular, the two-hour age check does not stop or fence the previous worker.
+The execution/effect ownership requirement above replaces that assumption;
+retaining this sketch is historical traceability, not a conformance claim.
 
 ```python
 def can_execute(task: Task) -> bool:
@@ -872,6 +1041,48 @@ operation:
 ---
 
 ## Platform-Agnostic Scheduling
+
+### Command admission — proposed clarification
+
+**Amendment status: Proposed (2026-09-12).** Unattended command execution must
+establish a supported installed adapter, output ownership and recovery behavior
+before any Git synchronization or executor effects. A command-definition file
+found inside selected data does not establish this contract. Unknown commands,
+argument-bearing variants without a declared adapter, and missing required
+adapters fail admission. They must not execute and only afterward discover that
+publication cannot be acknowledged.
+
+| Field | Record |
+| --- | --- |
+| Previous requirement | The scheduler invoked commands, while the generic slash-command fallback had no producer-owned output or retry contract. |
+| Problem | The executor could perform effects and report success, followed by unavoidable publication failure; a retry could repeat those effects. Prompt lookup also chose executable instructions from selected data. |
+| Corrected requirement | Establish the installed command adapter and its output/recovery contract before effects; otherwise report an admission refusal. |
+| Reason | Failure known before execution must not be delayed until after irreversible or duplicate effects. |
+| Implementation impact | Remove generic tool-session fallback and data-root prompt discovery from scheduled command dispatch. |
+| Compatibility impact | Existing dedicated `/today` and `/research-daily` adapters remain. Other slash commands require an explicit supported adapter before unattended execution; a timeout-table entry alone does not authorize execution. |
+| Tests affected | Unknown, known-name-without-adapter and argument-bearing command variants perform no Git or executor work; installed adapter selection and required-adapter refusal remain covered. |
+| Runtime/deployment impact | Reconcile configured schedules with installed adapters before activation. This admission control does not itself prove adapter credential isolation or exactly-once external effects. |
+
+### Briefing preview — proposed clarification
+
+**Amendment status: Proposed (2026-09-12).** A briefing preview may retrieve
+information, but must not execute CoS maintenance or mail actions, write or
+publish review queues, refresh persisted news artifacts, generate model prose,
+or deliver audio/messages. Omitted refreshes are identified as omitted; absence
+of a refresh is not evidence of current operational health. News preview uses
+available cached data, and review items can be computed without persisting them.
+This contract is not a network sandbox or an assertion of independent OS isolation.
+
+| Field | Record |
+| --- | --- |
+| Previous requirement | The dry-run option gathered data and skipped prose/audio generation, without separating effectful gatherers from preview reads. |
+| Problem | Preview could run maintenance, invoke mail scanning with execution enabled, refresh news files and publish review queues before returning. |
+| Corrected requirement | Separate preview collection from these actions and refuse generation/delivery in preview mode. |
+| Reason | A preview must not apply the changes it is being used to inspect. |
+| Implementation impact | Non-persisting review collection, cached-news collection, and omission of CoS/mail actions in preview dispatch. |
+| Compatibility impact | Normal briefing execution retains its existing actions. Preview explicitly labels omitted actions and may show cached or unavailable data. |
+| Tests affected | Pipeline action refusal, unchanged cache/index/remote state, and news preview without refresh or external search. |
+| Runtime/deployment impact | Installed gatherers and dispatch must agree on preview behavior. Code provenance and the remaining adapter boundaries require independent verification. |
 
 ### Schedule Definition
 
@@ -1178,3 +1389,38 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 ---
 
 *"The night shift never sleeps. Your work continues while you rest."*
+
+
+### Durable task-attempt recovery — proposed audit amendment (2026-09-14)
+
+This amendment is proposed; the historical Implemented status does not ratify
+it or assert active deployment. Allocation consumption alone does not prevent
+one controller from retrying a partially executed task inside the allocation.
+
+Before invoking a task provider, the controller durably records a unique
+`NIGHTSHIFT_ATTEMPT` pending token through the canonical task transaction.
+Concurrent or stale snapshots cannot replace an existing attempt. A pending
+attempt after restart, or an unknown outcome after invocation, requires explicit
+reconciliation. Missing output, a timeout, an authentication/quota message, and
+absence of an acknowledgement are not evidence that no effects occurred.
+Queue selection, direct task invocation and stalled-task GC preserve that hold.
+
+Only a verified terminal provider result may mark an attempt completed. A
+failure to persist the completion acknowledgement leaves the attempt held.
+CLI task results use the structured success envelope. Batch submission disables
+SDK automatic retries and cannot fall back to another provider after submission
+has been attempted. A completed read-only proposal may subsequently enter the
+normal approval gate for full execution; it cannot automatically rerun as a
+proposal. Explicit operator reconciliation may clear the attempt only after
+checking pending and completed effects and preserving the original evidence.
+
+| Field | Record |
+|---|---|
+| Previous requirement | Allocation is consumed before work; legacy task recovery infers non-execution from missing output and permits transport-error retries. |
+| Problem | A worker can cause an effect, lose its acknowledgement, and run again through fallback, retry or stalled-task recovery. |
+| Corrected requirement | Persist the attempt before invocation; hold uncertain outcomes across restart and all task admission/recovery paths. |
+| Reason | Failure to observe completion cannot safely authorize duplicate effects. |
+| Implementation impact | Canonical task-property transaction; typed unknown outcome; strict provider acknowledgement; queue/GC hold. |
+| Compatibility impact | Existing untouched tasks need no migration. Uncertain new attempts require explicit reconciliation. Automatic quota fallback after invocation is removed. |
+| Tests affected | Concurrent stale snapshots, interrupted process, failed acknowledgement, quota/timeout/error-envelope variants, queue and GC refusal, proposal-to-approved-work transition. |
+| Runtime/deployment impact | Qualify the real controller and worker path. This marker is not an OS boundary and does not replace the designated-installation authority or protect against two independent restored controller stores. |

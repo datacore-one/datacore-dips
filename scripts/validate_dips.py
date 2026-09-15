@@ -37,6 +37,8 @@ def main() -> int:
         print('No DIP files found'); return 1
 
     for f in files:
+        if HYGIENE_RE.search(f.name):
+            errors.append(f'{f.name}: filename hygiene violation')
         if not NAME_RE.match(f.name):
             errors.append(f'{f.name}: bad filename (want DIP-NNNN-kebab-slug.md)')
             continue
@@ -55,14 +57,17 @@ def main() -> int:
             errors.append(f'{f.name}: invalid Status "{m.group(1)}" '
                           f'(valid: {", ".join(sorted(VALID_STATUS))})')
         for hit in HYGIENE_RE.finditer(text):
+            line = text.count('\n', 0, hit.start()) + 1
             errors.append(f'{f.name}: content hygiene violation: '
-                          f'"{hit.group(0)[:24]}…" — credentials and '
+                          f'line {line} — credentials and '
                           f'private-infra addresses must not be public')
 
     if errors:
         print(f'FAIL — {len(errors)} problem(s):')
         for e in errors:
-            print(f'  ✗ {e}')
+            # Filenames and malformed metadata may themselves contain a
+            # detected value. Keep diagnostics useful without reproducing it.
+            print(f'  ✗ {HYGIENE_RE.sub("[REDACTED]", e)}')
         return 1
     print(f'OK — {len(files)} DIPs valid, numbers unique, hygiene clean')
     return 0

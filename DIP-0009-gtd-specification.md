@@ -8,12 +8,33 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-04 |
-| **Updated** | 2026-08-29 (v2.0 DRAFT — seven-state loop, agents-as-workers; pending ratification. Prior: v1.1 2026-07-24) |
+| **Updated** | 2026-09-14 (proposed audit amendments; v2.0 DRAFT of 2026-08-29 — seven-state loop, agents-as-workers; pending ratification. Prior: v1.1 2026-07-24) |
 | **Tags** | `gtd`, `task-management`, `org-mode`, `agents` |
 | **Affects** | `org/`, `.datacore/commands/`, `.datacore/agents/`, `.datacore/modules/gtd/` |
 | **Specs** | `org-mode-conventions.md` |
 | **Agents** | `gtd-inbox-processor`, `ai-task-executor`, `queue-optimizer` |
 | **Supersedes** | `.datacore/gtd-spec.md` |
+
+**Amendment status (2026-09-14):** The audit clarifications below, including
+intent-review privacy, preservation and execution controls, are proposed in
+the audit amendment PR, with implementation and deployment
+verification tracked separately. The historical Implemented header does not
+ratify the v2.0 draft identified in Updated, nor certify this amendment's rollout.
+
+
+**Compatibility decision (2026-09-14, proposed audit amendment):** New workflow
+policies are explicit opt-ins, disabled by default. `DATACORE_REVIEW_BEFORE_EXECUTION=1`
+adds strict review freshness/contract gating; `DATACORE_CADENCE_PROPOSALS=1`
+selects proposal-only cadence/heartbeat production. `DATACORE_INSTANCE_BOUND_EXECUTION=1`
+selects the parked experimental allocation model, tracked in
+[core issue #192](https://github.com/datacore-one/datacore/issues/192); it is not
+approved for deployment or inclusion in main. Earlier audit prose that treats
+these additions as mandatory must be read within that opt-in scope. Data
+preservation, truthful completion, private output, operator controls and exact
+authority checks remain safety invariants. Unknown-effect retry policy remains
+pending a separate owner decision. No implemented/audited status is asserted for
+the parked proposal or any unverified deployment.
+
 
 ## Summary
 
@@ -1305,9 +1326,325 @@ Org-mode's agenda is its most powerful feature — structured queries over all t
 
 ## Part 9: Intent Graph (Strategy Layer)
 
-The Intent Graph is Datacore's strategic planning layer, connecting **why** (vision) to **what** (tasks). Every task should trace back to at least one intent. The graph lives as a document within the Datacore system space and is reviewed during GTD review cycles.
+The Intent Graph is Datacore's strategic planning layer, connecting **why** (vision) to **what** (tasks). Every task should trace back to at least one intent. Each graph retains its source-space ownership and is reviewed during GTD review cycles.
 
-**Source document:** `2-datacore/1-tracks/ops/Intent-Graph.md`
+**Historical example document:** `2-datacore/1-tracks/ops/Intent-Graph.md` described
+one system-space graph. It is not an authorized destination for an aggregate of
+personal and other teams' strategic data. Machine-readable sources currently
+include `.datacore/intents.org` and each discovered space's `org/intents.org`.
+An owner's combined view is a derived report, not a replacement source of truth.
+
+### 9.0 Review privacy and publication amendment
+
+An execution identity may combine graphs only from spaces it is authorized to
+read. A report combining those spaces is private to that owner/security context;
+membership in one contributing team does not authorize reading the aggregate.
+Do not publish it into a convenient shared space, repository, log, or telemetry
+stream. Application routing does not substitute for OS/credential isolation.
+
+The current CLI uses private, non-repository runtime state outside the data and
+installed-code trees. Its output argument selects only a filename within that
+private review namespace. A destination alias, shared permissions or an unsafe
+existing output fails without overwriting or relocating user data. Existing
+shared documents require separate review; a software upgrade must not delete
+them or rewrite their Git history automatically.
+
+Report publication must expose a complete file. Failure before publication
+preserves the previous report; successful durable acknowledgement requires
+flushing the file and directory on the supported filesystem. Concurrent report
+generators serialize generation and publication. Current counts and decisions
+come from input data, without embedding historical business assertions into
+the generator. Source text must not become executable report markup.
+
+#### Input integrity and identity clarification (proposed audit amendment)
+
+The following clarification records the implementation contract under review;
+it does not ratify the separate v2.0 task-state draft or assert fleet rollout.
+
+- Only absent optional sources may mean no data. Unreadable, aliased, malformed
+  or concurrently changed sources must stop generation without replacing the
+  previous report. Missing parser dependencies are errors. Reads never repair,
+  rewrite or discard source bytes.
+- Graph namespaces use the stable `space.name` from DIP-0015, not the local
+  numeric folder prefix. Current physical paths and historical numeric prefixes
+  are read-only compatibility references when they resolve unambiguously to an
+  existing stable identity. Duplicate space or intent identities require repair.
+- Within a source space, a bare intent reference resolves locally before the
+  installation graph. `space-name:intent-id` explicitly crosses spaces;
+  `@root:intent-id` explicitly names the installation graph. A missing declared
+  reference remains unplaced/reported; keyword inference must not substitute a
+  different intent. Inference with a source space considers that space and the
+  installation graph, and refuses equally specific ambiguous matches.
+- `SERVES` plus tree ancestry must form a DAG. Cycles are invalid input.
+  High leverage requires reaching more than one distinct level-1 intent;
+  missing links and redundant links to the same intent do not establish it.
+- Active-work coverage includes review and retryable legacy execution states,
+  and per-file declared TODO states. Completed, cancelled and explicitly
+  deferred work are not active coverage. This supports existing v1.1 files
+  without silently migrating their state vocabulary to the v2.0 draft.
+- A dated work-evidence report uses recorded completion/decision dates.
+  Undated evidence is reported separately and must not prove inactivity.
+  Repeated completed-task identities cannot inflate completion counts.
+- A lane gate is an admission decision, not a best-effort score. Queue,
+  pending, speculative and direct execution paths share the gate. The executor
+  rechecks current inputs before each model invocation/retry. Unreadable gate
+  evidence holds work; a process-lifetime cache cannot preserve an old ON state.
+  This check controls new invocations; it cannot revoke effects of an invocation
+  already in progress or provide OS/credential isolation.
+- A CoS freshness receipt means a complete review of the declared task
+  sources against readable current intent inputs. The reviewer records an
+  attempt before mutation; failure or interruption holds machine execution
+  even if an older successful receipt is still within its age limit. This
+  applies to previously approved machine tasks too: prior approval does not
+  bypass current freshness or a concrete execution contract. Consumers
+  require matching completed attempt and success records with a review ID,
+  declared actor, timestamp and supported contract version. The previous
+  successful record is retained on failure. These are cooperative records;
+  independent filesystem/credential boundaries must prevent worker forgery.
+- Review first validates a complete plan. Each changed task is then committed
+  through the recoverable, ledger-aware core writer against its reviewed
+  source version. Generated Phase-1 task files must agree with authoritative
+  ledger state before a decision; stale projections cannot authorize work.
+  A later failure retains earlier committed decisions and never attests a
+  completed sweep. Retry re-evaluates remaining work. The private per-run
+  audit record connects reviewed source hashes, decision, actor, task ID,
+  application readback and outcome; `COS_REVIEW_ID` connects changed tasks to
+  that record. Detailed records and aggregate reports remain owner-private.
+- Lane wake-up uses the exact `PARK_INTENT` identity, not a substring found
+  in explanatory prose. Approval of intent alignment does not dispatch work
+  missing `SURFACE` or `DONE_WHEN` (legacy `ACCEPTANCE_CRITERIA` is equivalent);
+  existing dispatch tags are removed in that
+  case. The daily service must report failed/held review or allocation
+  components rather than advertising a successful orchestration run.
+- Combined outlines use the same private durable publication path as reviews.
+  The stdout forms are owner-context CLI output and must not be forwarded to
+  another space or an unauthorized log collector.
+
+Intent tag bindings follow the scoped interpretation in DIP-0014's proposed
+intent-binding clarification. Tags describe meaning; they do not authorize an
+executor or choose an agent.
+
+#### Cadence capture and history clarification (proposed audit amendment)
+
+Cadence declaration, task capture, execution and verified completion are
+different events. Creating or queuing a task must not advance a cadence's
+completed-run timestamp. A partially failed capture batch retains its successful
+captures and reports its failures; it cannot report all requested work as run.
+
+Cadence generators capture proposals into the space inbox through the canonical
+recoverable, ledger-aware Org writer. Proposals carry `ORIGIN=cadence`, stable
+occurrence identity and the complete role/cadence/frequency binding. Generation
+does not set `APPROVED_BY` or the `AI` dispatch tag. Rich context is useful review
+input, but it does not grant approval or establish `SURFACE`. The existing CoS
+review requirements still apply. This supersedes the
+generator exception that inferred a clarified next action from rich properties.
+
+A capture retry must inspect durable task identity and existing pending work,
+including a prior day's still-open task and authoritative ledger captures not
+yet projected. Different roles, frequencies or distinct unnormalized names
+cannot collapse into one binding. A completed occurrence cannot be recreated
+merely because its derived Org entry was removed. Ambiguous legacy bindings
+require reconciliation; neither heading substrings nor cadence name alone are
+proof of an identical task. Local serialization and occurrence deduplication
+are not cross-host execution locks. No mechanism in this DIP establishes
+cross-host exclusion; that invariant is unresolved and must be selected and
+verified before anything relies on it.
+
+Observation forwards every overdue binding to that shared capture path. It
+must not pre-filter by cadence name or a partial queue snapshot. An already
+pending binding yields `already_queued`, allowing later distinct candidates to
+be considered. Pending-work counters are diagnostics: they parse task records,
+ignore terminal tasks and prose examples, reject invalid or aliased sources,
+and use authoritative ledger state in Phase 1, including unprojected captures.
+Such a count cannot grant approval or suppress work before identity validation.
+
+Cadence history readers reduce recognized legacy and current locations without
+rewriting them. Missing history can mean never run; malformed, ambiguous,
+aliased or unreadable history must hold scheduling and preserve original bytes.
+An invalid peer shard cannot be skipped while claiming a complete history.
+Writers merge under local exclusion, preserve independent observations, compare
+timestamps by instant and publish through durable bounded replacement. An
+interruption between the durable actor shard and derived view retains the shard
+for recovery. Equal-time conflicting outcomes need explicit reconciliation.
+These records remain cooperative observations, not independent proof that an
+executor had authority or that its reported work was correct.
+
+Completion recording requires the persisted task identity and full cadence
+binding, its completed GTD state, approved attempt outcome and completion time,
+and a durable output bound to the same task and execution. In a Phase-1 space,
+the ledger is authoritative: its ownership lifecycle `completed` still awaits
+review and must not be confused with the effective GTD state `DONE`. Cadence
+consumers use the same effective-state interpretation as the Org projector.
+Unresolved task-edit conflicts cannot establish completed work.
+
+Execution outputs are new, durable artifacts in the persisted task's source
+space. A missing or inconsistent space cannot fall back to another inbox.
+Retry or a concurrent writer cannot overwrite an existing artifact. Task and
+execution IDs and the produced-content hash are serialized as metadata values;
+caller text cannot introduce metadata fields. The controller's explicit output
+publication path owns Git staging and publication. An optional reviewer-list
+failure is recorded as unverified metadata without discarding a valid produced
+deliverable or inventing reviewers.
+
+Before advancing cadence history, the recorder retains an immutable private
+proof connecting task, execution, binding, completion time, source and artifact
+hash. A retry accepts identical evidence; conflicting evidence is held.
+Failure after proof publication retains that proof for retry/reconciliation.
+Only the completed binding's delta is merged; failed or pending-review attempts
+do not advance successful-run history. Nested legacy dates can be promoted to
+observations without dropping their date or another binding. Activity counters
+must understand both representations and must not count the same identified
+execution twice. Legacy records and outputs without this evidence are preserved
+but do not themselves establish independently verified execution.
+
+The heartbeat obeys the same completion contract. Model response text such as
+`CADENCE_COMPLETED` is untrusted commentary and cannot advance cadence or
+hypothesis progress. An issue scan is an observation, not acknowledgement that
+work was captured or completed. Legacy seen-issue lists remain preserved but
+cannot establish completion; durable task identity must own suppression/retry.
+Unavailable input is reported as unavailable, never as an empty successful scan.
+
+Attempt text and learning are retained in private immutable runtime evidence.
+Publishing learning to another service requires a separately authorized scoped
+path. Cadence synchronization publishes only the current actor's declared shard
+through the installed core publication mechanism. It cannot autosave unrelated
+files, execute a transport found in data directories, or report success when
+the declared shard was not acknowledged. Literal dot-prefixed paths retain
+their identity during knowledge/code routing. Failed publication retains local
+completion evidence and remains eligible for a publication retry.
+
+Continuous heartbeats are proposal producers. They capture configured signals
+through the same protected task writer as cadences, without launching a model,
+granting approval or writing completed-run history. Signal identity binds the
+venture, trigger, observed signal and revision; a host filesystem path is not
+part of that identity. Repeated pending signals cannot starve later candidates.
+Role documents and external signal text remain bounded, literal review input.
+They cannot inject another Org task or confer additional execution privileges.
+
+Daily and continuous CoS scheduling use one review-before-allocation path.
+Allocation requires a completed current review; review failure invalidates
+freshness while preserving previous evidence. Operator controls apply to both
+entry points and are rechecked before allocation. Intent-approved work held for
+an incomplete execution contract returns to the current review after correction;
+the earlier approval does not make it permanently invisible or bypass that
+review. Continuous review does not regenerate the daily briefing.
+
+Controller commands report incomplete work with a nonzero result. Health uses
+validated completion timestamps and component outcomes, not filesystem mtimes
+or merely the absence of a free-form error. Invalid, ambiguous or future run
+evidence cannot establish health. Diagnostics do not export input values.
+One venture's failed observation or capture must remain visible without
+starving independent ventures, and a dry tick must not write progress or health.
+Production scheduling still requires supported runtime dependencies and
+independently enforced credential boundaries; these application rules do not
+establish an OS boundary, and no mechanism in this DIP supplies one.
+
+Heartbeat state uses declared actor identities, bounded validated records and
+locally serialized publication. A caller-controlled legacy actor value cannot
+choose an arbitrary filesystem destination. Corrupt, duplicate-key, aliased,
+non-finite or conflicting observations are preserved and hold reduction or
+mutation; they cannot be skipped while presenting a complete healthy view.
+Stale or ambiguous timestamps cannot overwrite a newer observation. Shards are
+cooperative observations; multiple hosts must not share one mutable writer
+shard, and local serialization does not provide cross-host exclusion.
+
+A host becoming stale is not evidence that its pending decisions were resolved.
+The reduced view retains those decisions. An empty snapshot default does not
+remove existing decisions; explicit updates belong to the source decision's
+writer or to a separately authorized reconciliation. Conflicting same-ID
+decisions require reconciliation. Pending counts must match retained records.
+Legacy observations keep their declared actor or an explicit `legacy` identity;
+they are not attributed to the current actor merely to refresh their age.
+
+Migration and normal publication use the same canonical state implementation.
+Migration discovers canonical declared spaces, including nested spaces, and
+loads installed module code independently of the data root. Preview writes no
+state. Apply preserves the legacy observation before replacing its derived view,
+and retries do not duplicate it. A failure after durable shard publication leaves
+that shard recoverable even when the view could not be refreshed. Invalid source
+records and unavailable installed code yield an explicit failed/held result.
+
+Venture discovery uses the canonical space catalog, including marked nested
+spaces. Invalid configurations and duplicate venture identities cannot become
+a successful partial inventory. A legacy venture directory outside that catalog
+requires a preserved space-declaration migration; it must not silently vanish
+from monitoring. Filtering disabled ventures does not remove identity ambiguity.
+
+Discovery, heartbeat, portfolio status and cadence scheduling use the same bounded configuration
+validation. Known policy fields retain their declared types; autonomy is an
+integer in the supported range, and budget values are finite and nonnegative
+under the existing allocation-sum constraint. Configured file references remain
+relative to their venture. Duplicate YAML keys, recursive values and excessive
+expanded structure are refused; supported extension metadata remains preserved.
+Cadence declarations use supported frequencies and distinct, nonempty binding
+names. An explicit empty heartbeat-trigger list disables observations; disabled
+sources are not read or queried. Unknown or malformed triggers cannot implicitly
+enable work or hide it. Runtime dependencies for these validators are declared
+and installed under the qualified core dependency profile.
+Validation diagnostics name invalid fields without copying input values.
+These checks validate configuration and proposals; they do not establish durable
+spend accounting, execution admission or an OS-level credential boundary.
+
+Cadence observation, scheduling, budget-month selection and captured daily
+occurrence identities use the same UTC calendar. Host-local midnight cannot
+advance or delay the scheduler relative to the identity it captures. An explicit
+historical date used for analysis does not change the production occurrence clock.
+
+Crew self-reports use the declared writer; a producer cannot silently identify
+itself as a fixed default agent. Reports are bounded diagnostic evidence, not
+execution attestations. Unknown statuses, invalid sources, conflicting or
+regressing timestamps and failed publication cannot become successful health.
+Valid legacy extension fields survive updates; invalid evidence remains intact.
+Per-venture failures do not prevent independent reports, and budget holds remain
+blocked. The heartbeat preserves old append logs without extending them; the
+service journal retains process diagnostics while authoritative task/ledger and
+completion records retain work evidence. An empty scan still publishes a current
+crew diagnostic; a dry tick publishes nothing.
+
+Venture budget evidence preserves acknowledged spending across month boundaries.
+Rollover starts a new month's counters while retaining complete prior-month
+records, opening balances and extension metadata. A future month, malformed
+record, ambiguous category or non-finite/negative amount requires reconciliation;
+it cannot be interpreted as zero spending. Entry dates must match their month.
+All consumers select the configured source under the venture boundary. When
+canonical and legacy files coexist, the canonical source must preserve the
+legacy evidence; a custom source does not silently fall back to another ledger.
+
+Budget publication is bounded, durable and locally serialized, with a comparison
+against the snapshot read before mutation. A stale publisher must reload and
+reconcile; it cannot overwrite acknowledged entries or historical months.
+Interrupted publication retains the previous or complete new document, and an
+identical publication retry does not duplicate spending. Callers that retry
+spend recording supply a stable operation identity; conflicting reuse is held.
+A budget check evaluates a snapshot. It neither reserves funds nor grants
+payment/execution authority. External effects still require the execution site's
+admission and the applicable approval; local file exclusion is not cross-host
+coordination. No claim of atomicity with an external payment provider is made.
+
+Hypothesis evidence has one bounded reader and preserved mutation path across
+venture observation, app authoring and portfolio views. Supported historical
+board, flat-list and mixed representations retain all rows and extension data;
+identities are unique across the complete document. Unknown states stay explicit
+and cannot authorize execution or become an assumed active/proposed state.
+Configured source locations apply to every caller. Invalid or ambiguous evidence
+requires reconciliation; it must not become an empty successful observation.
+Archived hypotheses remain in the source history but are excluded from active
+views. Monetary budgets and experiment counts are not measured sample sizes.
+
+Mutations preserve authored YAML comments and history, refuse shared mutable
+aliases, serialize cooperating local writers and verify bounded durable
+publication. A supplied operation identity binds to one request in the entire
+source. Identical retries do not append another effect or undo later updates;
+conflicting or duplicated retained identities hold without rewriting the source.
+Historical records without operation identities remain readable. Mutation
+history declares the writer; this declaration is not an OS identity attestation.
+Caller authentication and the app mutation gate remain necessary. Local file
+exclusion does not establish cross-host exclusive execution.
+
+
+Unresolved Git conflict syntax outside literal Org blocks must stop task review,
+mutation and projection reconciliation. Reading both sides as ordinary tasks is
+not a valid way to resolve conflicting intent or completion evidence.
 
 ### 9.1 Structure
 
@@ -1325,7 +1662,8 @@ Leaves (Level 4) feed into `next_actions.org` as GTD projects and tasks. Every t
 
 ### 9.2 Dimensions
 
-The five intents span complementary dimensions:
+The original example's five intents span complementary dimensions; these are
+illustrative, not five mandatory nodes across every owner's combined graph:
 
 | # | Intent | Dimension |
 |---|--------|-----------|
@@ -2713,7 +3051,7 @@ Alternative designs considered:
 - **AI task delegation:** Tasks tagged `:AI:technical:` require human review before execution, preventing autonomous changes to infrastructure or security-sensitive systems
 - **Org file access:** All `.org` files are classified as PRIVATE per `privacy-policy.md` — they never sync to public repositories
 - **CLOCK data:** Time tracking entries in LOGBOOK drawers contain work pattern information and are treated as private
-- **Intent Graph:** Strategic intent data (`Intent-Graph.md`) reveals business priorities — restricted to personal space
+- **Intent Graph:** Strategic data retains its source-space permissions. A combined owner review is private to that owner/security context and cannot be published into a contributing team space (Part 9.0).
 - **Nightshift execution:** AI agents execute with scoped permissions per DIP-0011; no filesystem access beyond designated output directories
 
 ## Open Questions
@@ -2746,7 +3084,534 @@ This section provides essential information for agents working with GTD tasks an
 | What are the terminal states? | `DONE` and `CANCELLED` — never modify |
 | How are AI tasks tagged? | `:AI:`, `:AI:research:`, `:AI:content:`, `:AI:data:`, `:AI:pm:` |
 | What triggers archival? | Terminal state + >30 days old |
-| Where is the intent graph? | `2-datacore/1-tracks/ops/Intent-Graph.md` |
+| Where is the intent graph? | Source-owned `.datacore/intents.org` and space `org/intents.org`; combined reviews use private runtime state (Part 9.0) |
+
+### Intent-review amendment change control — 2026-09-13
+
+- **DIP:** 0009, Part 9 and related security/quick-reference text.
+- **Previous requirement:** The graph lived in the system space, while Security
+  Considerations restricted strategic data to personal space. The quick
+  reference named one physical system-space document without a sharing scope.
+- **Problem:** Two incompatible placement instructions allowed an owner-wide
+  aggregate to be published to readers authorized for only one source space.
+  The implemented generator also repeated fixed counts and historical private
+  business assertions independently of current input.
+- **Corrected requirement:** Preserve source-space ownership; keep combined
+  reviews in owner-private state; enforce the output boundary, literal source
+  rendering and durable, serialized publication. Derive assertions from data.
+- **Reason:** Resolve a privacy contradiction and preserve complete reviews
+  through failed generation or interrupted storage, rather than treating
+  convenient paths as authorization.
+- **Implementation impact:** `intent_review.py` uses the shared private-state
+  boundary and atomic-write/lock helpers. Shared reports are not modified.
+- **Compatibility impact:** `--out` now accepts a filename in private state;
+  arbitrary export paths fail. The data-root path distinguishes installations.
+  This does not change the source Org files or ratify the v2.0 GTD draft.
+- **Tests affected:** Original shared-write, arbitrary-output and write-failure
+  regressions; path/permission/alias variants; concurrent generation admission;
+  installed date-helper behavior; current-data rendering.
+- **Runtime/deployment impact:** Provision private state for the authorized
+  identity and verify the real filesystem boundary. Retain and assess existing
+  shared reports separately. Repository tests alone do not close deployment.
+
+### Intent-input and gate clarification change control — 2026-09-13
+
+- **DIP:** 0009 Part 9, with DIP-0014 tag interpretation and DIP-0015 identity.
+- **Previous requirement:** Space identity and multi-intent prioritization
+  existed, but machine-readable graph references, incomplete-input behavior,
+  coverage of review/retry states and gate freshness were not fully specified.
+- **Problem:** Read failures became empty evidence, folder order changed
+  identity/meaning, broken links inflated priority, completed evidence ignored
+  its date filter, and pending/direct paths could bypass a stale cached gate.
+- **Corrected requirement:** The explicit input/identity/gate invariants in
+  Part 9.0 and DIP-0014's intent-binding clarification.
+- **Reason:** Align the implementation with stable identity, complete evidence
+  and current standing decisions, while keeping uncertainties visible.
+- **Implementation impact:** Bounded snapshot parsing without source mutation;
+  scoped references/maps; DAG checks; complete active-state coverage; accurate
+  dated evidence; private outline publication; common queue/executor gate.
+- **Compatibility impact:** Historical ordinal references remain readable
+  when unambiguous. Invalid or ambiguous sources now refuse review/admission;
+  explicit broken references remain unplaced. Default completed-work reports
+  retain all-time behavior; an explicit `--since` now filters dated evidence and
+  reports undated records separately. No source rewriting or v2.0 promotion.
+- **Tests affected:** Malformed/read-failure and alias cases; directory-swap
+  and file-replacement races; duplicate identities and cycles; local/root tag
+  resolution; custom and retryable task states; failed-report preservation;
+  dated/undated evidence; queue-route bypasses and direct-executor refusal.
+- **Runtime/deployment impact:** Matched core/CoS/Nightshift installations must
+  preserve canonical identity and verify actual parsing, private publication
+  and current gate decisions. Runtime rollout and the CoS producer remain
+  pending; passing repository tests cannot mark this amendment fleet-audited.
+
+### Delegation review evidence change control — 2026-09-13
+
+- **DIP:** 0009 Part 9, with DIP-0015 identity and DIP-0044 actor provenance.
+- **Previous requirement:** CoS review freshness constrained execution, but a
+  timestamp did not distinguish complete review, partial failure or a crash.
+  Automatic task mutation did not specify its relationship to generated
+  ledger projections and retained review evidence.
+- **Problem:** Invalid inputs could still produce a fresh timestamp; direct
+  file saves bypassed authoritative task updates; stale review decisions and
+  substring-based wake-up could change the wrong work; successful briefing
+  publication obscured failed delegation/allocation components.
+- **Corrected requirement:** The complete-attempt, conditional task-update,
+  private audit-trail and explicit outcome invariants in Part 9.0.
+- **Reason:** A successful receipt must represent work actually reviewed and
+  durably committed, with enough retained evidence to investigate retries and
+  partial failures. This does not claim exclusive cross-host execution or OS
+  isolation; those require the separately specified runtime boundary.
+- **Implementation impact:** Shared versioned receipt reader; one review
+  lock; plan-before-mutation; core task adapter and ledger preconditions;
+  private per-run evidence; exact lane identities; honest component status.
+- **Compatibility impact:** Legacy timestamp-only receipts are unverified by
+  the new executor. Install matched core/CoS/Nightshift versions and complete
+  a new review before resuming machine-originated work. Preserve older
+  receipts/tasks. Legacy freeform park reasons require a dated wake or an
+  explicitly reconciled lane identity. Aggregate reports move to private
+  runtime storage, with their actual destination returned to the caller.
+- **Tests affected:** Malformed sources; canonical nested spaces; stale task
+  and ledger state; partial writes/retry; actor and review-ID readback;
+  malformed/legacy/mismatched/future receipts; publication failure/directory
+  swap; missing dispatch fields; orchestration component failure.
+- **Runtime/deployment impact:** Qualify private report/audit storage, review
+  source access and matched receipt behavior in the installed environment.
+  Repository remediation is in progress. No historical status or v2.0 draft
+  is promoted; no fleet audit completion is asserted by this amendment.
+
+### Cadence evidence change control — 2026-09-13
+
+- **DIP:** 0009 Parts 3 and 9, with DIP-0011 execution admission and DIP-0034
+  / DIP-0043 / DIP-0046 ledger authority and projection semantics.
+- **Previous requirement:** Cadences were declared in venture configuration;
+  rich generator output was treated as an already clarified next action.
+  The distinction between queuing and recorded completion, retry identity and
+  corrupt cadence history was not specified precisely.
+- **Problem:** Task generation could self-dispatch or falsely advance completed
+  history; a partial batch could mark unwritten work as run. Name-only identity,
+  fallback raw writes and permissive history recovery could duplicate work or
+  discard evidence. Unresolved Org conflicts could become ordinary task input.
+- **Corrected requirement:** The proposal, identity, preserved-history and
+  unresolved-conflict invariants in the Part 9.0 cadence clarification.
+- **Reason:** Orchestration must be reviewable against durable evidence and
+  preserve ambiguity for reconciliation instead of inventing success.
+- **Implementation impact:** Shared protected capture and history paths,
+  explicit origin, ledger-aware idempotency, no raw fallback, no completed
+  timestamp on capture, and shared unresolved-source validation.
+- **Compatibility impact:** Newly generated cadence proposals enter inbox
+  without dispatch tags. Existing approved tasks remain subject to normal
+  current review gates; this amendment does not bulk-edit historical work.
+  Preserve legacy logs and IDs. Ambiguous pending bindings and malformed
+  history hold scheduling until reconciled; upgrades must not erase them.
+- **Tests affected:** Partial batch failure, rich-property readback, retries,
+  concurrent capture and history writes, terminal ledger replay, malformed
+  peer history, stale writes, alias and directory-swap attacks, unresolved
+  conflict refusal and preservation of literal examples.
+- **Runtime/deployment impact:** Install matching core and Ventures code with
+  private writable runtime state. Qualify CoS capture-to-review, execution
+  completion, heartbeat callers and recovery before claiming installed
+  conformance. These remain deployment requirements, not a claim of completed
+  runtime verification. Historical DIP status and the v2.0 draft are unchanged.
+
+### Completion artifact evidence change control — 2026-09-13
+
+- **DIP:** 0009 cadence and Nightshift execution properties; related ledger
+  implementation and the still-proposed DIP-0043 / DIP-0046 migration model.
+  These references do not promote unmerged proposals to current requirements.
+- **Previous requirement:** Task completion properties, output files and
+  cadence run dates existed, without an exact evidence relationship or
+  artifact publication/retry contract.
+- **Problem:** Failed attempts, substituted bindings and missing artifacts
+  could establish completed cadence history. Output paths could fall back to
+  another space, overwrite prior work or serialize caller text as metadata.
+  Ownership lifecycle state and GTD task state could be conflated.
+- **Corrected requirement:** Persisted task/output binding, common effective
+  GTD state, private immutable completion proof, no-overwrite publication and
+  full-binding observation delta as specified above.
+- **Reason:** Completion and downstream scheduling require preserved evidence
+  of the particular work recorded, rather than a success-shaped return value.
+- **Implementation impact:** Core bounded no-clobber publication and canonical
+  effective task state; Nightshift output metadata/source validation and honest
+  completion-hook failure; Ventures evidence recorder and shared observation
+  interpretation for overdue calculations and activity reporting.
+- **Compatibility impact:** Historical files remain untouched. New reports
+  include task identity and execution identity; old artifacts lacking required
+  evidence require explicit reconciliation before new verified completion can
+  be recorded from them. Existing task IDs remain stable; new execution IDs
+  are independent of clock precision. Failed attempts no longer postpone a
+  successful cadence run. Ambiguous flat role/name history is held.
+- **Tests affected:** Actual capture/output/task-completion/record/retry pipeline
+  in authored and ledger-authoritative spaces; awaiting-review lifecycle;
+  metadata substitution; missing artifacts; stale or changed output; private
+  proof and history partial failure; legacy date upgrade; activity counters;
+  concurrent no-clobber publication and directory swaps.
+- **Runtime/deployment impact:** Qualify the matching versions, private proof
+  storage, durable output filesystem and source-space access in the installed
+  controller. A crash during no-clobber link publication can leave a complete,
+  unacknowledged temporary hard link requiring reconciliation; it cannot be
+  treated as successful acknowledgement or removed indiscriminately. Heartbeat
+  execution and completion callers still require alignment and verification.
+  No fleet conformance or historical DIP-status promotion is asserted here.
+
+### Proposed heartbeat evidence amendment (2026-09-13)
+
+- **DIP:** 0009 Part 9; related 0011 and proposed 0046 publication semantics.
+- **Previous requirement:** Cadence completion was tied to task/output evidence,
+  but the standalone heartbeat still accepted response prose, consumed issue
+  observations before task capture and exported unverified learning text.
+- **Problem:** Interrupted work could disappear from monitoring; unrelated
+  hypotheses could be marked checked; broad convergence could publish unrelated
+  drafts. Dot-directory classification also silently omitted cadence shards.
+- **Corrected requirement:** One persisted completion contract, read-only signal
+  observation, private attempt evidence and explicitly acknowledged publication
+  of the writer's shard. Input failure must remain visible.
+- **Reason:** Auditability must connect observed signals to retained work and
+  actual completion; a successful subprocess or model statement is insufficient.
+- **Implementation impact:** Heartbeat post-processing delegates to the shared
+  completion recorder and bounded core publication; core routing preserves
+  literal dot-prefixed paths and rejects parent/absolute path aliases.
+- **Compatibility impact:** Historical issue lists, logs and learning records
+  remain intact. Legacy prose-only completions no longer advance progress.
+  Existing uncompleted signals may surface again for durable task reconciliation.
+- **Tests affected:** Repeated issue observations, scan errors, prose-only
+  completion, private learning, completion/publication retry, malformed
+  acknowledgements, and real local-remote publication with unrelated staged work.
+- **Runtime/deployment impact:** Install the matching core and Ventures versions
+  and provide private writable evidence storage. Continuous execution admission,
+  bounded signal ingestion and installed worker isolation are separate open
+  verification requirements; this amendment does not claim their completion.
+  Historical DIP status and unmerged/future DIP classifications are unchanged.
+
+### Proposed continuous orchestration amendment (2026-09-13)
+
+- **DIP:** 0009 Part 9; related 0011 and 0041 execution-admission amendments.
+- **Previous requirement:** Cadence generators entered review, but the standalone
+  heartbeat could launch an executor directly; continuous CoS review did not
+  share the daily allocation path. CLI success and file recency could stand in
+  for completed orchestration. Contract-held approvals were skipped thereafter.
+- **Problem:** Signals bypassed review/admission, pending work could starve
+  later signals, failed review could appear healthy, and clarified work could
+  remain stranded. Dry ticks mutated state; one capture failure stopped peers.
+- **Corrected requirement:** Protected proposal capture, common current review
+  and allocation, recoverable contract holds, trustworthy health/exit evidence,
+  independent per-venture continuation, and effect-free dry ticks as above.
+- **Reason:** Scheduling must retain and review work while exposing failures;
+  a separate cadence must not create a second execution authority.
+- **Implementation impact:** Ventures fixed producer entry points share the
+  core capture transaction. CoS daily and lightweight review reuse one gate;
+  CLI policy/state overrides and completion health agree with service results.
+  Corrected contract-held proposals are reviewed against current intent.
+- **Compatibility impact:** Existing task identities and evidence are retained.
+  Heartbeats queue reviewable proposals instead of launching Claude directly.
+  Operators must schedule the reviewed controller for continuous execution.
+  Failures and disabled runs can now return nonzero where they formerly returned
+  zero. Optional Nightshift absence remains visible in daily component state;
+  continuous allocation requires the module to be installed.
+- **Tests affected:** Malicious role/signal input; disabled triggers; repeat,
+  concurrent and interrupted capture; host-location-independent signal identity;
+  pending-candidate starvation; policy changes during review; incomplete receipts;
+  restored execution contracts under changed intent; stale/future/aliased health;
+  dry-run and per-venture failure behavior. The audit also exercised actual
+  capture/review/allocation/failure/recovery in authored and authoritative-ledger
+  temporary spaces without launching a model.
+- **Runtime/deployment impact:** Install matching core, Ventures, CoS and
+  Nightshift code, configure the lightweight review entry point and qualify
+  continuous scheduling through the admitted controller. Current runtime rollout,
+  shared state-writer preservation and credential isolation remain separate open
+  requirements. No implemented/audited status promotion or runtime conformance
+  is asserted by this proposed amendment.
+
+### Proposed heartbeat state preservation amendment (2026-09-13)
+
+- **DIP:** 0009 cadence/orchestration clarification; related 0011 and actor
+  attribution in the 0044 draft. Existing DIP status classifications are retained.
+- **Previous requirement:** Legacy heartbeat state used per-writer shards, but
+  reduction could omit malformed peers and age out pending decisions after 48h;
+  updates and migrations directly replaced files and inferred writer aliases.
+- **Problem:** An idle host or default snapshot could make unresolved work
+  disappear. Corrupt state could be overwritten; a legacy actor could redirect
+  migration writes, and concurrent writers shared temporary paths. Migration
+  discovery and source selection differed from normal state publication.
+- **Corrected requirement:** Declared identity, preserved bounded observations,
+  explicit decision updates, local exclusion, durable bounded publication and
+  common canonical migration as specified above.
+- **Reason:** Liveness and the absence of recent observations cannot establish
+  resolution, authorize path selection or justify destroying source evidence.
+- **Implementation impact:** Ventures heartbeat state has one storage path for
+  normal writes, decisions and migration. Core migration delegates to the
+  matching installed writer and canonical space catalog. Invalid evidence holds
+  work and produces a failure result without exporting input values.
+- **Compatibility impact:** Existing bytes are retained on invalid input. Valid
+  legacy records migrate under their original/legacy attribution; stale decisions
+  may reappear for explicit reconciliation. Invalid hostname-derived identities
+  must be reconciled to declared writers. Old tests that required silent skipping,
+  age-based deletion or destructive recovery are replaced with preservation
+  assertions; valid timestamp ordering and legacy read compatibility remain tested.
+- **Tests affected:** Stale peer decisions, snapshot defaults, explicit writer
+  updates, malformed/duplicate/conflicting records, path aliases, legacy traversal,
+  concurrent field preservation, shard/view partial failure, stale/future clocks,
+  migration preview/apply/retry and installed-code selection.
+- **Runtime/deployment impact:** Install matching core and Ventures versions with
+  private lock storage and qualify filesystem durability, declared writer topology,
+  continuous services and credential isolation. Application checks and temporary
+  installation probes do not certify active hosts. Runtime rollout and the final
+  fresh audit remain open; no DIP is promoted to implemented/audited by this text.
+
+### Proposed venture configuration amendment (2026-09-13)
+
+- **DIP:** 0009 cadence/orchestration clarification; canonical space discovery
+  comes from 0015 and module configuration from 0022. This does not introduce
+  an autonomous-venture requirement from unrelated proposed DIPs.
+- **Previous requirement:** Discovery selected ordinal directories and skipped
+  invalid venture files. The model validated some fields, while heartbeat and
+  cadence callers reread raw YAML and applied different assumptions.
+- **Problem:** Nested ventures could be omitted, malformed inventory could look
+  empty, duplicate venture identity could collapse captured work, and non-finite,
+  negative or ambiguous policy values bypassed controls. Recursive/duplicate
+  YAML and source aliases were accepted; diagnostics copied input values.
+- **Corrected requirement:** Canonical complete inventory, unique venture
+  identity, bounded and shared typed validation, scoped source references and
+  private diagnostics as specified above.
+- **Reason:** Every orchestration entry point must interpret the same policy;
+  inconsistent parsing must not select a different authority or omit work.
+- **Implementation impact:** Venture loaders share model invariants and bounded
+  unique-key source reads. Discovery validates canonical spaces and identities;
+  heartbeat, cadence and portfolio readers consume validated snapshots. Portfolio
+  reports use configured evidence paths and report unavailable evidence as failure. Missing legacy
+  declarations are reported for reconciliation rather than inferred silently.
+- **Compatibility impact:** Valid model serialization and extension fields are
+  preserved. Invalid configurations remain on disk and hold work; operators must
+  correct ambiguous policy values or declare legacy spaces. The budget allocation
+  constraint already existed; previously bypassing readers now enforce it.
+- **Tests affected:** Nested/legacy discovery, duplicate identities, malformed
+  input, boolean autonomy, non-finite/negative budgets, file references, aliases,
+  recursive/expanded YAML, diagnostic privacy, model/schema round trips and
+  supported cadence bindings, disabled-trigger source access, and actual
+  sense/capture/contract-hold/clarify/review/allocation integration.
+- **Runtime/deployment impact:** Deploy matching module and core versions, then
+  reconcile actual configuration. Budget persistence, remaining observation and
+  reporting sources, dependency state and installed-controller qualification
+  remain separate open verification requirements. No status promotion or active
+  runtime conformance is asserted by this amendment.
+
+### Proposed venture budget evidence amendment (2026-09-13)
+
+- **DIP:** 0009 orchestration evidence, using the existing module/data boundaries
+  in 0015 and 0022. This defines preservation and failure semantics missing from
+  the venture budget helper; it does not implement a new payment service.
+- **Previous requirement:** Monthly budget checks guide venture scheduling. The
+  helper reset entries when the month differed and saved a complete snapshot;
+  concurrency, recovery, malformed input and legacy-source conflicts were not
+  defined. Callers selected different default or configured ledger locations.
+- **Problem:** Loading an old month, recording a new spend and saving destroyed
+  earlier entries. Two valid snapshots could overwrite each other's spending.
+  Future months and invalid numeric/category values could reset or bypass limits.
+- **Corrected requirement:** Preserve complete monthly history and opening
+  balances; validate bounded evidence; reject stale publication and conflicting
+  source files; support explicit retry identity and durable acknowledgment as
+  above. Separate snapshot checks from actual external-spend admission.
+- **Reason:** Budget health and orchestration must not infer available resources
+  by discarding history, accepting invalid values or choosing an unrelated file.
+- **Implementation impact:** Shared budget reader/resolver, preserved archives,
+  serialized compare-and-publish with readback, append-only entry preservation,
+  stable optional operation identities and explicit reconciliation errors.
+- **Compatibility impact:** The current-month API and valid legacy records remain
+  readable. Older months are retained under history; unknown metadata survives.
+  Existing opening balances are preserved without inventing missing entries.
+  Unloaded/stale replacement, historical edits and ambiguous sources are refused.
+  An absent file remains an uninitialized empty record, not proof that no external
+  spending has occurred. Acknowledged observations do not certify provider costs.
+- **Tests affected:** Rollover and repeated rollover, extension/opening-balance
+  preservation, stale and simultaneous snapshots, interruption before/after
+  publication, identical/conflicting retries, aliases, invalid/future evidence,
+  category/date/amount validation, fractional totals and legacy-source conflicts.
+- **Runtime/deployment impact:** Matching readers/writers must be deployed and
+  actual legacy sources reconciled before rollout. The local lock protects
+  cooperating writers on one host; independent OS isolation and execution-site
+  admission remain required. No active-host verification or DIP status promotion
+  is asserted by this amendment.
+
+### Proposed heartbeat reporting and calendar amendment (2026-09-13)
+
+- **DIP:** 0009 cadence/orchestration evidence; attribution aligns with the current
+  actor implementation and Draft 0044 without promoting that DIP's status.
+- **Previous requirement:** Heartbeat status fed the portfolio and crew panels.
+  The producer identified itself as a fixed agent and used a raw append log;
+  the shared report writer silently downgraded invalid statuses to success and
+  swallowed publication failures. Calendar scheduling used each host's local day
+  while occurrence identity and completion evidence used UTC.
+- **Problem:** Another actor could appear to have done work, budget holds could
+  appear idle, invalid reports could be overwritten, aliases could redirect
+  writes and concurrent fixed temporary filenames could collide. Calendar
+  disagreement could advance or delay cadence observation across hosts.
+- **Corrected requirement:** Declared attribution, bounded preserved diagnostics,
+  explicit publication/validation failure, monotonic unambiguous timestamps,
+  visible holds, independent reporting and the shared UTC calendar above.
+- **Reason:** Orchestration and auditability require truthful attribution and
+  consistent time semantics; diagnostic success must follow verified publication.
+- **Implementation impact:** The core crew-report writer validates identity,
+  status, source and extensions, serializes durable publication and verifies
+  readback. Heartbeat delegates to that writer and the venture actor-shard writer,
+  removes its independent append path and keeps holds/failures visible.
+- **Compatibility impact:** Existing display fields and valid extension metadata
+  remain available. A self-report can only name its declared actor; invalid/stale
+  sources require reconciliation. Old append logs remain untouched. Calendar
+  defaults become UTC, matching occurrence IDs and stored completion timestamps.
+- **Tests affected:** Attribution and path substitution, invalid status/JSON,
+  duplicate/non-finite fields, preserved legacy metadata, stale and equal-time
+  conflicts, publication failure, report isolation, empty/dry ticks, budget holds,
+  peer continuation and hosts straddling local midnight at the same UTC instant.
+- **Runtime/deployment impact:** Deploy matching core and Ventures modules with
+  an explicit actor and qualified journal retention. These are application
+  diagnostics; OS isolation, controller admission and active service qualification
+  remain separate requirements. No active runtime or audited status is asserted.
+
+### Proposed hypothesis evidence preservation amendment (2026-09-13)
+
+- **DIP:** 0009 Part 9; related 0011 execution and 0044 identity requirements.
+- **Previous requirement:** Venture observations and app hypothesis authoring
+  feed task review and human decisions. The text did not define cross-format
+  preservation, consistent source selection or retry-history semantics.
+- **Problem:** Parallel readers dropped board/flat evidence, the app writer could
+  truncate valid data or replace malformed input, aliases could couple histories,
+  and repeated requests could create duplicate hypotheses. Readers also inferred
+  proposed states and sample counts unsupported by the source.
+- **Corrected requirement:** Use the bounded, preserved and unambiguous evidence
+  contract above; distinguish absent data from invalid data, and declared history
+  from verified execution. A daily legacy check date is not proof that current
+  hypothesis evidence has been reviewed.
+- **Reason:** Agent orchestration must act on the same retained evidence shown to
+  reviewers, with traceable changes and recoverable failures.
+- **Implementation impact:** Shared Ventures hypothesis store and reader, app
+  delegation and installed sibling imports, preserved budget YAML, explicit
+  status mutation admission and client operation identities. Round-trip YAML is
+  validated against the existing safe interpretation before publication.
+- **Compatibility impact:** Valid historical representations, metadata and
+  comments are retained. Ambiguous IDs, mutable aliases, invalid source values
+  and conflicting retries require reconciliation. Operation IDs are optional
+  for historical callers; automatic retry safety requires reusing one identity.
+  Source statuses remain visible and sample counts require explicit sample data.
+- **Tests affected:** Mixed and legacy layouts, malformed/aliased sources,
+  configured paths, duplicate IDs, failed/short/interrupted publication, retained
+  comments and month history, concurrent operations, lost-response retries,
+  stale retries, writer attribution, app admission and matching reader views.
+- **Runtime/deployment impact:** Deploy matching core, Ventures and app artifacts;
+  the hashed runtime profile includes ruamel.yaml 0.19.1 for preservation. Verify
+  installed module imports, credentials and state paths before activation. This
+  amendment does not claim active deployment, distributed ownership, OS isolation
+  or an implemented/audited status promotion.
+
+### Pending cadence observation follow-up (2026-09-13)
+
+- **DIP:** 0009 Part 9 proposed cadence amendment; related 0011 and 0043.
+- **Previous requirement:** Shared capture binds role, cadence and frequency and
+  holds ambiguous legacy identity. Observation still had a separate name-only
+  suppression rule and an unstructured tag-count diagnostic.
+- **Problem:** A queued cadence could hide another role or frequency with the
+  same name before capture, and incomplete legacy identity appeared idle.
+  Prose and completed tasks inflated counts; unsafe aliases were followed.
+- **Corrected requirement and reason:** Capture alone determines duplication;
+  diagnostic counts use validated current task evidence. This prevents an early
+  observation shortcut from bypassing the existing full-identity invariant.
+- **Implementation impact:** Remove the heartbeat prefilter, retain every due
+  candidate and read bounded Org or authoritative ledger records for counts.
+- **Compatibility impact:** Queued due work may produce `already_queued`
+  instead of `idle`. No duplicate task, execution grant or completion is added.
+  Incomplete legacy bindings remain intact and require reconciliation.
+- **Tests affected:** Same-name roles/frequencies, all-file pending work,
+  completed/prose examples, aliases, duplicate IDs, full capture retries and
+  unprojected ledger work behind a stale Org view.
+- **Runtime/deployment impact:** Install the matched Ventures candidate with
+  the existing core. Source tests do not establish active runtime conformance;
+  implemented/audited status is unchanged.
+
+### Operator cadence controls and preserved policy edits (proposed, 2026-09-13)
+
+Cadence production, review and execution are separate stages. A pause is an
+execution restriction, not a deletion of queued work or an approval grant.
+All new executor launches, including direct entry and retries, must re-read
+current controls. The bound task's `VENTURE` and complete `CADENCE` metadata
+identify a venture cadence independently of its editable display title. A
+venture/cadence pause applies to all its roles and frequencies. Historical
+full-title and bare-cadence pause forms remain supported. This does not promise
+that an already running external operation can be revoked or rolled back.
+
+All readers and writers of the selected CoS `policies.yaml` must use one
+validated interpretation. Only an absent optional source selects defaults.
+Malformed, duplicate-key, aliased, special-file, oversized or structurally
+ambiguous evidence must remain unchanged and must not authorize execution.
+Known control fields retain their types; unrelated settings, comments, quoted
+values and existing override extensions survive a successful edit.
+
+An edit holds a stable private lock across read, validation and publication.
+Publish complete validated output by durable replacement; do not truncate the
+source in place. A failed edit must not be acknowledged, including failure to
+flush the containing directory. Changes detected before publication are held
+for reconciliation. Concurrent supported writers must use the same transaction.
+This is local cooperative exclusion, not distributed locking or protection from
+another process that can bypass filesystem permissions. Runtime rollout must
+bind all consumers to the intended policy source and security context.
+
+**Normative change record:**
+
+- **DIP:** 0009, related 0011 and 0041; this clarification remains proposed.
+- **Previous requirement:** Paused cadences and operator overrides were consumed
+  by independent queue/UI paths without a complete preservation or launch-time
+  contract.
+- **Problem:** UI edits could replace malformed policy with defaults or truncate
+  controls on interruption. Direct execution and retries could omit per-cadence
+  pauses, while title parsing lost multiword cadence identity.
+- **Corrected requirement / reason:** Preserve the entire policy and enforce
+  its current restrictions at every launch using bound task identity. An error
+  cannot erase restrictions or become permission.
+- **Implementation impact:** Core policy parser and durable transaction; one
+  shared authored-YAML codec; CoS/app delegation to the transaction; task-local
+  Nightshift control context rechecked by CLI and batch launch paths.
+- **Compatibility impact:** Invalid existing controls require reconciliation;
+  they are retained. Unrelated override extensions and legacy pause forms stay
+  supported. Existing operations are not represented as automatically cancelled.
+- **Tests affected:** Malformed/aliased sources, comment and extension retention,
+  concurrent writers, interrupted replacement, durability failure, direct
+  execution, changed controls before launch and context cleanup after refusal.
+- **Runtime/deployment impact:** Deploy matching core, CoS, Ventures and app
+  artifacts and bind the selected private policy path for every consumer.
+  Candidate tests do not certify active deployment or promote DIP status.
+
+### CoS execution acknowledgement and fallback (proposed, 2026-09-14)
+
+A submitted agent request without a verified terminal result has an unknown
+outcome. Partial streamed text, end-of-stream, timeout, transport failure and
+an error message are not completion evidence. An authentication marker in CLI
+output does not prove that no earlier tool or external operation ran.
+
+Automatic backend fallback is allowed only when the previous path is known
+not to have submitted work, or the operation has an independently enforced
+duplicate-safe contract. Unknown agent outcomes must propagate through both
+the ordinary fallback chain and quality escalation. They require reconciliation
+before another execution; they must not replace an acknowledged briefing with
+partial output or a synthetic successful result. Normal completed results and
+known pre-submission unavailability retain their existing behavior.
+
+**Normative change record:**
+
+- **DIP:** 0009, related 0041; this clarification remains proposed.
+- **Previous requirement:** Briefing availability and recovery prose did not
+  distinguish an unavailable executor from an unacknowledged submitted request.
+- **Problem:** Broad error fallback could submit a second agent execution after
+  the first had already acted. Partial stream output could be published as final.
+- **Corrected requirement / reason:** Require explicit completion evidence and
+  carry unknown outcome through all retry layers, preventing duplicate effects
+  and false acknowledgement.
+- **Implementation impact:** Typed unknown-outcome errors in the CoS app SDK
+  and CLI adapters; outer fallback and escalation propagate those errors.
+- **Compatibility impact:** Some previously automatic retries now stop for
+  reconciliation. Confirmed pre-submission fallback remains available.
+- **Tests affected:** Stream exception/error/EOF/partial-EOF, explicit completion,
+  outer backend fallback, quality escalation, CLI authentication text, retained
+  prior briefing, and hermetic pre-submission CLI test fixtures.
+- **Runtime/deployment impact:** Deploy the matching app adapter and verify its
+  executor binding. These application semantics do not establish independent OS
+  isolation, external idempotency, or completion across a process crash.
 
 ### Related Agents
 

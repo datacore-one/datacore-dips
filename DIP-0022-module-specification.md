@@ -8,7 +8,7 @@
 | **Type** | Standards Track |
 | **Status** | Implemented |
 | **Created** | 2026-02-20 |
-| **Updated** | 2026-03-04 |
+| **Updated** | 2026-09-13 |
 | **Tags** | `modules`, `mcp`, `skills`, `agents`, `engrams`, `workflows`, `architecture` |
 | **Affects** | `.datacore/modules/`, `datacore-mcp`, `module.yaml`, `SKILL.md`, `CATALOG.md` |
 | **Specs** | `datacore-specification.md`, `DIP-0002`, `DIP-0009`, `DIP-0014`, `DIP-0016`, `DIP-0019` |
@@ -57,7 +57,7 @@ Key design principles:
 | Manifest? | `module.yaml` |
 | Entry point? | `SKILL.md` (ecosystem-discoverable) |
 | Tool namespace? | `datacore.[module].[tool]` |
-| Module data? | `[space]/.datacore/modules/[name]/data/` |
+| Module data? | `[module-private-root]/data/` |
 | Engram namespace? | Declared in module.yaml `engrams.namespace` |
 | Create a module? | `/create-module` command or `create-module` agent |
 | Register a module? | `module-registrar` agent or `datacore.modules.register` tool |
@@ -581,7 +581,7 @@ phases:
 ```
 User invokes /create-presentation
   → Command loads workflows/create-presentation.yaml
-  → Creates workspace: [space]/.datacore/modules/slides/state/workflows/[run-id]/
+  → Creates workspace: [space]/.datacore/module-data/slides/state/workflows/[run-id]/
   → For each phase:
       1. Read inputs from workspace (files/JSON from previous phases)
       2. Dispatch to handler by type:
@@ -607,7 +607,7 @@ User invokes /create-presentation
 
 **Skill phases** do not "execute" in the traditional sense — they inject knowledge that shapes how the next agent or command phase reasons. A skill phase followed by an agent phase means: "load this methodology, then let the agent apply it."
 
-**State persistence:** Workflow state is stored at `[space]/.datacore/modules/[name]/state/workflows/[run-id]/`. If a session is interrupted mid-workflow, the next session can resume from the last completed phase via `/continue`.
+**State persistence:** Workflow state is stored at `[module-private-root]/state/workflows/[run-id]/`. If a session is interrupted mid-workflow, the next session can resume from the last completed phase via `/continue`.
 
 > **Status note:** The workflow execution model is functional for the patterns described above. Advanced features (conditional branching, parallel phases, error recovery) are deferred to a future DIP amendment.
 
@@ -705,7 +705,7 @@ Applying DIP-0002: **module code is public, module data is private**.
 ```
 MODULE CODE — PUBLIC (shareable)            USER DATA — PRIVATE (per-space)
 ────────────────────────────────            ────────────────────────────────
-.datacore/modules/slides/                   [space]/.datacore/modules/slides/
+.datacore/modules/slides/                   [space]/.datacore/module-data/slides/
 ├── SKILL.md                                ├── settings.local.yaml
 ├── module.yaml                             ├── state/
 ├── CLAUDE.base.md                          │   └── last-run.json
@@ -728,15 +728,49 @@ MODULE CODE — PUBLIC (shareable)            USER DATA — PRIVATE (per-space)
 | Module context (CLAUDE.base.md) | PUBLIC | `.datacore/modules/[name]/` | Yes |
 | Private context (CLAUDE.local.md) | PRIVATE | `.datacore/modules/[name]/` | No (gitignored) |
 | Starter engrams | PUBLIC | `.datacore/modules/[name]/engrams/` | Yes |
-| User settings | PRIVATE | `[space]/.datacore/modules/[name]/settings.local.yaml` | No |
-| Runtime state | PRIVATE | `[space]/.datacore/modules/[name]/state/` | No |
-| Module output/data | PRIVATE | `[space]/.datacore/modules/[name]/data/` | No |
+| User settings | PRIVATE | `[module-private-root]/settings.local.yaml` | No |
+| Runtime state | PRIVATE | `[module-private-root]/state/` | No |
+| Module output/data | PRIVATE | `[module-private-root]/data/` | No |
 | User engrams | PRIVATE | `[space]/.datacore/learning/engrams.yaml` | No |
-| API keys/secrets | PRIVATE | `.datacore/env/.env` | No |
+| API keys/secrets | PRIVATE | Explicit deployment credential scope, outside code | No |
 
 **The contribution test:** Can you `git push` the module directory without leaking personal data? If yes, the separation is correct.
 
-**The rule:** Nothing in `.datacore/modules/[name]/` should be gitignored (except CLAUDE.local.md and CLAUDE.md composed output). If it needs to be gitignored, it belongs in the space-scoped path `[space]/.datacore/modules/[name]/`.
+**The rule:** Nothing in `.datacore/modules/[name]/` should be gitignored (except CLAUDE.local.md and CLAUDE.md composed output). If it needs to be gitignored, it belongs in the space-scoped private root `[module-private-root]/`.
+
+#### Corrected private-storage invariant (September 2026)
+
+The private module root is selected by preservation and separation, not by a
+mandatory directory rename. Retain `[canonical-space]/.datacore/modules/[module-name]/`
+when it is user-space data separate from installed code. Retain an existing
+`[canonical-space]/.datacore/module-data/[module-name]/` store; use that layout
+when copied or linked scoped code would otherwise alias the data directory.
+Examples using `[module-private-root]` refer to this selected root. Conflicting
+existing stores require reconciliation, never first-match selection. The root
+must remain separate from every installed code directory and code symlink. It contains
+`data/`, `state/` and private settings. Directories must be private to their
+assigned security context. Code updates and module removal must not remove this
+root. Module code uses the supplied context data path; it must not reconstruct
+private storage from its own source location. A root-level space follows the
+same rule. Scoped code and data must never alias the same directory.
+
+Tools need an established data destination. `DATACORE_SPACE` may explicitly select
+a canonical space; otherwise the MCP default requires exactly one canonical personal space. Missing or
+ambiguous private scope disables those writes; it never selects an arbitrary
+team space. Tools intentionally acting across spaces require their own explicit
+scope and authorization contract.
+
+Valid separate user-space data needs no migration. Data that overlaps installed
+code must be inventoried before changing that deployment. A new empty
+location must not silently supersede data under the old module directory.
+Quiesce legacy writers, preserve and verify the complete source, publish the
+new private copy durably, and reconcile every caller before resuming writes.
+Interrupted preparation leaves the original recoverable and cannot be reported
+as a completed migration. Destination conflicts, source changes, unsafe links
+or an incomplete migration require explicit reconciliation. Retry must not
+overwrite either existing authoritative copy. Backups remain private and are
+not included in module publication. These requirements apply to copied and
+linked module installations, settings and workflow state as well as data files.
 
 ### 10. Installation Scope
 
@@ -776,7 +810,10 @@ When the same module name exists at multiple scopes:
 3. Global:   .datacore/modules/[name]/              # Least specific
 ```
 
-Most specific scope wins. A space can override a global module with a customized version.
+This precedence describes context selection within an explicitly selected
+space. It must not select an MCP tool's data destination implicitly. A
+space-specific customization has a distinct callable identity in the
+owner-wide MCP server; it cannot replace or shadow another scope's handler.
 
 #### Installation Commands
 
@@ -793,7 +830,8 @@ git clone https://github.com/datacore-one/datacore-campaigns 1-teamspace/.dataco
 
 #### MCP Tool Scoping
 
-Global module tools are always registered. Space module tools are registered with scope awareness:
+Global module tools register only when their required data context is verified.
+Space selection uses canonical identity; optional scoped callable names are described below:
 
 ```typescript
 interface ModuleToolContext {
@@ -804,7 +842,28 @@ interface ModuleToolContext {
 }
 ```
 
-When `datacore.crm.lookup` is called and CRM is installed in `1-teamspace/`, the tool handler receives `dataPath` pointing to `1-teamspace/.datacore/modules/crm/data/`.
+Callable names default to the existing `datacore_crm_lookup` form. The MCP
+process selects one canonical module data context using `DATACORE_SPACE`, or the
+unique personal space when unset. For each module, selected-space code overrides
+personal code, which overrides global code. An equal-precedence duplicate or
+failed selected implementation refuses registration; it must not silently fall
+back to another implementation. All selected handlers receive the selected data
+context. Numeric folder prefixes are not identity (DIP-0015).
+
+`DATACORE_SCOPED_MODULE_NAMES=1` explicitly opts into simultaneous scoped
+registration. For a space with stable name `team`, CRM then advertises
+`datacore_team_crm_lookup`; the global callable remains `datacore_crm_lookup`.
+The default is `0`. Changing names is not required to correct ambiguous routing.
+Invalid identifiers, duplicate names and identifiers above the MCP 64-character
+limit are refused in both modes. A third-party `acme/crm` retains its data
+namespace while using callable namespace `acme-crm`.
+
+Changing a marker identity/path requires rebuilding registration; stale calls
+must not retain the previous destination. Callers use advertised `tools/list`.
+Registration and `dataPath` route trusted code; neither restricts its OS
+privileges. Independent data/credential isolation requires a separate restricted
+process and accessible data root. Installation scope is not an authorization
+control supplied by module naming.
 
 ### 11. CLAUDE.md Integration
 
@@ -1011,7 +1070,7 @@ Or use the `create-module` agent with audit intent. The audit checks:
 - [ ] No user data in module directory
 - [ ] Settings that vary per-user use `.local.yaml` pattern
 - [ ] Module outputs reference space-relative paths, not absolute
-- [ ] Module data paths point to `[space]/.datacore/modules/[name]/data/`
+- [ ] Module data paths point to `[module-private-root]/data/`
 
 **Naming compliance:**
 - [ ] module.yaml `name` follows convention
@@ -1209,7 +1268,7 @@ Modules using the v1 format (pre-DIP-0022) should migrate incrementally. No forc
 1. Scan modules for v1 patterns (`learning:`, `use_cases:`, data in module dir)
 2. Generate migration report showing required changes
 3. Optionally auto-migrate with user confirmation
-4. Move any user data from module dirs to `[space]/.datacore/modules/[name]/data/`
+4. Retain valid user-space data. If code/data overlap, explicitly preserve and reconcile it into the selected `[module-private-root]/data/`
 
 ## Security Considerations
 
@@ -1219,9 +1278,9 @@ Modules using the v1 format (pre-DIP-0022) should migrate incrementally. No forc
 - SKILL.md files should not contain sensitive information (ecosystem-discoverable)
 - `x-datacore:` namespace prevents frontmatter conflicts
 - Tool namespace prevents collisions between modules
-- Data separation enforced by directory structure (code dir gitignored differently from data dir)
+- Use a distinct private data root, publication exclusions and deployment permissions. Directory naming and Git ignore rules alone do not establish an OS or credential boundary.
 - Third-party modules should be audited before installation
-- Module settings with secrets use `.datacore/env/.env` (gitignored), not module.yaml
+- Secrets are assigned explicitly to their authorized runtime context, outside shareable code. Never pass an entire shared secret file to every module or MCP process; modules in one process share that process’s authority.
 
 ## Implementation
 
@@ -1240,13 +1299,13 @@ Modules using the v1 format (pre-DIP-0022) should migrate incrementally. No forc
 - [ ] Update `module-registrar` agent to use `datacore.modules.register` tool
 
 ### Phase 3: Data Separation
-- Create space-scoped module data directories: `[space]/.datacore/modules/[name]/data/`
+- Create space-scoped module data directories: `[module-private-root]/data/`
 - **Migrate existing module data** from module dirs to space dirs:
   1. Scan modules for `output/`, `data/`, `state/`, `*.json`, `*.db` in module code dir
-  2. For each file: determine target space (personal if ambiguous)
-  3. Move to `[space]/.datacore/modules/[name]/data/[filename]`
+  2. For each file: establish its authorized target space; refuse ambiguous routing
+  3. Move to `[module-private-root]/data/[filename]`
   4. Update any hardcoded paths in module agents/commands
-  5. Add moved paths to module `.gitignore` as safety net
+  5. Exclude the private module-data tree from publication; do not rely on a code-tree ignore rule for data isolation
   6. Verify module still functions after migration
 - Update module agents to use space-scoped data paths via `ModuleToolContext.dataPath`
 - Add privacy audit to `create-module` audit mode (flag any non-code files in module dir)
@@ -1316,8 +1375,8 @@ _Last audited: 2026-03-04_
 | CATALOG.md | `module-registrar` agent maintains module catalog |
 | Module naming standardization | All 21 modules use consistent lowercase names (gtd, crm, comms, etc.) |
 | Dynamic module tool loading | `modules.ts` — `discoverModules()` + `loadModuleTools()` operational; all 10 modules have compiled `tools/index.js` |
-| Space-scoped data directories | `dataPath` construction correct in `modules.ts`; lazy creation by design (tools create on first write) |
-| Workflow YAML Executor | `lib/workflow_executor.py` — parsing framework with condition evaluation and state tracking; phase handlers log actions but do not dispatch to MCP tools or agents (CLI-only) |
+| Space-scoped data directories | Historical implementation used the legacy modules/name/data path. The September 2026 correction below requires code/data separation and verified preservation of existing state; it is not evidence of completed deployment. |
+| Workflow YAML Executor | `lib/workflow_executor.py` — parsing framework with condition evaluation and diagnostic state tracking; phase handlers log actions but do not dispatch to MCP tools or agents (CLI-only). Diagnostic state belongs to the runtime identity's private `DATACORE_STATE`, not installed code. Writes must serialize, preserve unrelated records, and refuse malformed state. Existing state at a legacy location requires preserved migration before writes to a new store. This file is not proof that any tool executed or that a production workflow can resume. |
 | Module engram starter packs | `modules/gtd/engrams/starter-pack.yaml` — pack format defined; auto-import requires MCP server build step |
 | CATALOG.md enrichment | Context layer counts + installation quick reference per public module |
 
@@ -1334,12 +1393,12 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 |----------|------------|
 | Capability placement: tools vs skills vs agents? | Discovery hierarchy defined: MCP tools > Skills > Agents > Commands |
 | How does module context enter CLAUDE.md? | Via `context.priority` in manifest — `always` (GTD), `on_match` (most), `on_demand` (rarely used) |
-| Module testing format? | Deferred — modules rely on system-level MCP tests and agent validation for now |
+| Module testing format? | The test framework remains a module choice. Data isolation, preservation and callable identity require behavioral tests through the actual loader; agent validation alone does not establish these invariants. |
+| Workflow state persistence? | Persisting actual phase completion is part of the orchestration model in §7. The CLI records diagnostics only; automated dispatch, recovery and resume remain unimplemented there. No side effect may be inferred from a diagnostic “completed” or “dry-run” entry. |
 
 ## Open Questions
 
-1. **Workflow state persistence**: Should workflow phase completion be persisted for resume across sessions?
-2. **Skill auto-injection**: Should skills inject automatically based on context, or only on explicit reference?
+1. **Skill auto-injection**: Should skills inject automatically based on context, or only on explicit reference?
 
 ## References
 
@@ -1363,3 +1422,87 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 ---
 
 *This DIP supersedes the module structure defined in datacore-specification.md Section "Modules" and establishes the five-layer capability model with data separation, engram integration, and workflow orchestration.*
+
+
+## September 2026 audit change record
+
+- **Previous requirement:** Sections 9 and 10 placed scoped code and private data
+  under the same `[space]/.datacore/modules/[name]/` directory while requiring
+  shareable code to contain no private data. The implementation table described
+  the old data path as correct. Migration guidance selected personal space when
+  the destination was ambiguous.
+- **Problem:** Copied scoped modules stored private files in shareable code;
+  linked scoped and root-space modules wrote through the code link into the
+  provider checkout. Immutable code made legitimate writes fail. Three actual
+  synthetic handler-write regressions reproduce these failures.
+- **Corrected requirement:** Retain valid separate per-space storage; use a separate module-data
+  root only where installed code overlaps data. Apply the preservation/refusal contract above. Do not infer a
+  destination from installation ordinals or ambiguous scope. Credential access
+  is a deployment boundary, not an implication of directory names or ignores.
+- **Reason:** Enforce the existing public-code/private-data invariant for all
+  supported installation layouts, including root and nested spaces.
+- **Implementation impact:** MCP context construction, private path helpers,
+  legacy-data reconciliation, hardcoded module readers and workflow state must
+  use the new contract. Discovery remains exclusively in `spaces.py`.
+- **Compatibility impact:** Existing data is not discarded, reset or silently
+  replaced. Only overlapping or ambiguous installations require verified migration/reconciliation;
+  unresolved copies block affected writes. Installed module code locations and
+  package namespaces are unchanged.
+- **Tests affected:** Real handler writes through copied/linked code; existing
+  data preservation; interrupted/concurrent preparation; destination conflicts;
+  retries; scoped permissions; code immutability; installed-runtime recovery.
+- **Runtime/deployment impact:** Quiesce writers, verify private backups, bind
+  qualified code and the migrated private store, then test actual writes and
+  restart before retiring the previous configuration. The historical
+  Implemented status does not assert that this corrective rollout is complete.
+- **Traceability:** This amendment preserves the earlier intent and records why
+  its path layout failed. It accompanies the continuing audit and requires normal
+  repository review; no successful migration or runtime closure is asserted here.
+
+### Scoped calls and diagnostic state clarification
+
+- **Previous requirement:** “Most specific scope wins” also applied implicitly
+  to MCP calls, and scope names implied restricted availability. §7 specified
+  persistence while the open questions asked whether to persist it at all.
+- **Problem:** Unqualified calls cannot safely select among multiple accessible
+  scopes. Names and application routing do not restrict same-process access.
+  The CLI's diagnostic state could be mistaken for durable executed work.
+- **Corrected requirement:** Default names bind to an explicit canonical context; scoped names are opt-in;
+  collisions and stale registrations refuse execution. Actual isolation is a
+  deployment boundary. Diagnostic persistence is private and failure-preserving;
+  automated production dispatch/resume is not supplied by the CLI scaffold.
+- **Reason:** Make routing, isolation and execution evidence independently
+  testable without inventing capabilities or weakening data-preservation rules.
+- **Implementation impact:** MCP canonical discovery, scoped registration and
+  stale-call guards; serialized atomic diagnostic state with explicit roots.
+- **Compatibility impact:** Existing callable names remain by default. Only opt-in scoped callers adopt
+  advertised qualified names. Legacy diagnostic state needs preserved
+  migration. No requirement to implement future workflow dispatch is introduced.
+- **Tests affected:** Loader routing/collision/stale-marker tests; real handler
+  writes; malformed/linked diagnostic files; concurrent updates; failed flush.
+- **Runtime/deployment impact:** Rebuild registration after identity changes;
+  verify scoped OS/credential boundaries separately and preserve prior state.
+
+## Compatibility correction — 2026-09-14 (proposed)
+
+- **Previous requirement:** The audit amendment required new private directory
+  names and scope-qualified calls for all scoped modules.
+- **Problem:** Both exceeded the existing separation/routing invariant and forced
+  migration even when user data was already safely separate from code.
+- **Corrected requirement:** Retain valid existing stores and callable names.
+  Resolve one explicit context with space > personal > global code precedence;
+  refuse ambiguity. Scoped names are optional, disabled by default.
+- **Reason:** Fix code/data aliasing and wrong-module dispatch without imposing
+  a new layout or public API on valid installations.
+- **Implementation impact:** Shared Python/MCP storage selection, one selected
+  registration context, explicit opt-in multi-scope names.
+- **Compatibility impact:** No automatic renames, migration or new callable names.
+  Already migrated valid stores remain in use. Unsafe/conflicting stores still
+  require preservation and reconciliation.
+- **Tests affected:** Existing file/inode retention, copied/linked code, ambiguous
+  stores, default names, selector precedence, duplicate selection, opt-in names.
+- **Runtime/deployment impact:** Defaults preserve these contracts; no live
+  deployment changed. Matching core/MCP runtime qualification remains required.
+- **Traceability:** Earlier audit change records remain to preserve rationale;
+  this correction supersedes their universal rename/scoped-name requirements.
+  Historical Implemented status does not ratify an unmerged audit amendment.

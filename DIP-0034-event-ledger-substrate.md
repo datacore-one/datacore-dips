@@ -466,14 +466,16 @@ Two locations with different trust properties and different git treatment:
   `ensure_keypair()` alongside private-key generation. Because it holds only
   public keys, it is safe to commit and sync across machines like any other
   Datacore config file — any party can verify a signature without holding a
-  secret. A malformed or missing registry never raises; it degrades to an
-  empty actors map (fail-safe read), and `keys.verify()` returns `False` for
-  an unknown actor rather than raising.
-- **Concurrency**: `ensure_keypair()` is guarded by a per-actor `fcntl.flock`
-  lock file (`<keys_dir>/.<actor>.lock`) with a double-checked existence test
-  after acquiring the lock, so two processes cold-starting the same
-  brand-new actor cannot race into generating two different keypairs for one
-  actor name (the loser loads the winner's key instead of overwriting it).
+  secret. Verification treats an unavailable or malformed registry as unverified,
+  and `keys.verify()` returns `False` for an unknown actor. Mutation is
+  stricter: `ensure_keypair()` refuses unreadable or malformed existing
+  registry state and preserves it. Only an absent registry starts empty.
+- **Concurrency**: `ensure_keypair()` locks both the actor key and the shared
+  registry, in that order, across read, validation and durable publication.
+  The key lock prevents different keys for the same actor; the registry lock
+  prevents different actors from overwriting each other's entries. Existing
+  key/registry disagreement requires explicit restoration or rotation and
+  cannot silently replace the registered identity.
 
 ### Signing (opt-in)
 
@@ -753,16 +755,13 @@ statement — not part of this DIP.
   is "a foreign agent joins the ledger" or "an external/enterprise audit-trail
   need" — i.e., the moment "trust the filesystem" stops being an adequate
   model.
-- **Fail-safe registry reads.** A malformed or missing
-  `.datacore/keys/registry.yaml` degrades to an empty actors map rather than
-  raising, and `keys.verify()` returns `False` (never raises) for an unknown
-  actor or a bad signature — a corrupt registry can only cause spurious
-  verification failures, never a false "verified" result and never a crash
-  of the reading process.
-- **Key generation concurrency.** The per-actor lock file in `ensure_keypair`
-  prevents two racing cold-starts from generating two different keypairs for
-  the same actor name and leaving the registry pointing at one while a
-  process signs with the other.
+- **Fail-closed registry handling.** Read-only signature verification returns
+  unverified when registry evidence is unavailable or malformed. Key/registry
+  mutation refuses malformed or unreadable existing state; it must not
+  convert an error into an empty registry and overwrite valid identities.
+- **Key generation concurrency.** The per-key and shared-registry locks in
+  `ensure_keypair` protect both same-actor creation and simultaneous creation
+  for different actors. Both complete entries must survive.
 - **Not an access-control system.** This substrate detects tampering and (once
   signing is on) attributes authorship; it does not, by itself, restrict
   *who may write* `item.claim` or `item.complete` for a given item — that is
@@ -913,3 +912,20 @@ substrate for briefing/approval/attestation/spend objects.
   format and for "policy file + fail-closed defaults" reasoning, reused for
   `ledger/policy.py` in Phase 5 — not a functional dependency, so DIP-0034
   does not require DIP-0032 to ratify first).
+
+
+## September 2026 audit amendment: registry preservation
+
+**Status: Proposed (2026-09-14).** The historical Implemented header does not
+ratify this amendment or certify active rollout.
+
+| Field | Record |
+|---|---|
+| Previous requirement | All malformed registry reads degrade to an empty map; per-actor locking is sufficient. |
+| Problem | Applying the read-only fallback to mutations loses existing registry entries; independent actor locks do not serialize shared-registry updates. |
+| Corrected requirement | Verification fails closed; mutations preserve invalid state and use a shared registry lock alongside the key lock. Existing key/registry disagreement requires explicit recovery. |
+| Reason | Preserve signing identities and prevent concurrent updates from losing another actor. |
+| Implementation impact | Aligns with the canonical `ledger/keys.py` strict mutation path and shared lock. |
+| Compatibility impact | Valid registries/signatures are unchanged; invalid mutation inputs require repair. |
+| Tests affected | Malformed/null/list registries, same-actor and different-actor concurrency, existing key mismatch; core key/persistence suites. |
+| Runtime/deployment impact | Qualify actual key storage permissions and deployed readers; signing alone does not establish independent OS or credential isolation. |

@@ -17,6 +17,8 @@ A DIP is a design document providing information to the Datacore community about
 
 ## DIP Status
 
+Read each DIP header and its explicit amendment, rollout and future-work notes together. An Implemented header does not ratify an explicitly proposed section or establish that every follow-up is deployed. Catalog rows mirror the referenced header; they do not override it.
+
 | Status | Description |
 |--------|-------------|
 | **Draft** | Initial proposal, open for feedback |
@@ -117,28 +119,30 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 | DIP | Title | Status |
 |-----|-------|--------|
 | [0021](DIP-0021-search-research-architecture.md) | Search & Research Architecture | Implemented |
-| [0022](DIP-0022-module-specification.md) | Module Specification | Partial |
+| [0022](DIP-0022-module-specification.md) | Module Specification | Implemented |
 
 ### Infrastructure & Security
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0018](DIP-0018-credential-management-DRAFT.md) | Credential Management | Partial |
-| [0020](DIP-0020-whatsapp-module.md) | WhatsApp Module | Partial |
+| [0018](DIP-0018-credential-management.md) | Credential Management | Draft |
+| [0020](DIP-0020-whatsapp-module.md) | WhatsApp Module | Accepted |
 
 ### Historical / Superseded
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0004](DIP-0004-knowledge-database.md) | Knowledge Database | Superseded (learning→DIP-0019, search→Datacortex) |
-| [0006](DIP-0006-open-questions-management.md) | Open Questions Management | Superseded (by DIP-0013) |
-| [0007](DIP-0007-inbox-done-option.md) | Inbox DONE Option | Superseded (by DIP-0009 Part 2) |
+| [0004](DIP-0004-knowledge-database.md) | Knowledge Database | Superseded |
+| [0006](DIP-0006-open-questions-management.md) | Open Questions Management | Superseded |
+| [0007](DIP-0007-inbox-done-option.md) | Inbox DONE Option | Superseded |
 
 ---
 
-## DIP Roadmap
+## Historical roadmap (not current number reservations)
 
-The following DIPs are planned to complete full specification coverage:
+This older planning list is retained for traceability. Its numbers and titles
+were superseded by the subsequently created DIP files and do not reserve
+numbers or define current implementation requirements:
 
 | DIP | Title | Purpose | Priority |
 |-----|-------|---------|----------|

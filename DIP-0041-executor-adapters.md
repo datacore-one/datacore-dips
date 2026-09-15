@@ -9,7 +9,7 @@
 | **Status** | Implemented |
 | **Depends** | DIP-0034 (Event Ledger Substrate) — hard dependency for the shadow-accounting half only (`ledger.log.EventLog`, the `spend.record` event type, its fold handler); the executor-abstraction half and the generator half are each independently functional without it — see Compatibility |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-08-27 |
+| **Updated** | 2026-09-12 |
 | **Tags** | `executors`, `provider-registry`, `shadow-accounting`, `spend.record`, `harness-generation`, `datacore-v2` |
 | **Affects** | `.datacore/lib/executors/__init__.py`, `.datacore/lib/executors/base.py`, `.datacore/lib/executors/claude_code.py`, `.datacore/lib/executors/hermes.py`, `.datacore/lib/executors/api.py`, `.datacore/lib/tests/test_executors.py`, `.datacore/lib/gen_claude_agents.py`, `.datacore/lib/tests/test_gen_claude_agents.py`, `.datacore/lib/ledger/fold.py` (`_handle_spend`, consumed not modified), `cos_generate.py`/`cos_reasoning.py` + one nightshift call site (deploy-side, not in this repo — named as follow-up below), `.datacore/modules/nightshift/module.yaml` (deploy-side, stale evaluator names — named as follow-up below) |
 | **Specs** | `.datacore/lib/executors/base.py`, `.datacore/lib/gen_claude_agents.py` |
@@ -27,6 +27,21 @@
 > record outstanding gates as follow-up work, and those remain open. Read the
 > Implementation/Rollout sections for the per-DIP position rather than inferring it
 > from this status field.
+
+
+**Compatibility decision (2026-09-14, proposed audit amendment):** New workflow
+policies are explicit opt-ins, disabled by default. `DATACORE_REVIEW_BEFORE_EXECUTION=1`
+adds strict review freshness/contract gating; `DATACORE_CADENCE_PROPOSALS=1`
+selects proposal-only cadence/heartbeat production. `DATACORE_INSTANCE_BOUND_EXECUTION=1`
+selects the parked experimental allocation model, tracked in
+[core issue #192](https://github.com/datacore-one/datacore/issues/192); it is not
+approved for deployment or inclusion in main. Earlier audit prose that treats
+these additions as mandatory must be read within that opt-in scope. Data
+preservation, truthful completion, private output, operator controls and exact
+authority checks remain safety invariants. Unknown-effect retry policy remains
+pending a separate owner decision. No implemented/audited status is asserted for
+the parked proposal or any unverified deployment.
+
 
 ## Summary
 

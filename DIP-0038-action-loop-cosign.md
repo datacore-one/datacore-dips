@@ -8,13 +8,18 @@
 | **Type** | Infrastructure |
 | **Status** | Implemented |
 | **Created** | 2026-07-30 |
-| **Updated** | 2026-08-27 |
+| **Updated** | 2026-09-12 |
 | **Tags** | `action-loop`, `co-sign`, `approvals`, `briefing`, `policy`, `datacore-v2` |
 | **Affects** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py`, `.datacore/config/approvals_policy.yaml`, future `cos_approval_*` MCP wiring, Telegram dismiss/approve handlers |
 | **Specs** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py` |
 | **Agents** | any process that materializes briefing items into ledger items (`briefing.actions.materialize`); any human approver granting cosign for a side-effecting item |
 | **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate. Non-functional without it: the `item.create`/`approval.grant` event schema, `EVENT_TYPES`, and the Task 5.2b cross-actor HLC ordering fix this DIP's grant→create causality relies on. |
 | **Relates to** | winston-open-gaps item 7 (approvals loop built but never wired), DIP-0037 (Grounded Briefings — the upstream producer of the items this DIP materializes, soft/optional), DIP-0032 (Egress Enforcement — structural precedent for "policy file + fail-closed defaults"), DIP-0009 (GTD Specification — adjacent, disambiguated GTD task-state model, see Specification), DIP-0013 (Meetings Module §5.2 — escalation-detection pattern cited in Open Questions), DIP-0006 (Open Questions Management — superseded into DIP-0013 §4, cited for the same reason), `ENG-2026-0729-030` (signing opt-in amendment — the trust boundary this DIP's co-sign gate operates under) |
+
+> **Audit amendment status: Proposed (2026-09-11/12).** The trust-boundary,
+> content-binding, lifecycle and authority-configuration corrections recorded
+> below remain under review. The historical `Implemented` status does not
+> ratify those amendments or certify deployed conformance.
 
 > **Ratification note (2026-08-27).** Status moved `Draft` → `Implemented` on the
 > owner's instruction. **No human review was performed on this DIP.** It is recorded
@@ -27,6 +32,21 @@
 > record outstanding gates as follow-up work, and those remain open. Read the
 > Implementation/Rollout sections for the per-DIP position rather than inferring it
 > from this status field.
+
+
+**Compatibility decision (2026-09-14, proposed audit amendment):** New workflow
+policies are explicit opt-ins, disabled by default. `DATACORE_REVIEW_BEFORE_EXECUTION=1`
+adds strict review freshness/contract gating; `DATACORE_CADENCE_PROPOSALS=1`
+selects proposal-only cadence/heartbeat production. `DATACORE_INSTANCE_BOUND_EXECUTION=1`
+selects the parked experimental allocation model, tracked in
+[core issue #192](https://github.com/datacore-one/datacore/issues/192); it is not
+approved for deployment or inclusion in main. Earlier audit prose that treats
+these additions as mandatory must be read within that opt-in scope. Data
+preservation, truthful completion, private output, operator controls and exact
+authority checks remain safety invariants. Unknown-effect retry policy remains
+pending a separate owner decision. No implemented/audited status is asserted for
+the parked proposal or any unverified deployment.
+
 
 ## Summary
 
@@ -56,13 +76,12 @@ source-of-truth boundary and [DIP-0009](DIP-0009-gtd-specification.md) for
 the GTD side of this; the full disambiguation and the capture-point argument
 are in Specification below.
 
-**Trust boundary, stated up front, not buried.** While signing is dormant,
-the actor asserting a grant is self-declared, not cryptographically
-authenticated — this gate is a **process-boundary control** that prevents an
-*accidental* ungated side effect, not a defense against adversarial forgery
-by a process that can already write to the approver's actor file. Do not read
-"co-sign" as cryptographically binding until `DATACORE_LEDGER_SIGN=1` is on;
-see TRUST BOUNDARY below for the exact scope.
+**Trust boundary.** This is a cooperative application control inside one
+owner-controlled installation. An unsigned actor name is self-declared.
+Signing authenticates an event against a configured key only when verification
+is enforced; independent approver authority additionally requires protected
+private keys, registry and policy. A shared OS identity, shared credentials or
+an environment flag alone does not establish that boundary. See TRUST BOUNDARY.
 
 ## Agent Context
 
@@ -88,9 +107,9 @@ see TRUST BOUNDARY below for the exact scope.
 | Question | Answer |
 |----------|--------|
 | Does dismissing a briefing item touch `inbox.org` or `next_actions.org`? | No. Ledger items are a disjoint object class from org-mode GTD tasks ([DIP-0034](DIP-0034-event-ledger-substrate.md), [DIP-0009](DIP-0009-gtd-specification.md)); `materialize()`/`act()` never write to org files. |
-| Is a co-sign grant cryptographically verified today? | No. Actor identity is self-declared, process-boundary trust only, until `DATACORE_LEDGER_SIGN=1` — see TRUST BOUNDARY. |
+| Is a co-sign grant cryptographically verified? | The signed policy path verifies its signature and registry binding. Unsigned paths are cooperative; independent identity also requires protected keys, policy and registry. See TRUST BOUNDARY. |
 | Can a dismissed item be un-dismissed? | No mechanism exists in the current event vocabulary. Dismissal is fold-level terminal; the only recovery is creating an unrelated new ledger item under a new id — see Open Question 4. |
-| Which event authorizes a gated `item.create`? | `approval.grant`, validated by `guarded_append`'s 8 ordered checks (actor-bound, id-bound, replay-blocked). |
+| Which event authorizes a gated `item.create`? | `approval.grant`, validated by `guarded_append` checks, including complete content binding, actor/space/ID binding and creation replay refusal. |
 | Where does an ungranted side-effecting item go? | `MaterializeResult.blocked`; nothing is written to the log, and it reappears on every re-materialize call until granted — see Open Question 3 for the (deferred) escalation path. |
 | Who can gate an `item.create`? | Only the single `policy.approver` named in `.datacore/config/approvals_policy.yaml`; per-effect approvers are Open Question 2. |
 
@@ -296,51 +315,50 @@ from materializing.
 `cosign_effects` set (effect tags — `email.send`, `payment`, `prod.deploy` by
 default). `requires_cosign(policy, event_type, payload)` is `True` iff
 `event_type == "item.create"` and `payload["effects"]` intersects
-`cosign_effects` — **only `item.create` is ever gated**; once a side-effecting
-item exists with a valid grant, its downstream lifecycle events (`item.claim`,
-`item.complete`, ...) are never re-checked, keeping the gate singular
-(one grant, checked once, at creation) rather than requiring a fresh grant
-for every event a long-running item ever emits.
+`cosign_effects`. This predicate classifies effectful proposals; the enforcement
+surface is broader: `guarded_append` validates creation, the complete resulting
+content of updates, and current content at claim time.
 
-`guarded_append(log, type, payload, policy=None, space_dir=None)` is the
-**only sanctioned way** for gated code to append an `item.create` — calling
-`EventLog.append` directly bypasses the gate entirely. Before `requires_cosign`
-is even consulted, a present `effects` field is type-checked: it must be a
-`list`, or `guarded_append` fails closed with `PolicyError` rather than
-letting a malformed value (e.g. a bare string, which Python iterates
-character-by-character) silently decide gating from garbage — **fail-closed
-effects validation**.
+The invariant is **approval binds what will be executed**. A grant can remain
+valid for unchanged content. A changed title, effect, target, command, assignee,
+body, property or other bound field requires a grant for the new complete
+content. Removing an effect from an already approved item does not remove its
+approval requirement. Claim validation must also cover imported/unguarded
+historical updates and reject stale dispatch selections.
 
-When `requires_cosign` is `True`, ALL of the following must hold, checked in
-order, each raising `PolicyError` naming exactly which failed, with nothing
-later evaluated once one fails:
+Before appending, the policy path validates:
 
-1. `payload["approval_ref"]` is present and non-empty.
-2. It is the `hash` of an event that actually exists in the space (via
-   `read_events`, which merges every actor's file).
-3. That event's `type` is `"approval.grant"`.
-4. That event's `actor` equals `policy.approver` — **actor-bound**: a grant
-   from anyone other than the policy's named approver never counts, no
-   matter how well-formed it otherwise is.
-5. `payload["id"]` (the new event's own id) is a non-empty string, checked
-   explicitly and *before* the comparison in (7) — so a gated create with no
-   id at all can never slip through by coincidentally matching an equally
-   id-less grant (two missing fields must never compare equal to each
-   other). This is the **id-binding** half of the contract.
-6. The matched grant's `payload["item"]` is likewise checked to be a
-   non-empty string *before* being compared — a grant with no item binding
-   must never validate any create, whatever that create's id is or isn't.
-7. `payload["id"] == grant.payload["item"]` — the grant names *this specific*
-   item id, not "any item this approver has ever blessed."
-8. No event in the space is already an `item.create` for this same id — a
-   granted `approval_ref` authorizes creation **exactly once**; replaying the
-   same ref against a second create attempt at the same id is rejected as
-   "item already created," not silently re-validated. This is the
-   **replay-block**.
+1. Effect lists contain nonempty strings from the declared vocabulary; malformed
+   values and unknown effects are refused.
+2. Creation authority and declared per-principal limits apply to the actual
+   writer, not a caller-controlled requester identity. Only the configured
+   approver may append an `approval.grant` through the policy interface.
+3. A required `approval_ref` identifies an existing `approval.grant` in the
+   destination space by the configured approver. Both item identifiers must be
+   nonempty and equal. Another space's grant cannot authorize this space.
+4. The grant's `payload_hash` equals `approval_payload_hash` of the complete
+   proposed content. The existing hash format is canonical UTF-8 JSON with
+   sorted keys, compact separators and non-finite numbers refused; only
+   `approval_ref` and the diagnostic `assignee_absent` are excluded, and absent
+   `effects` is represented as an empty list. Conditional edit metadata is
+   evaluated before hashing and is not persisted item content.
+5. Signed policy operations require a valid grant signature against the
+   configured actor-key registry. Unsigned grants cannot authorize that path.
+6. A gated creation cannot reuse an already created ID. This is local admission
+   and deterministic replay protection, not proof of cross-host exclusion.
+7. Updates preserve creation authority and cannot change content after execution
+   starts. Policy validation and replay use the same merge semantics. Malformed,
+   stale or conflicting conditional edits are refused before local admission;
+   conflicts received during replication remain visible and block execution
+   until explicitly reconciled.
+8. Claims require an available item, an allowed/registered writer, correct
+   assignment, applicable budget/effect restrictions and a hash of the current
+   content. Executor startup rechecks ownership and that hash.
 
-All eight checks run before `log.append` is ever called, so a rejected event
-never touches the log file — `PolicyError` is raised on validation, not on a
-partially-committed write that then has to be rolled back.
+Rejected local operations do not append an event. Cooperating policy operations
+share a per-space local lock. Independent offline hosts are not serialized by
+that lock; effects requiring exclusive execution need a separately enforced
+execution/commit authority. A grant is not a distributed lock or fencing token.
 
 ### Amendment: Closed Effects Vocabulary — Precondition for Wiring (final-review wave, 2026-07-30)
 
@@ -370,43 +388,35 @@ approval surfaces can now assume that every effect tag reaching
 one of `cosign_effects` — never an unrecognized string masquerading as
 "harmless because it didn't match."
 
-### The `TRUST BOUNDARY` (verbatim, from `ledger/policy.py`'s module docstring)
+### The `TRUST BOUNDARY`
 
-This is load-bearing enough to the whole gate's honesty that it is
-reproduced here exactly as written in the reference implementation, not
-paraphrased:
+Unsigned actor fields are self-declared. The application gate reduces accidental
+unauthorized actions through its covered interfaces; it does not isolate an
+adversarial process that can edit the same files or invoke raw tools.
 
-> TRUST BOUNDARY: while signing is dormant (`ENG-2026-0729-030`), actor
-> strings are self-declared — `approval.grant` authenticity rests on process
-> boundaries (who can write to the space's `<actor>.jsonl` file), not
-> cryptography. It becomes cryptographic only when `DATACORE_LEDGER_SIGN=1`
-> gives the approver a keypair (see `ledger.log.EventLog`'s `sign` parameter
-> and `ledger.keys`). Until then, this gate prevents ACCIDENTAL ungated side
-> effects (an item.create slipping into existence with no human ever having
-> looked at it) — it does NOT defend against adversarial forgery: any
-> process able to write to `policy.approver`'s actor file in this space can
-> forge a self-declared grant. Do not present this gate as tamper-proof
-> until signing is switched on.
+`DATACORE_LEDGER_SIGN=1` enables signing and the policy path's grant-signature
+verification. Signatures provide evidence of possession of a key, not an OS
+security boundary. A caller who can read the approver's private key, replace the
+trusted registry, weaken policy or bypass the consuming interface can defeat
+independent approval. Environments promising protection against that caller
+must protect those resources with separate identities/credential scopes or an
+equivalent independently enforced boundary, and verify denial with negative
+runtime tests. Merely creating a keypair or adding an application guard is
+insufficient.
 
-Concretely: this DIP's gate is a **process-integrity control**, not (yet) a
-**cryptographic-authenticity control**. It reliably prevents the failure mode
-that actually motivated it — an agent's side-effecting `item.create` slipping
-into existence with nobody having recorded a decision about it — because the
-normal, non-adversarial path to writing `human.jsonl` is a human (or a
-process acting under their direct control) doing so. It does not, today,
-defend against a compromised or malicious process that has write access to
-the approver's actor file forging a grant for itself. Signing
-(`DATACORE_LEDGER_SIGN=1`, per DIP-0034) is the designed upgrade path for
-closing that gap; it is deliberately not the default yet, per the same
-opt-in-signing ruling DIP-0034 documents, because at the current single-owner
-trust domain the marginal security is small relative to key-management cost.
+The current single-owner cooperative deployment model is distinct from such an
+isolated deployment. This DIP does not claim tenant isolation, malicious-process
+containment, global exactly-once effects or cross-host fencing. Deployments must
+state their supported trust model rather than infer it from the word co-sign.
 
 ### `approval.grant` event flow
 
-`approval.grant` is one of DIP-0034's `EVENT_TYPES`. It is **never itself
-policy-gated** — only `item.create` is — so an approver appends it via a
-plain `EventLog.append("approval.grant", {"item": <item_id>})`, no
-`guarded_append` involved. The flow, end to end:
+`approval.grant` is one of DIP-0034's `EVENT_TYPES`. The configured approver
+uses the guarded interface or `ledger_cli.py approve` to record
+`{"item": <item_id>, "payload_hash": <complete-content-hash>}`. Granting does not
+need another grant, but the policy interface checks who grants it. A low-level
+`EventLog.append` remains an import/storage primitive, not an authorization
+interface. The flow is:
 
 1. A briefing item with side-effecting `effects` is submitted to
    `materialize`. `guarded_append` finds no valid `approval_ref` and raises
@@ -416,18 +426,17 @@ plain `EventLog.append("approval.grant", {"item": <item_id>})`, no
 2. The policy's named `approver` — a human, per the default policy — reviews
    the blocked item (surfaced via whatever the Phase 6 wiring exposes it as;
    see Integration) and appends `approval.grant` with
-   `payload = {"item": item_id(item_text)}` via their own actor's
-   `EventLog`.
+   the item ID and complete proposed content hash via the guarded approver
+   interface.
 3. The SAME item is re-submitted to `materialize`, this time carrying
    `approval_ref` set to the grant event's `hash`. `guarded_append` walks the
-   eight checks above; all pass; `item.create` is appended, with
+   applicable checks above; all pass; `item.create` is appended, with
    `approval_ref` forwarded into its payload (so the created item carries a
    durable pointer to the grant that authorized it).
 4. A third submission of the same item (or the same `approval_ref` against a
    different item id) is rejected: either the never-resurface guarantee
    skips it outright (the id is already known, any status), or — if somehow
-   the id differs but the ref is replayed — check 8 rejects the replay
-   directly.
+   the id differs but the ref is replayed — item binding rejects it directly.
 
 ### The HLC causal floor (Task 5.2b) as the ordering guarantee actions depend on
 
@@ -453,16 +462,13 @@ deliberately uses two distinct actors (`"human"` grantor, `"agent"`
 materializer) to exercise that guarantee directly rather than only the
 same-actor case, which the fix was never needed for.
 
-### `act`: lifecycle transitions are never re-gated
+### `act`: lifecycle validation
 
-`act(space_dir, item_id, action, actor)` appends the `item.*` event for
-`claim`, `complete`, or `dismiss` via a **plain** `EventLog.append` — no
-`guarded_append`, no policy check. This is intentional and matches
-`requires_cosign`'s scope exactly: the create is the single enforcement
-point; an item's subsequent lifecycle is ungated by design, so a long-running
-side-effecting item's `complete` event doesn't require a second grant, and a
-plain (non-side-effecting) item's `dismiss` was never going to be gated in
-the first place.
+`act(space_dir, item_id, action, actor)` uses `guarded_append`. Claim validates
+current content, assignment and authority. Completion is governed by lifecycle
+ownership; dismissal/release/reassignment applies configured arbitration.
+Unchanged work does not require a fresh approval for every bookkeeping event.
+Caller-supplied details cannot substitute a different target item.
 
 ### Changes Required
 
@@ -515,28 +521,16 @@ later event addressed to that item id is a history no-op") — the two layers
 reinforce each other by construction rather than by two independently
 maintained pieces of logic agreeing by convention.
 
-**Why gate only `item.create`, not every event a side-effecting item ever
-emits?** A single, unambiguous enforcement point (creation) is easier to
-reason about and to audit than "was every event in this item's lifecycle
-individually authorized" — and re-checking cosign at, say, `item.complete`
-would either require a *second* grant (extra friction for no real safety
-gain, since the create already required a human to have looked at the
-declared effects) or would need to re-derive "was this item ever properly
-created" anyway, which is exactly what the create-time check already
-established once. Per-event re-checking also does not compose well with
-long-running items whose lifecycle spans days — a single grant at creation
-is the natural unit of "a human agreed to this specific piece of work."
+**Why revalidate content at update and claim?** Creation-only validation lets
+an approved item be changed into different work or imported through an unguarded
+writer. Reusing a grant for unchanged content avoids unnecessary approval while
+binding changed work to a new decision. The shared replay/validation merge
+prevents approval of one representation followed by persistence of another.
 
-**Why is the grant mechanism a plain, ungated event rather than itself
-requiring some meta-approval?** `approval.grant` is the exit from the gate,
-not an entry into it — gating the grant itself would just relocate the
-"who can create side effects unchecked" question one level up without
-resolving it, and would require inventing a second policy for who may grant
-grants. The trust boundary this DIP settles for is process-level (who can
-write to the approver's actor file), consistent with DIP-0034's own opt-in
-signing stance; a cryptographically-gated grant is exactly what turning on
-signing (`DATACORE_LEDGER_SIGN=1`) upgrades this into, without requiring a
-second gate mechanism invented specifically for grants.
+**Why authorize the grant writer without requiring a meta-grant?** The configured
+approver is the authority for this policy. Checking that writer enforces the
+existing authority rather than creating an infinite hierarchy of approvals.
+Independent identity protection still depends on the deployment boundary above.
 
 **Why collect blocked items rather than raising out of `materialize`
 entirely?** A real briefing batches many unrelated items in one call. One
@@ -554,9 +548,8 @@ never silently stop everything else.
   stay consistent with `fold`'s own state, exactly the shared-mutable-state
   problem DIP-0034 already solved once. The fold already has this
   information; `materialize` reuses it rather than re-deriving it.
-- **Gate every lifecycle event on a side-effecting item, not just create** —
-  rejected; see Rationale above (extra friction, no proportional safety
-  gain, poor fit for long-running items).
+- **Require a fresh grant for every lifecycle event** — unnecessary for
+  unchanged content; update and claim validation reuse a still-matching grant.
 - **A synchronous approval prompt at materialize time (block until a human
   answers)** — rejected; `materialize` is meant to run unattended (e.g. from
   a cron-triggered briefing pipeline) and cannot block on a human being
@@ -584,14 +577,9 @@ are new functions with no prior callers to break.
   public-adjacent). `.datacore/config/approvals_policy.yaml` is policy, not key
   material — it names an approver identity string and a set of effect tags,
   no secrets, and is tracked deliberately so the policy itself is auditable.
-- **See the TRUST BOUNDARY section above** — the substantive security caveat
-  of this whole DIP: process-boundary trust, not cryptographic
-  non-repudiation, until `DATACORE_LEDGER_SIGN=1` is switched on. This DIP
-  does not claim tamper-proof approvals; it claims accidental-side-effect
-  prevention, which is the failure mode that actually motivated it
-  (an agent's ungated action slipping out with no human ever having seen the
-  declared effects), not a defense against a malicious insider or a
-  compromised process.
+- **See TRUST BOUNDARY above.** Cooperative application checks, signature
+  verification and independent OS/credential isolation are separate guarantees.
+  Enabling signing alone does not provide the latter.
 - **Fail-closed on malformed policy or malformed effects.** A present-but-
   broken `approvals_policy.yaml` raises `PolicyError` listing every problem
   found (never just the first), rather than silently falling back to
@@ -606,11 +594,9 @@ are new functions with no prior callers to break.
   — it authorizes exactly one creation, closing an otherwise-obvious replay
   vector for anyone who can read the ledger (which, per DIP-0034, is not
   itself access-controlled).
-- **Not an authorization system beyond item creation.** This gate answers "may
-  this side-effecting item come into existence" — it says nothing about who
-  may later `claim` or `complete` it, which remains ungated per `act`'s
-  design (see Rationale). Broader authorization, if ever needed, is future
-  work layered on top, not something this DIP retrofits.
+- **Covered authorization surface.** Creation, content updates and claims
+  enforce the checks above. This does not establish an independent security
+  boundary around arbitrary tools or processes outside those interfaces.
 
 ## Implementation
 
@@ -715,11 +701,12 @@ prevent literal re-creation of the same item id.
    type, or an admin override explicitly scoped to clear (not merely attempt
    to overwrite) a dismissed status with its own audit trail — does not exist
    in the current event vocabulary and is not designed by this DIP. Recorded
-   here rather than built now, consistent with `act`'s dismiss path being
-   deliberately ungated at the current trust level: revisit at the earlier
-   of (a) an observed accidental dismissal in practice, or (b) the same
-   signing-rollout trigger (`ENG-2026-0729-030`) that upgrades the trust
-   boundary elsewhere in this DIP.
+   here as deferred behavior. The current `act` dismissal path applies
+   ownership/arbitration checks; it is not an ungated operation. Designing an
+   explicit correction or replacement link remains separate from signing:
+   enabling signatures does not provide undo or protect a shared OS identity.
+   Revisit this recovery design before offering an undo action or claiming
+   that a dismissed item can be restored under the same identifier.
 
 ## References
 
@@ -748,3 +735,53 @@ prevent literal re-creation of the same item id.
   Question 3 reuses rather than re-derives).
 - `ENG-2026-0729-030` — signing opt-in amendment (the ruling this DIP's
   TRUST BOUNDARY section is a direct consequence of).
+
+## Authority configuration — proposed clarification (2026-09-12)
+
+Configuration used to select approval authority, principal limits or tool
+effects must have unambiguous string-key mappings. Duplicate keys at any depth
+and non-string keys are invalid; readers must not choose the last value.
+Malformed principal-limit blocks cannot become empty limits. Integer protocol
+and limit fields exclude booleans. Diagnostics identify the failing rule
+without reproducing rejected configuration values.
+
+A principal registry binds each canonical writer to at most one principal,
+including direct principal names, writer aliases and supported run suffixes.
+Principal names are canonical lowercase identities; writer aliases use the
+same normalization as lookup. An invalid or ambiguous registry cannot be
+treated as an empty valid registry. When execution context requires a registry
+lookup, missing or failed lookup must refuse the tool call; it cannot select
+an `unknown` or actor-named policy as a fallback. Explicitly supplied trusted
+execution context remains subject to its deployment's independent boundary.
+
+The low-level ledger policy's documented default for a genuinely absent policy
+is retained. A dangling policy reference is a read failure, not intentional
+absence. Execution-policy and allocation consumers that require configured
+authority continue to require it. These rules do not authenticate a writable
+configuration file or isolate processes sharing its OS identity.
+
+| Field | Record |
+|---|---|
+| Previous requirement | Present malformed policy must fail closed, but ambiguity, YAML coercion, registry membership conflicts and failed-context fallback were unspecified. |
+| Problem | Duplicate mappings could replace constraints or approvers; malformed limits became empty limits; multiple principal memberships depended on mapping order; identity read failure could select another policy. |
+| Corrected requirement | Unique typed configuration, unique canonical writer membership and explicit refusal of failed required identity resolution, with sanitized diagnostics. |
+| Reason | Parsing and lookup failures cannot create or enlarge execution authority. |
+| Implementation impact | Shared strict YAML loader in policy/effects/principal/allocation readers, validated limits and memberships, fail-closed tool context construction. |
+| Compatibility impact | Existing valid mappings and unambiguous YAML aliases remain supported; incomplete or ambiguous authority configuration must be repaired. No data or ledger rewrite. |
+| Tests affected | Duplicate/nested mappings, false/null/list limits, boolean integer fields, conflicting writer aliases, missing/invalid registry fallback, safe diagnostic text, explicit fixtures and shipped registry template. |
+| Runtime/deployment impact | Validate installed policy and private registry using the actual interpreter and execution identity before activation; qualify negative tool decisions and valid writer aliases. |
+| Status | Proposed; candidate code and tests do not certify active deployment. |
+
+## Normative change record — 2026-09-11 audit
+
+| Previous requirement | Problem | Corrected requirement | Implementation / tests | Compatibility / deployment |
+| --- | --- | --- | --- | --- |
+| Creation-only approval; item-ID-only grants | Approved content could change, and imported updates bypassed the original decision | Bind complete resulting content and revalidate at update/claim | `ledger.policy`, shared `ledger.edits.update_payload`, executor startup; policy/adversarial/replicated-edit tests | Legacy ID-only grants require a new content-bound grant; existing complete-content hash format is preserved |
+| Signing alone turns process trust into an independent cryptographic boundary | Same-identity processes may possess keys or change policy/registry | Verify signatures and separately protect keys, registry, policy and consuming interfaces when independent authority is required | Signed-grant rejection tests; deployment-specific isolation tests required | No assertion that enabling a flag installs OS isolation; cooperative single-owner scope remains explicit |
+| Ungated grant and lifecycle interfaces | Writer/claim authority and changed content were not checked | Guarded approver and lifecycle interfaces, content-bound claims and explicit conflict reconciliation | `briefing.actions`, `ledger.policy`, `executors.base` and their regressions | Direct log append remains a storage/import primitive; callers requiring enforcement must use the covered interfaces |
+| A local singular gate implied sufficient execution safety | Separate hosts may admit work concurrently | Local serialization is scoped to one host; exclusive effects need independent execution/commit authority | Local concurrency tests; cross-host deployment verification is separate | Does not introduce a lease, distributed lock or fencing promise |
+
+These corrections retain the historical motivation and the original ratification
+note. Phase 6 integration and other explicitly deferred features remain future
+work. The audit changes are subject to the repository's normal review process;
+the status of unrelated Draft DIPs is not changed by this amendment.
