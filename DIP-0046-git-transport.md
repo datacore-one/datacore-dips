@@ -1183,3 +1183,81 @@ changes to files the transaction actually modified still require reconciliation.
 | Compatibility impact | Event bytes and historical chains are unchanged. Unsafe truncated/divergent log publication and ambiguous acknowledgement now refuse; retained state requires reconciliation. Explicit local-only mode remains a separate contract. |
 | Tests affected | Configured matching refs/tags/submodules, stale log truncation, failed fetch, rejecting hooks, branch/actor changes, event removal, forked chains, failed flush and idempotent receipt retry. |
 | Runtime/deployment impact | Active publishers and admission paths require matching code and verification. Candidate test success is not active deployment evidence; required independent isolation and cross-host ownership remain separate work. |
+
+## Node-class amendment — 2026-09-21
+
+This amendment adds a distinction the transport always implied and never stated;
+**Status remains Draft**. It does not change event bytes, hash chains, the
+merge-never-rebase rule, or any host's authorship. Ratification is the owner's.
+
+**Why.** §1–§13 describe how facts move between hosts and treat every host
+alike. They are not alike. Four hosts are promised to be up. The fifth is a
+laptop: it arrives when a person opens the lid, contributes while they work and
+leaves without notice. Monitoring applied server deadlines to it anyway, and for
+a month each detector grew its own exemption for the lid — awake-time ages
+(2026-09-16), a dark-wake hold (09-17), launchd in place of cron (09-09), a
+publisher grace moved to the right clock (09-21). Four patches approximating one
+missing rule. The roster already said *"a workstation is not a degraded
+server"*; this makes that sentence normative.
+
+### 14. Residents and visitors
+
+A node is a **resident** if its presence is promised and a **visitor** if it is
+not. The axis is not human-versus-agent — agents write from a laptop all day —
+but whether the node can be relied on to be there.
+
+| | Resident | Visitor |
+|---|---|---|
+| Presence | promised | not promised; a closed lid is a **leave**, not a failure |
+| May carry | network duties with clock-based contracts | only what is about itself (`scope: local`), or a duty pinned by a stated constraint (`scope: pinned` + `unpin_when`) |
+| Clock | wall clock | awake time, for every freshness bound |
+| Alarms | per contract | exactly one — see §15 |
+| Authorship | its own writer log | its own writer log |
+
+The last row is the one that must not erode. **A resident may relay and observe a
+visitor; it never writes on a visitor's behalf.** Every system this design
+resembles draws the same line — a Scuttlebutt pub replicates feeds it cannot
+sign, a light client signs the transactions a full node relays — and DIP-0044
+is that line here. The git remotes are already the always-on rendezvous, so no
+transport proxy is needed; a resident acting as *steward* can read how far a
+visitor's log has replicated from the remote alone, without reaching it.
+
+`left` versus `failed` is the distinction SWIM, Cassandra and Consul all draw. A
+visitor that has left is not alerted on; only duties assigned to a node can be
+late, and a visitor is assigned none with a deadline.
+
+### 15. The join protocol
+
+A visitor converges on arrival — anti-entropy on rejoin, as a Dynamo or
+Cassandra replica does. Each writer's `seq` is monotonic, so the map
+(writer → highest seq) is a version vector and the §8 drain metric is already a
+version-vector diff.
+
+1. **Measure divergence in both directions, before syncing.** The order is
+   normative. The drain metric exists to catch a machine holding work nobody
+   else can see; measured after a sync it is always zero, which deletes the
+   detector while keeping its alert.
+2. **Converge**: fetch, merge (never rebase), publish, ingest, regenerate
+   projections — the ordinary cycle, under its own lock.
+3. **Measure again.**
+4. **Write one record, atomically, only if the join converged**:
+   `{joined_at, ahead_by, behind_by, converged, blocked}`.
+
+A join is due on a **full** wake, on retry after a join that did not converge,
+and every four waking hours while present. A DarkWake is not an arrival.
+
+**The one alarm.** Because only a converged join rewrites the record, its age in
+awake time *is* "how long this node has been present without converging". A
+failed join on a train writes nothing over the last good record and alerts
+nobody; eight waking hours without convergence is an incident — human input at
+risk — and is reported on those grounds and no others.
+
+| Change record | Detail |
+|---|---|
+| Previous requirement | §8 ran the drain metric on every host on a wall-clock schedule with a wall-clock grace. |
+| Problem | On a host that sleeps, elapsed time is not time the publisher could run. An event written before the lid shut read as a ten-hour gap next morning; publishing by hand cleared it until the next night, so it was "fixed" repeatedly and stayed broken. |
+| Corrected requirement | Hosts are classed (§14). A visitor's drain metric is taken at join, before convergence (§15), and its only alarm is non-convergence in awake time. |
+| Implementation impact | `jobs.awake.node_class`, `visitor_join.py`, a cycle lock, `scope:` on manifest jobs, and a test refusing an unscoped job on a visitor. Network duties moved to residents after each was run on its target host. |
+| Compatibility impact | None to events, chains or authorship. An undeclared machine is a resident, so no existing contract changed behaviour. |
+| Known debt | Three duties remain `pinned` to the visitor: fleet config polling (needs operator ssh trust — to be inverted so each host attests its own config), and two checks needing a complete module replica. |
+| Tests affected | `test_visitor_nodes`, `test_visitor_join`, `test_seq_gap` (sleep both excuses and does not excuse), `test_phase1_cycle_safety` (live and stale lock). |
