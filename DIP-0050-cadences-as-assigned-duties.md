@@ -496,7 +496,25 @@ Closed on 2026-09-23: see the appendix. Still open:
 >   `--adopt plur-daily-x-memory-mon=cadence-plur-cmo-x-post` and a
 >   `cadence-migration.yaml` for the other six. X posts move from a
 >   different time each weekday to 06:33 UTC daily.
-> - **Miles is staged.** 23 templates with evidence (18 new, 5 given
+> - **Promotion, later on 2026-09-23.** The owner promoted Miles and
+>   Winston the same day.
+>   - **Miles:** 23 cron lines, registrations pushed in three spaces. A
+>     run under cron's bare environment reached claude-code and recorded
+>     `quota` (plan window spent until 18:40 UTC).
+>   - **Winston:** two cadence lines. `cos-server-setup` now retires the
+>     old direct lines rather than reinstalling them, and the scripts keep
+>     their own logs, which the morning check reads.
+>   - **Data:** the owner's credits were never the problem. `agent exec`
+>     reads provider credentials from the environment, a drained API key,
+>     while the Gateway's Codex-harness agent uses the stored login. The
+>     `openclaw-gateway` executor runs one Gateway turn per run. Data then
+>     posted through his own scheduler. The judge failed the record on a
+>     200-byte floor that a real 184-byte record missed. That third strike
+>     tripped the job as designed. The floor is fixed, and
+>     `--rearm-only` records the fix without posting twice.
+>   - **Proof:** `cadence_watch.py` waits for each principal's next
+>     self-scheduled run.
+> - **Miles was staged before promotion.** 23 templates with evidence (18 new, 5 given
 >   evidence), none asking an agent to log its own run. The heartbeat now
 >   skips any cadence in its owner's signed registration. `--check` on
 >   nightshift plans 23 creates, and the wrapper dry-run resolves claude-code
