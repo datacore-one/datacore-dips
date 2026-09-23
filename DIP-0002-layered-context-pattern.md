@@ -80,7 +80,6 @@ The composed `[NAME].md` is:
 Each layer can:
 - **Add sections** - New headers are appended
 - **Extend sections** - Content under same header is concatenated
-- **Override values** - Specific key-value patterns can be overwritten
 
 Merge utility: `.datacore/lib/context_merge.py`
 

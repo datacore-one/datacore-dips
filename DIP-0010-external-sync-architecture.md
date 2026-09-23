@@ -146,7 +146,7 @@ class OrgTask(OrgEntry):
 
 # Calendar-specific (calendar.org)
 class OrgCalendarEntry(OrgEntry):
-    timestamp: datetime  # <2025-12-10 Tue 10:00-11:00>
+    timestamp: datetime  # <2025-12-10 Wed 10:00-11:00>
     end_time: Optional[datetime]
     repeater: Optional[str]  # +1w, +1m, etc.
     location: Optional[str]
@@ -300,13 +300,13 @@ Tasks are linked via properties in org-mode and metadata in external tools.
 ```org
 *** TODO Review Dubai pilot proposal
 :PROPERTIES:
-:CREATED: [2025-12-04 Wed]
+:CREATED: [2025-12-04 Thu]
 :EXTERNAL_ID: github:datacore-one/datafund-space#42
 :EXTERNAL_URL: [[https://github.com/datacore-one/datafund-space/issues/42][datafund-space#42]]
 :SYNC_STATUS: synced
-:SYNC_UPDATED: [2025-12-04 Wed 14:30]
+:SYNC_UPDATED: [2025-12-04 Thu 14:30]
 :END:
-DEADLINE: <2025-12-04 Wed>
+DEADLINE: <2025-12-04 Thu>
 ```
 
 Note: `:EXTERNAL_URL:` uses org-mode link format `[[url][description]]` so it's clickable for users who access org-mode directly.
@@ -602,7 +602,7 @@ sync:
 **Status:** ✅ Complete (2025-12-09)
 
 **Deliverables:**
-- [x] Conflict detection logic (`ConflictDetector`)
+- [x] Conflict detection logic (`ConflictDetector`) — removed 2026-09-23: it was two-way and would reopen human-closed issues; the three-way spec `resolve3` in `.datacore/specs/datacore-lean/DatacoreSpec/Reconcile.lean` is the rule to build to
 - [x] Resolution strategies implementation (org_wins, external_wins, merge, ask)
 - [x] Conflict queue in `/today` briefing
 - [x] Sync history logging (completed in Phase 1)
@@ -612,8 +612,7 @@ sync:
 - `.datacore/lib/sync/conflict.py` - Full conflict resolution module:
   - `ConflictType` enum (state, title, description, priority, deadline, labels, comments)
   - `ConflictStrategy` enum (org_wins, external_wins, merge, ask)
-  - `ConflictDetector` - Detects conflicts between org and external tasks
-  - `ConflictResolver` - Resolves conflicts using configured strategies
+  - ~~`ConflictDetector`~~, ~~`ConflictResolver`~~ — removed 2026-09-23 until the sync engine exists (see Phase 2 note)
   - `ConflictQueue` - SQLite-backed queue for unresolved conflicts
   - CLI interface for conflict management
 
@@ -648,9 +647,9 @@ Calendar entries are org-mode entries with timestamps:
   :PROPERTIES:
   :EXTERNAL_ID: calendar:primary/abc123
   :SYNC_STATUS: synced
-  :SYNC_UPDATED: [2025-12-09 Mon 10:00]
+  :SYNC_UPDATED: [2025-12-09 Tue 10:00]
   :END:
-  <2025-12-10 Tue 10:00-11:00>
+  <2025-12-10 Wed 10:00-11:00>
   Discuss Series A terms
   - Attendees: John, Sarah
   - Location: Zoom
@@ -659,10 +658,10 @@ Calendar entries are org-mode entries with timestamps:
   :PROPERTIES:
   :EXTERNAL_ID: calendar:primary/def456
   :END:
-  <2025-12-09 Mon 09:00-09:30 +1w>
+  <2025-12-09 Tue 09:00-09:30 +1w>
 
 * Doctor appointment
-  <2025-12-12 Thu 14:00>
+  <2025-12-12 Fri 14:00>
 ```
 
 **Key differences from tasks:**

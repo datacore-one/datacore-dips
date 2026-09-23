@@ -375,7 +375,7 @@ human triage pass) · `PROJECT`→`TODO` · `ACTIVE`→`NEXT` · `COMPLETED`→`
 - `NEXT` → `TODO`, `WAITING`, `REVIEW`, `DONE`, `DEFERRED`, `CANCELLED`
 - `WAITING` → `TODO`, `NEXT`, `REVIEW`, `DONE`, `DEFERRED`, `CANCELLED`
 - `REVIEW` → `DONE`, `NEXT` (rework), `DEFERRED`, `CANCELLED` — owner only
-- `DEFERRED` → `TODO` (wake: past-due `SCHEDULED:`, lane back on, or human)
+- `DEFERRED` → `TODO` (wake: past-due `SCHEDULED:`, lane back on, or human), `CANCELLED` (drop a benched task without waking it; owner decision 2026-09-23)
 - `DONE`, `CANCELLED` → terminal (`FAILED` no longer exists; `DEFERRED` is
   closed but wakeable, i.e. done-class, non-terminal — the FAILED-in-v1.1
   parser pattern)
