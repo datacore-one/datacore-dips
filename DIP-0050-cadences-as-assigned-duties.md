@@ -236,6 +236,23 @@ Closed on 2026-09-23: see the appendix. Still open:
 
 ### P1 — ownership visible, nothing red that is not real
 
+> **Progress 2026-09-23 — ventures half done.**
+> - Items 1 and 2: `owner_of`, `all_assignments` and `cadences_owned_by` are
+>   in; the runner and heartbeat call sites are moved (ventures `ca4c1be`).
+> - The explicit `defaults: {agent: miles, defaulted: true}` is written in
+>   datafund, datacore, fds, forge, plur and megaphone. Firm's roles now name
+>   their owners with `agent:` (cos winston, coo miles, cio tris, comms data).
+> - Miles's set is proven identical under the old and new rules: 41 cadences
+>   across the eight files, checked on the mac and on nightshift.
+> - `venture_doctor` fails an unowned cadence, or one owned by a
+>   non-principal.
+> - Also fixed along the way: a spent plan window read as `capture_error`
+>   (ventures `494c2a5`).
+> - **Waiting for the parallel core-lib session:** items 3–8 (space
+>   declarations, liveness states, view→shard migration, Winston's duties,
+>   the `owns` readers, names), and the deletion of `SELF_AGENTS`, which core's
+>   `cadence_liveness.py` still uses through `own_cadences`.
+
 1. `owner_of(venture, role)`: `role.agent`, then `defaults.agent`, then an
    **error**. P1 writes `defaults: {agent: miles, defaulted: true}` into the
    enabled ventures Miles's host holds. `defaulted: true` is the marker the
