@@ -212,7 +212,7 @@ round-2 finding 1.
 
 Closed on 2026-09-23: see the appendix. Still open:
 1. **Winston's scope.** Recommended: `firm:cos` only (O7).
-2. **Daily run ceiling per host: an absolute number the owner sets**,
+2. **Daily run ceiling per host: an absolute number the owner sets** (accepted by the owner 2026-09-23: nightshift 18, hermes 3, plur-claw and the box set at their rollout step),
    changed only at promotion sign-offs. It never tracks the load
    (critic r3-2).
    - The load is computed by `cadence_load.py` (ventures `c66fc7a`), never
@@ -229,7 +229,7 @@ Closed on 2026-09-23: see the appendix. Still open:
      the cadences. Until then their ceiling is **unset**, and `cadence_run`
      refuses any run on a host with an unset ceiling. No ceiling is typed
      (popper r4-1, r5-2).
-3. **Rollout promotion.** Recommended: when a step's soak is green, Winston
+3. **Rollout promotion** (accepted by the owner 2026-09-23). Recommended: when a step's soak is green, Winston
    proposes promotion on a decision board, and the owner's yes starts the
    next step (O-r2-5).
 4. Takeover N and stand-ins: P3 only.
