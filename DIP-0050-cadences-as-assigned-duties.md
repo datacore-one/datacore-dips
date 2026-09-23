@@ -496,10 +496,25 @@ Closed on 2026-09-23: see the appendix. Still open:
 >   `--adopt plur-daily-x-memory-mon=cadence-plur-cmo-x-post` and a
 >   `cadence-migration.yaml` for the other six. X posts move from a
 >   different time each weekday to 06:33 UTC daily.
-> - **Winston is open.** Pinned to today's times with `cadence_times`. His
->   duties are scripts, not prompts, and their outputs are outside the firm
->   space: the briefing goes to the personal journal, the others to logs.
->   Evidence across spaces needs a rule before his step.
+> - **Miles is staged.** 23 templates with evidence (18 new, 5 given
+>   evidence), none asking an agent to log its own run. The heartbeat now
+>   skips any cadence in its owner's signed registration. `--check` on
+>   nightshift plans 23 creates, and the wrapper dry-run resolves claude-code
+>   in the Meridian space. Promotion follows the Tris soak (from
+>   2026-09-23): set the ceiling (18 is already set), then `sync --apply`.
+>   Many Meridian reports are weeks old (trade-reconciliation last ran
+>   07-14), which the old prose cadence log hid. Signed evidence will show it.
+> - **Winston is staged** (owner decision 2026-09-23: judge the real
+>   artifact).
+>   - His cadences are `briefing` and `weekly-plan`, which are script
+>     templates (`script:`) whose evidence names the personal space
+>     (`evidence.space`).
+>   - The wrapper commits the validated artifact where it lives, and
+>     liveness verifies it there.
+>   - verify-daily and scoreboard stay box job contracts.
+>   - `--check` on the box plans 2 creates.
+>   - Promotion: set a ceiling of 3, `sync --apply`, and retire the two old
+>     crontab lines in the same step.
 
 Before a principal's adapter goes live, the P1.5 fixtures are re-run against
 the real adapter in dry-run (`--check` against a scratch job, then removed)
