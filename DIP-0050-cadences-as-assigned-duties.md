@@ -1,9 +1,15 @@
 # DIP-0050: Cadences as assigned duties, executed by their owners
 
-- **Status:** Draft (owner ratifies)
-- **Created:** 2026-09-22
-- **Depends on:** DIP-0034/0046 (per-writer ledger and cadence shards), DIP-0044 (principals, authorship), DIP-0035 (job contracts)
-- **Supersedes in part:** the single-executor behaviour of `venture-heartbeat.service`
+| Field | Value |
+|-------|-------|
+| **DIP** | 0050 |
+| **Title** | Cadences as assigned duties, executed by their owners |
+| **Author** | Datacore Team |
+| **Type** | Architecture |
+| **Status** | Draft (owner ratifies) |
+| **Created** | 2026-09-22 |
+| **Depends on** | DIP-0034/0046 (per-writer ledger and cadence shards), DIP-0044 (principals, authorship), DIP-0035 (job contracts) |
+| **Supersedes in part** | the single-executor behaviour of `venture-heartbeat.service` |
 
 ## The problem, measured on 2026-09-22
 
