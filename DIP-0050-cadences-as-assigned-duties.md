@@ -465,6 +465,35 @@ Closed on 2026-09-23: see the appendix. Still open:
 
 ### P2b — rollout, one principal at a time, promoted by the owner
 
+> **Status 2026-09-23.**
+> - **Tris is live.** Three Hermes cron jobs run `cadence_run` from
+>   `~/.datacore/v50`, deployed by `cadence_deploy.py`. The first real run
+>   was `blocked` because hermes had none of core's policy config, so the
+>   tool policy failed closed; the config is now followed. The rerun
+>   finished `ok` with its artifact's sha256 matching the copy in git.
+>   Liveness read the cadences as unregistered until the wrapper started
+>   committing and pushing its own event log after the end event; an agent's
+>   commit can never carry that event. All three are now green from signed
+>   records. The Tris soak starts today. The first unaided wrapper runs are
+>   geo-research on 09-24 and geo-sov-scan on Thursday.
+> - **Data is ready but not promoted.** Done so far:
+>   - the OpenClaw adapter;
+>   - the `x-post` and `blog-post` templates, each judged by a committed
+>     record carrying the live URL;
+>   - policy config on plur-claw;
+>   - the v50 deploy;
+>   - `--check` against the real gateway: two creates, the nine existing
+>     automations untouched.
+>
+>   At promotion: set Data's ceiling (3), then sync with
+>   `--adopt plur-daily-x-memory-mon=cadence-plur-cmo-x-post` and a
+>   `cadence-migration.yaml` for the other six. X posts move from a
+>   different time each weekday to 06:33 UTC daily.
+> - **Winston is open.** Pinned to today's times with `cadence_times`. His
+>   duties are scripts, not prompts, and their outputs are outside the firm
+>   space: the briefing goes to the personal journal, the others to logs.
+>   Evidence across spaces needs a rule before his step.
+
 Before a principal's adapter goes live, the P1.5 fixtures are re-run against
 the real adapter in dry-run (`--check` against a scratch job, then removed)
 (P-r2-5). Soak: one full period of the longest frequency owned, capped at
