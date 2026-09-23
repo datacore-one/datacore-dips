@@ -204,7 +204,7 @@ the owner → **P2c** retire the old executor → **P1.5b** reassignment safety 
 
 ## Implementation plan v6 (2026-09-23, after audit round 5)
 
-Answers `DIP-0050-audit-2026-09-23.md` rounds 1-5. The tags are the
+Answers `audits/DIP-0050-audit-2026-09-23.md` rounds 1-5. The tags are the
 findings each item answers. Round-2 tags carry `r2`: C-r2 1 is the critic's
 round-2 finding 1.
 
