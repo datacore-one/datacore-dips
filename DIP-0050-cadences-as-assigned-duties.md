@@ -476,7 +476,14 @@ Closed on 2026-09-23: see the appendix. Still open:
 >   commit can never carry that event. All three are now green from signed
 >   records. The Tris soak starts today. The first unaided wrapper runs are
 >   geo-research on 09-24 and geo-sov-scan on Thursday.
-> - **Data is ready but not promoted.** Done so far:
+> - **Data was promoted by the owner on 2026-09-23 (ahead of Miles: a
+>   different host and scheduler).** The two cadence automations are live,
+>   and the seven `plur-daily-x-memory-*` automations are disabled rather
+>   than adopted, so they can be restored. The first run, fired through the
+>   gateway, failed because Data's only model (`openai/gpt-6-astra`, no
+>   fallback) is out of provider credits. That run was counted as a failure
+>   strike; out-of-credits text now counts as `quota`. It is the owner's
+>   action: add credits or give Data another model. Preparation, all done:
 >   - the OpenClaw adapter;
 >   - the `x-post` and `blog-post` templates, each judged by a committed
 >     record carrying the live URL;
@@ -485,7 +492,7 @@ Closed on 2026-09-23: see the appendix. Still open:
 >   - `--check` against the real gateway: two creates, the nine existing
 >     automations untouched.
 >
->   At promotion: set Data's ceiling (3), then sync with
+>   Planned at promotion (superseded above): set Data's ceiling (3), sync with
 >   `--adopt plur-daily-x-memory-mon=cadence-plur-cmo-x-post` and a
 >   `cadence-migration.yaml` for the other six. X posts move from a
 >   different time each weekday to 06:33 UTC daily.
