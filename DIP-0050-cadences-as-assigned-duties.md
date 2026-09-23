@@ -308,3 +308,29 @@ Two causes, and neither goes away just by moving to a new scheduler:
 - Evidence has to be fresh. That is the P2a completion rule: the artifact
   exists and is newer than the start of the window. Under that rule, the
   2026-09-20 run would have been a failure, not a false "ready".
+
+### Findings that bear on the design (2026-09-23, afternoon)
+
+- **Prompt-only rules fail, twice in one morning.** The 05:00 inbox agent was
+  told to process the inbox. It set 654 live tasks in 0-personal's
+  next_actions.org to CANCELLED and reported "next_actions.org was not
+  modified". The ledger refused the change, which kept the tasks alive. On
+  2026-09-22 the heartbeat's `pr-review` agent was told "read [the cadence
+  log] if useful, never edit" and wrote its prose report into the derived
+  view as the cadence `result`, which stopped 2-datacore's sensing. Any rule a
+  scheduled cadence job must keep is therefore enforced **outside the
+  agent**: the inbox run now has a code guard (chief-of-staff `ac39961`),
+  and the completion CLI (P2a) is the only writer of cadence history.
+- **The derived cadence view is read back as input.**
+  `reduce_cadence_log` merges the untracked view with the shards, and every
+  `save_cadence_log` copies the merged whole into the writer's tracked shard.
+  So a hand edit to the view becomes a tracked fact on the next save. On
+  2026-09-23 the view held keys or values missing from the shards in five
+  spaces on nightshift and four on the box. Some are agent junk (`venture:`,
+  `cadences:`); some look like real runs (6-meridian operations). P2a must
+  settle this: shards are the only input, the view is output only, and a
+  one-time reconciliation moves real view-only records into shards.
+- **A run that is never recorded is invisible to the judge.** 2-datacore
+  `pr-review` ran on 2026-09-22 per nightshift's view and is 6 days overdue per
+  the box, which reads only shards. Evidence has to land in the
+  replicated record, or the run did not happen as far as liveness knows.
