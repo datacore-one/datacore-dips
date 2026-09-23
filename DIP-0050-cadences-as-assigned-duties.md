@@ -134,3 +134,177 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
    layout on those hosts, and the daily firing window per host (the
    stagger the reconciler uses).
 4. For phase 3: N missed windows before takeover, and who may stand in.
+
+## Implementation plan (2026-09-23)
+
+### What the live state adds to the draft
+
+Measured 2026-09-23 across the eight venture.yaml files:
+
+- **62 cadences in enabled ventures** (19 daily, 27 weekly, 13 monthly, 3
+  sub-daily bot loops that are never registered). 38 have no
+  `agent:` and default to Miles, 21 name `nightshift` (6-meridian), 3 name
+  `tris`. That is about 23
+  agent runs a day, all of them going through one `claude -p` tick that picks
+  one cadence per tick.
+- **Assigned roles with nothing to do, and duties with no role.**
+  principals.yaml gives 8-firm cos/coo/cio/comms to Winston, Miles, Tris and
+  Data, but 8-firm declares no cadences. 5-plur cmo→data declares none
+  either. 6-meridian quant_researcher (`agent: nightshift`) appears in no
+  principal's `owns.roles`. The two files already disagree. They have to
+  become one fact, not two facts kept in step.
+- **The model already exists by hand, uncounted.** Tris's Hermes cron runs
+  `geo-research-tris` daily at 06:00 and reports `ok`. That is the 5-plur
+  cio `geo-research` cadence, running in the owner's own scheduler, and
+  liveness does not see it. OpenClaw on plur-claw already runs cron
+  automations with a `Declaration` column (`heartbeat:main`). That column is
+  a natural ownership key for reconciled jobs.
+- **Completion is tied to nightshift.** `cadence_completion.record_completion`
+  accepts only an approved nightshift org task
+  (`NIGHTSHIFT_STATUS`, `NIGHTSHIFT_OUTPUT`). A Hermes or OpenClaw job has no
+  such task, so it has no way to record a completion. That gap blocks
+  phase 2, not a detail to leave for later.
+
+### Work items, in order
+
+**P0 — owner decisions (below), plus one simplification.**
+`principals.yaml: owns.roles` stops being maintained by hand. It is
+derived from venture.yaml `role.agent`, and the registry holds only who a
+principal is and where it runs. That removes the agreement test the draft
+proposed, because nothing is left to disagree.
+
+**P1 — ownership is total and visible** (core + ventures, one session)
+1. `cadence_engine.owner_of(role, venture)` resolves `role.agent`, then
+   the venture's `defaults.agent`, then `miles`. Aliases are normalised
+   (`nightshift`/`heartbeat` → `miles`); `human` means a person owns it,
+   so it is never scheduled and is reported as a reminder.
+   `venture_doctor` rejects an agent that is not a principal.
+2. `SELF_AGENTS` is deleted. `own_cadences(overdue, roles, actor)` keeps
+   only this actor's cadences.
+3. `cadence_liveness.py` counts every assigned cadence and names owner and
+   state for each: `not-registered`, `registered-not-run`, or `late`.
+- DONE_WHEN: box liveness lists 5-plur cio's cadences with owner `tris`.
+  A test assigns a role to an unknown agent and venture_doctor fails.
+- MUST NOT: change which cadences Miles executes. The heartbeat's
+  behaviour is unchanged in P1.
+
+**P2a — the shared pieces** (ventures module, one session)
+1. `cadence_schedule.py plan --actor X` builds the desired job set from
+   venture.yaml:
+   - name `cadence:<venture>:<role>:<cadence>`
+   - a cron expression from the frequency: daily `M H * * *`, weekly
+     `M H * * D`, monthly `M H d * *`, quarterly `M H d 1,4,7,10 *`
+   - minute, hour and day are hashed from the name inside the host's
+     window, so the result is deterministic and staggered
+   - the prompt
+   - the venture.yaml commit it came from
+2. The prompt builder is extracted from `venture_heartbeat.build_agent_prompt`
+   and narrowed to one cadence (role, template, boundary, budget). It ends
+   with the completion command.
+3. **Completion evidence without nightshift.** `cadence_completion record
+   --venture --role --cadence --output <path-in-space> --run-id <scheduler run>`
+   writes the actor's shard. It requires the artifact to exist inside the
+   space, to be non-empty, and to be newer than the window's start. The
+   nightshift-task path stays as a second evidence kind. Liveness
+   re-verifies the artifact from git on the box, so the actor reports and
+   the box judges.
+4. Reconciler `cadence_schedule_sync.py --actor X --scheduler S
+   [--apply|--check]`. The default is dry-run. `--check` exits non-zero on
+   drift. It touches only jobs whose name (or OpenClaw declaration) starts
+   with `cadence:`, and never a hand-made job. It writes
+   `cadence-log/registrations/<actor>.yaml` next to the completion shards,
+   so it replicates the same way.
+- DONE_WHEN: `plan` output for Miles equals today's set of 56 non-continuous
+  Miles cadences. `sync --check` against an empty fake scheduler reports
+  every one of them missing, and after `--apply` it reports none.
+
+**P2b — rollout, one principal at a time, each soaked 3 days green**
+1. **Tris / hermes (first: small and already half-true).**
+   - The Hermes adapter goes through the hermes CLI in its venv, or holds
+     a file lock that the ticker honours. It never does a blind write to
+     jobs.json while the ticker runs, which a spike checks first.
+   - The existing `geo-research-tris` job is adopted, renamed to the
+     cadence name, and not duplicated.
+   - Precondition: hermes holds 5-plur under its canonical name.
+   - Contract: `hermes-cadence-registration` (sync --check).
+2. **Miles / nightshift (the bulk, and the real change).**
+   - About 56 cadences move from the heartbeat's pick-one tick into
+     nightshift's scheduler.
+   - While both paths exist, the heartbeat executes only cadences that
+     are *not* in Miles's registration record, so no cadence runs twice.
+     Once all are registered, the heartbeat keeps only sense-and-escalate.
+   - Runs are serialised by a flock so one host's jobs never stack.
+   - The window spans the day. The fleet's Claude plan window is shared,
+     and spreading the load matters more than timing.
+3. **Data / plur-claw.** Cadences: the daily X post (today seven hand-made
+   OpenClaw automations, `plur-daily-x-memory-<weekday>`, adopted and not
+   duplicated), plus a **daily** blog post (canonical) with a dev.to
+   mirror (owner, 2026-09-23; replaces the 2026-07-29 "2-3/week" drip).
+   The 07-29 publish policy is unchanged: evergreen posts publish after
+   the automated fact-check, and comparison-class posts wait for cos-approval. The adapter
+   drives `openclaw cron add/edit/rm` and keys ownership on the
+   `Declaration` column.
+4. **Winston / box.** Cadence: the Sunday weekly plan, plus the four box
+   duties that `principals.yaml: owns.cadences` lists today (briefing,
+   verify-daily, liveness, scoreboard). They move into venture.yaml
+   (firm:cos), so there is one place for cadences. The adapter is
+   `cron_install.py` managed entries.
+
+**P2c — retire the old path.** The execution branch of
+`venture_heartbeat` and `cadence_runner.py` are removed. `cadence_runner.py`
+turns org tasks into nightshift work, a second executor that nothing wires
+today.
+
+**P3 — takeover.** Later, behind the owner's N and stand-in decisions.
+
+### Whole-upgrade DONE_WHEN (machine-checkable)
+
+- For 7 consecutive days box liveness reports 0 cadences in
+  `not-registered` or `late`, and every completion is attributed to its
+  owner with a verified artifact.
+- **Induced failure:** `venture-heartbeat.service` is stopped on nightshift
+  for a day. Tris's cadences still complete, and Miles's scheduled cadences
+  still complete, because the heartbeat no longer executes anything.
+
+### Owner decisions, 2026-09-23
+
+1. **Every principal gets its cadences. Rollout goes one principal at a
+   time**: Tris, then Miles, then Data, then Winston.
+2. **No folder numbers.** `5-plur` and `8-firm` are one machine's layout. A
+   venture is named by `venture.yaml: name` (`plur`, `firm`, `fds`) in job
+   names, in `principals.yaml` role references (`firm:cos`, not
+   `8-firm:cos`) and in `members.yaml`. Each host resolves name → local path
+   with `venture_discovery`, which already scans for venture.yaml. That
+   dissolves the "canonical layout on hermes/plur-claw" precondition: a host
+   needs a checkout of the space repo, under any directory name. Known
+   offenders to fix in P1: `3-fds/venture.yaml space: 3-fds`,
+   `members.yaml space: <N-name>`, and every `N-name:role` in
+   principals.yaml.
+3. **Reassignment comes after execution.** Roles keep their current owners
+   (unassigned → Miles) until every principal executes cadences. Then the
+   existing cadences are analysed and reassigned.
+4. **Clean slate.** Every 1-datafund and 3-fds cadence was parked on
+   2026-09-23 (datafund c06b5fb, fds 35418d9). None had run since
+   2026-08-19 and 2026-09-04 respectively. The list, with the last run
+   recorded for each, is kept as comments in each venture.yaml, so they
+   come back one by one.
+
+### Winston's weekly plan: why it does not start reliably (measured 2026-09-23)
+
+`cos_weekly_plan.sh` (box cron, Sunday 07:00) runs `claude -p "/weekly-plan …"`.
+On the box, Claude Code does not know the command, because it lives in
+`modules/chief-of-staff/commands/` and is not in `~/Data/.claude/commands`.
+The log records `Unknown command: /weekly-plan` on 2026-09-16 and on
+2026-09-20. `claude` exits 0 anyway. The script's artifact check then asks
+whether *any* `fragments/*/weekly-plan.json` exists. The 2026-09-16 fragment
+does, so on 2026-09-20 the script logged "draft written" and sent "Weekly plan
+draft ready for review" over a plan that was four days old. The scheduler
+started the job reliably; the job ran nothing, and the check was fooled.
+
+Two causes, and neither goes away just by moving to a new scheduler:
+- The command has to resolve on the host that runs it. The cadence prompt
+  builder therefore inlines the command body, and does not depend on a
+  slash-command lookup.
+- Evidence has to be fresh. That is the P2a completion rule: the artifact
+  exists and is newer than the start of the window. Under that rule, the
+  2026-09-20 run would have been a failure, not a false "ready".
