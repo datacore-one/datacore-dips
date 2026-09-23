@@ -211,7 +211,7 @@ round-2 finding 1.
 ### P0 — decisions (owner)
 
 Closed on 2026-09-23: see the appendix. Still open:
-1. **Winston's scope.** Recommended: `firm:cos` only (O7).
+1. **Winston's scope** (decided by the owner 2026-09-23): Winston's recurring cadences are `firm:cos` only (briefing, verify-daily, scoreboard, weekly plan). He keeps every other chief-of-staff function: editing cadences and assignments, coordination, delegation, merge gatekeeping, approvals, escalation, and ad-hoc tasks. He owns no venture role's cadences, because he judges and reports on them (O7).
 2. **Daily run ceiling per host: an absolute number the owner sets** (accepted by the owner 2026-09-23: nightshift 18, hermes 3, plur-claw and the box set at their rollout step),
    changed only at promotion sign-offs. It never tracks the load
    (critic r3-2).
