@@ -74,14 +74,19 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
     new key when none exists (`ledger/keys.py` `ensure_keypair`), so the
     wrapper checks **before** opening the log that the actor's local key
     exists and matches its proven entry in `principals.yaml verify_keys`, and
-    refuses otherwise. Key material is versioned like the wrapper: a rotation
-    reaches one principal, soaks one period, then the rest (taleb r4-1, cto r4-2)
+    refuses otherwise. Key material is versioned like the wrapper: a
+    **scheduled rotation** reaches one principal, soaks one period, then the
+    rest. An **emergency revocation** (a leaked key) is the opposite: it is
+    fleet-wide and immediate, sets `paused: all`, and each host resumes only
+    once its new key is proven in `verify_keys` (taleb r4-1, r5-1; cto r4-2)
   - the agent is invoked through the existing headless executors
     (`executors/hermes.py`, `executors/openclaw.py`, `claude -p`)
-  - the git step runs under the host's repo lock. **`git_fleet_sync.py` has
-    no runtime lock today** (only a static `--hold` list). A P1.5 work item
-    makes it acquire the same lock (`ledger_transport._repo_lock`) and skip a
-    repo that `cadence_run` holds. A push is retried with backoff; a push that
+  - the git step runs under the host's repo lock,
+    `ledger_transport._repo_lock`. `git_fleet_sync.py` taking that lock
+    exists **only as an uncommitted change on the mac** (concurrent work,
+    2026-09-23, `git_fleet_sync.py:398-416`, which reports `BUSY` and retries
+    next run). It is committed on no host and deployed on none. P1.5 depends
+    on it landing and being deployed everywhere (critic r5-1). A push is retried with backoff; a push that
     still fails is `blocked`, never a strike (cto r4-1, critic r4-1)
   - `cadence_run` is **version-pinned per host**. A change to it rolls to one
     principal, soaks one full period, and only then reaches the others, the
@@ -103,16 +108,22 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
   **Channel:** Telegram through the existing `cos_alert.sh`, plus an entry on
   the owner's decision board. Every escalation is also written as a ledger
   event (`item.create` through autofix). **Delivery is verified**: a
-  decision-board entry unacknowledged after 12h is sent again by email
-  through the mail module, which does not depend on Telegram (taleb r4-2).
+  decision-board entry unacknowledged after 12h becomes a GitHub issue on the
+  datacore repo, **opened from nightshift, not the box**. The owner gets
+  GitHub's own notification email. That shares no host, bot token or sender
+  with the Telegram path, which the box sends (taleb r4-2, r5-2).
   **Two repair tracks** (data r4-2):
-  - *Execution repair* covers `late`, `blocked`, and decayed
-    `quota-exhausted`. The owner's agent gets a repair task, which may rerun
-    `cadence_run`.
+  - Only **red** states escalate. Amber states (`blocked`,
+    `quota-exhausted`) escalate only once they decay to `late` (data r5-1).
+  - *Execution repair* covers `late`. The owner's agent gets a repair task,
+    which may rerun `cadence_run`.
   - *Coordination repair* covers `not-held`, `double`, `not-registered`,
     `conflict` and `tripped`. The owner's reconciler, or the owner, gets a
     repair task. It **never reruns** the cadence, because a rerun of a
-    `double` is a third run.
+    `double` is a third run. One exception: after the cause of a `tripped`
+    job is fixed (a template or venture.yaml change, or `--rearm`), a single
+    probe run is allowed. It cannot double-run, because a second registration
+    would show as `double`, which has higher precedence (data r5-2).
 - **Winston** edits cadences and coordinates, and executes only `firm:cos`.
 - **Takeover (phase 3, later):** only while the owner's host is up and has
   missed N windows, with a cooldown.
@@ -129,7 +140,7 @@ cadence has exactly one.
 | 3 | `not-held` | red | the owner's host does not declare the space |
 | 4 | `pending-rollout` | grey, **red after 14 days** | the owner's host has no registration record yet |
 | 5 | `double` | grey for 2h after an `assignment_seq` bump, **red otherwise from t=0** | registered by two actors |
-| 6 | `not-registered` | grey for 2h after an `assignment_seq` bump, red otherwise | the owner's host registered, but not this cadence |
+| 6 | `not-registered` | grey for 2h after the commit that assigned or added the cadence (an `assignment_seq` bump, or a new cadence in venture.yaml), red otherwise | the owner's host registered, but not this cadence |
 | 7 | `quota-exhausted` | amber, **one line per host** | the last run hit the usage limit |
 | 8 | `tripped` | red | three runs without valid evidence; the job is disabled |
 | 9 | `conflict` | red | the history could not be merged; repair task |
@@ -163,8 +174,14 @@ the owner → **P2c** retire the old executor → **P1.5b** reassignment safety 
   Tris 3, Miles the computed list (23 today), Data 2, Winston 1. At about 20
   minutes per template with its schema, Miles's list is about 8 hours (2
   sessions), and the others together 1 session. The decision board shows
-  "templates X/Y" as a promotion gate (coo r4-1). The worst case stays about 5
-  weeks: the soaks dominate
+  "templates X/Y" as a promotion gate (coo r4-1).
+- **Sum** (coo r5-1):
+  - build: 2 + 2 + 3 = 7 sessions to the first rollout, about 1.5 weeks at one
+    session a day
+  - rollout: soaks of 7 + 7 + 1 + 7 = 22 days. Miles's 2 template sessions
+    and the 1 session for the others fall inside the Tris and Miles soaks
+  - P1.5b is 1 session after that
+  - total: about 1.5 weeks + 3.1 weeks + 1 day, roughly 5 weeks
 - soaks: Tris 7 days (weekly geo-sov-scan), Miles 7, Data 1 (daily only),
   Winston 7
 - worst case about 5 weeks from P0 sign-off, published and re-dated at
@@ -185,9 +202,9 @@ the owner → **P2c** retire the old executor → **P1.5b** reassignment safety 
 5. No trusted literals: every count is computed at check time, and the
    budget comes from a stated formula.
 
-## Implementation plan v5 (2026-09-23, after audit round 4)
+## Implementation plan v6 (2026-09-23, after audit round 5)
 
-Answers `DIP-0050-audit-2026-09-23.md` rounds 1-4. The tags are the
+Answers `DIP-0050-audit-2026-09-23.md` rounds 1-5. The tags are the
 findings each item answers. Round-2 tags carry `r2`: C-r2 1 is the critic's
 round-2 finding 1.
 
@@ -209,7 +226,9 @@ Closed on 2026-09-23: see the appendix. Still open:
      nightshift 18 (Miles 12.2 once P1 writes the default) and hermes 3
      (Tris 2.1). plur-claw and the box have no cadences in venture.yaml yet,
      so their ceilings are printed at their rollout step, once that step adds
-     the cadences. No ceiling is typed (popper r4-1).
+     the cadences. Until then their ceiling is **unset**, and `cadence_run`
+     refuses any run on a host with an unset ceiling. No ceiling is typed
+     (popper r4-1, r5-2).
 3. **Rollout promotion.** Recommended: when a step's soak is green, Winston
    proposes promotion on a decision board, and the owner's yes starts the
    next step (O-r2-5).
@@ -322,8 +341,13 @@ Closed on 2026-09-23: see the appendix. Still open:
     missing key refuses the run; an unknown event kind is rejected
   - a push failure is `blocked`, not a strike; `blocked` past the window
     plus grace is `late`
-  - the **real** `git_fleet_sync.py`, not a stub, skips a repo while
-    `cadence_run` holds its lock, in a two-process test
+  - the **real** `git_fleet_sync.py`, not a stub, reports `BUSY` and leaves
+    the repo untouched while another process holds `_repo_lock`. The holder
+    in P1.5 is a minimal process taking the same primitive; the same test
+    repeats in P2a with `cadence_run` as the holder (critic r5-2)
+  - a cadence newly added to an existing role is grey `not-registered` for
+    2h, then red (popper r5-1)
+  - a run on a host with an unset ceiling is refused
   - a missing local key, or one that does not match `verify_keys`, refuses
     the run before any event is written, and no new key is minted
   - a continuous-class cadence cannot be registered or run
