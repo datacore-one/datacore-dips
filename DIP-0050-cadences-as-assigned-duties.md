@@ -236,22 +236,40 @@ Closed on 2026-09-23: see the appendix. Still open:
 
 ### P1 — ownership visible, nothing red that is not real
 
-> **Progress 2026-09-23 — ventures half done.**
-> - Items 1 and 2: `owner_of`, `all_assignments` and `cadences_owned_by` are
->   in; the runner and heartbeat call sites are moved (ventures `ca4c1be`).
-> - The explicit `defaults: {agent: miles, defaulted: true}` is written in
->   datafund, datacore, fds, forge, plur and megaphone. Firm's roles now name
->   their owners with `agent:` (cos winston, coo miles, cio tris, comms data).
-> - Miles's set is proven identical under the old and new rules: 41 cadences
->   across the eight files, checked on the mac and on nightshift.
-> - `venture_doctor` fails an unowned cadence, or one owned by a
->   non-principal.
+> **Status 2026-09-23: P1 done**, except item 3 on hermes, which moves to the
+> P2b-Tris preconditions.
+> - **Items 1–2:** `owner_of`, `all_assignments` and `cadences_owned_by`, with
+>   explicit `defaults.agent` in six ventures. Firm names owners with
+>   `agent:`. Miles's set is proven unchanged (41 cadences). `SELF_AGENTS`,
+>   `is_external_agent` and `own_cadences` are removed. Ventures `ca4c1be`,
+>   `0c08a37`.
+> - **Item 4:** liveness gives every cadence one state, keyed by venture
+>   name: red is late, not-held (via the replicated `members.yaml`),
+>   unowned or unreadable; grey is reminder or pending-rollout. Core
+>   `05876bb`. The box shows `0 overdue`, with Tris's three and Winston's four
+>   cadences grey.
+> - **Item 5:** real view-only runs were migrated (2-datacore `e6ceb054`, 6-meridian
+>   `8308a90e`; tool ventures `7becca7`). Once a space has shards, the view is
+>   output only (ventures `c41000b`). Deviation: the prose normaliser stays,
+>   because shards already hold prose copied from the view.
+> - **Item 6:** Winston's cadences (briefing, verify-daily, scoreboard,
+>   weekly-plan) are in firm `cos` (firm `23a5f1c`). Liveness is not a cadence.
+> - **Item 7:** nothing read `principals.yaml owns`. It is removed, and
+>   `principals_check` refuses it (core `05cd49b`).
+> - **Item 8:** members.yaml `space:` and fds's venture `space:` use names.
+>   The ledger's item payload `space` still carries folder names. That is the
+>   ledger's own identity, out of scope here, and noted.
+> - **Item 3 → P2b-Tris precondition:**
+>   - plur-claw discovers its three spaces.
+>   - hermes discovers firm **twice** (`3-firm`, plus `4-firm`, a symlink to it),
+>     and holds Tris's own `tris-space` as `3-plur`.
+>   - Before the reconciler runs on hermes, the symlink goes, or discovery
+>     refuses it, so Tris's firm cadences register once.
+>   - hermes's system Python lacks pydantic, so the reconciler runs under the
+>     Hermes venv.
 > - Also fixed along the way: a spent plan window read as `capture_error`
 >   (ventures `494c2a5`).
-> - **Waiting for the parallel core-lib session:** items 3–8 (space
->   declarations, liveness states, view→shard migration, Winston's duties,
->   the `owns` readers, names), and the deletion of `SELF_AGENTS`, which core's
->   `cadence_liveness.py` still uses through `own_cadences`.
+> - The heartbeat's 14:26 tick: "2 ventures active, 2 idle, 0 failed".
 
 1. `owner_of(venture, role)`: `role.agent`, then `defaults.agent`, then an
    **error**. P1 writes `defaults: {agent: miles, defaulted: true}` into the
