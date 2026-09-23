@@ -70,13 +70,19 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
   Mechanics, each a P1.5 work item:
   - the two event kinds are added to the closed ledger vocabulary
     (`ledger/events.py` EVENT_TYPES), with fold and policy handlers
-  - events are written with `sign=True`; the wrapper refuses to start
-    without key material (signing is opt-in by default, `ledger/log.py`)
+  - events are written with `sign=True`. `EventLog` would silently mint a
+    new key when none exists (`ledger/keys.py` `ensure_keypair`), so the
+    wrapper checks **before** opening the log that the actor's local key
+    exists and matches its proven entry in `principals.yaml verify_keys`, and
+    refuses otherwise. Key material is versioned like the wrapper: a rotation
+    reaches one principal, soaks one period, then the rest (taleb r4-1, cto r4-2)
   - the agent is invoked through the existing headless executors
     (`executors/hermes.py`, `executors/openclaw.py`, `claude -p`)
-  - the git step runs under the host's repo lock, which `git_fleet_sync`
-    honours by skipping a locked repo; a push is retried with backoff, and a
-    push that still fails is `blocked`, never a strike
+  - the git step runs under the host's repo lock. **`git_fleet_sync.py` has
+    no runtime lock today** (only a static `--hold` list). A P1.5 work item
+    makes it acquire the same lock (`ledger_transport._repo_lock`) and skip a
+    repo that `cadence_run` holds. A push is retried with backoff; a push that
+    still fails is `blocked`, never a strike (cto r4-1, critic r4-1)
   - `cadence_run` is **version-pinned per host**. A change to it rolls to one
     principal, soaks one full period, and only then reaches the others, the
     same rule as a new adapter.
@@ -96,7 +102,17 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
   the owner and bypasses Winston. `tripped` escalates the same way.
   **Channel:** Telegram through the existing `cos_alert.sh`, plus an entry on
   the owner's decision board. Every escalation is also written as a ledger
-  event, which is the DONE_WHEN artifact.
+  event (`item.create` through autofix). **Delivery is verified**: a
+  decision-board entry unacknowledged after 12h is sent again by email
+  through the mail module, which does not depend on Telegram (taleb r4-2).
+  **Two repair tracks** (data r4-2):
+  - *Execution repair* covers `late`, `blocked`, and decayed
+    `quota-exhausted`. The owner's agent gets a repair task, which may rerun
+    `cadence_run`.
+  - *Coordination repair* covers `not-held`, `double`, `not-registered`,
+    `conflict` and `tripped`. The owner's reconciler, or the owner, gets a
+    repair task. It **never reruns** the cadence, because a rerun of a
+    `double` is a third run.
 - **Winston** edits cadences and coordinates, and executes only `firm:cos`.
 - **Takeover (phase 3, later):** only while the owner's host is up and has
   missed N windows, with a cooldown.
@@ -112,8 +128,8 @@ cadence has exactly one.
 | 2 | `reminder` | grey | human-owned; never scheduled |
 | 3 | `not-held` | red | the owner's host does not declare the space |
 | 4 | `pending-rollout` | grey, **red after 14 days** | the owner's host has no registration record yet |
-| 5 | `double` | red | registered by two actors (red after 48h of the old host being unreachable) |
-| 6 | `not-registered` | red | the owner's host registered, but not this cadence |
+| 5 | `double` | grey for 2h after an `assignment_seq` bump, **red otherwise from t=0** | registered by two actors |
+| 6 | `not-registered` | grey for 2h after an `assignment_seq` bump, red otherwise | the owner's host registered, but not this cadence |
 | 7 | `quota-exhausted` | amber, **one line per host** | the last run hit the usage limit |
 | 8 | `tripped` | red | three runs without valid evidence; the job is disabled |
 | 9 | `conflict` | red | the history could not be merged; repair task |
@@ -144,8 +160,11 @@ the owner → **P2c** retire the old executor → **P1.5b** reassignment safety 
 **Calendar estimate:**
 - build: P1 2 sessions, P1.5 2, P2a 3, P1.5b 1 (before reassignment)
 - templates and evidence schemas, authored per principal before its step:
-  Tris 3, Miles the computed list (23 today), Data 2, Winston 1. The
-  decision board shows "templates X/Y" as a promotion gate
+  Tris 3, Miles the computed list (23 today), Data 2, Winston 1. At about 20
+  minutes per template with its schema, Miles's list is about 8 hours (2
+  sessions), and the others together 1 session. The decision board shows
+  "templates X/Y" as a promotion gate (coo r4-1). The worst case stays about 5
+  weeks: the soaks dominate
 - soaks: Tris 7 days (weekly geo-sov-scan), Miles 7, Data 1 (daily only),
   Winston 7
 - worst case about 5 weeks from P0 sign-off, published and re-dated at
@@ -166,9 +185,9 @@ the owner → **P2c** retire the old executor → **P1.5b** reassignment safety 
 5. No trusted literals: every count is computed at check time, and the
    budget comes from a stated formula.
 
-## Implementation plan v4 (2026-09-23, after audit round 3)
+## Implementation plan v5 (2026-09-23, after audit round 4)
 
-Answers `DIP-0050-audit-2026-09-23.md` rounds 1-3. The tags are the
+Answers `DIP-0050-audit-2026-09-23.md` rounds 1-4. The tags are the
 findings each item answers. Round-2 tags carry `r2`: C-r2 1 is the critic's
 round-2 finding 1.
 
@@ -185,7 +204,12 @@ Closed on 2026-09-23: see the appendix. Still open:
    - Computed on 2026-09-23: Miles 8.9 runs/day, Tris 2.1, and roles with no
      owner yet 3.3. P1 makes those Miles's, which brings Miles to 12.2. Data
      adds 2 with the posting cadences. The fleet total is 14.3.
-   - Recommended ceilings: nightshift 18, hermes 5, plur-claw 5, box 5.
+   - **Rule, printed by the script**: ceiling = max(3, ceil(1.4 × load)).
+     `cadence_load.py --assume-default miles` (ventures `e9bdcc4`) prints
+     nightshift 18 (Miles 12.2 once P1 writes the default) and hermes 3
+     (Tris 2.1). plur-claw and the box have no cadences in venture.yaml yet,
+     so their ceilings are printed at their rollout step, once that step adds
+     the cadences. No ceiling is typed (popper r4-1).
 3. **Rollout promotion.** Recommended: when a step's soak is green, Winston
    proposes promotion on a decision board, and the owner's yes starts the
    next step (O-r2-5).
@@ -298,7 +322,10 @@ Closed on 2026-09-23: see the appendix. Still open:
     missing key refuses the run; an unknown event kind is rejected
   - a push failure is `blocked`, not a strike; `blocked` past the window
     plus grace is `late`
-  - `git_fleet_sync` skips a repo while `cadence_run` holds its lock
+  - the **real** `git_fleet_sync.py`, not a stub, skips a repo while
+    `cadence_run` holds its lock, in a two-process test
+  - a missing local key, or one that does not match `verify_keys`, refuses
+    the run before any event is written, and no new key is minted
   - a continuous-class cadence cannot be registered or run
   - the shadow state is logged during a pause and reported on unpause
 - MUST NOT: write a live scheduler.
@@ -314,15 +341,19 @@ Closed on 2026-09-23: see the appendix. Still open:
 3. **A gap is bounded.** The old host removes its job when it sees the
    higher `assignment_seq`. If the new owner has not registered within 2h,
    the old host re-enables the job and the cadence is `double` rather than
-   orphaned (taleb r3-2). A `double` past 48h with the old host unreachable
-   alerts the owner.
+   orphaned (taleb r3-2). **A `double` past 48h with the old host
+   unreachable is resolved automatically**: the owner named by the highest
+   `assignment_seq` records a ledger claim, and the old host removes its job
+   when it returns and reads the claim. The owner is told, and is not asked
+   to act (taleb r4-3).
 4. **Schema versions** on registration records, run events and shards;
    readers refuse an unknown major version (T10, deferred here from P1.5 per
    coo r3-3).
 - DONE_WHEN (fixtures, each run twice): reassignment by `assignment_seq`
   out of commit order leaves one owner; a new owner that never registers
-  gives `double` within 2h, not a silent gap; the 48h unreachable case
-  alerts (popper r3-2).
+  gives `double` within 2h, not a silent gap; a `double` is grey at 1h59m and
+  red at 2h01m after a bump, and red at once without a bump (popper r4-2);
+  the 48h unreachable case ends with a claim and one owner.
 
 ### P2a — wrapper, planner, evidence
 
