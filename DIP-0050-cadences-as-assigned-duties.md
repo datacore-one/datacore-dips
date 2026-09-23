@@ -137,6 +137,12 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
 
 ## Implementation plan (2026-09-23)
 
+> **Status: revise.** Six evaluators audited this plan on 2026-09-23 and all six
+> said revise; see `DIP-0050-audit-2026-09-23.md`. The synthesis there adds a
+> P1.5 (safety rails) and corrects one claim below: `venture_discovery`
+> does **not** adopt undeclared directories, so each host needs a space
+> declaration per held space.
+
 ### What the live state adds to the draft
 
 Measured 2026-09-23 across the eight venture.yaml files:
