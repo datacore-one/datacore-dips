@@ -67,6 +67,19 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
 
   The run record is therefore ours, not the scheduler's, and not the agent's.
   Spikes S1 and S2 confirm that each scheduler can run a command (P1.5).
+  Mechanics, each a P1.5 work item:
+  - the two event kinds are added to the closed ledger vocabulary
+    (`ledger/events.py` EVENT_TYPES), with fold and policy handlers
+  - events are written with `sign=True`; the wrapper refuses to start
+    without key material (signing is opt-in by default, `ledger/log.py`)
+  - the agent is invoked through the existing headless executors
+    (`executors/hermes.py`, `executors/openclaw.py`, `claude -p`)
+  - the git step runs under the host's repo lock, which `git_fleet_sync`
+    honours by skipping a locked repo; a push is retried with backoff, and a
+    push that still fails is `blocked`, never a strike
+  - `cadence_run` is **version-pinned per host**. A change to it rolls to one
+    principal, soaks one full period, and only then reaches the others, the
+    same rule as a new adapter.
 - **A reconciler per host** (`cadence_schedule_sync.py`, from the host's
   heartbeat timer) turns venture.yaml into scheduler jobs. It refuses rather
   than guesses (P1.5).
@@ -80,7 +93,10 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
   becomes a repair task for its owner. The owner is told when the repair
   gives up (3 failed attempts, or 24 hours without a green run, whichever
   comes first). A red on one of **Winston's own** cadences goes straight to
-  the owner and bypasses Winston.
+  the owner and bypasses Winston. `tripped` escalates the same way.
+  **Channel:** Telegram through the existing `cos_alert.sh`, plus an entry on
+  the owner's decision board. Every escalation is also written as a ledger
+  event, which is the DONE_WHEN artifact.
 - **Winston** edits cadences and coordinates, and executes only `firm:cos`.
 - **Takeover (phase 3, later):** only while the owner's host is up and has
   missed N windows, with a cooldown.
@@ -109,15 +125,27 @@ cadence has exactly one.
 Windows: daily 24h, weekly 7d, monthly the calendar month, each with a grace
 of a quarter of the window. "Red" means the contract turns red.
 
+Two rules keep a grey or amber state from hiding a missed duty:
+- **Amber decays.** `quota-exhausted` and `blocked` become `late` once the
+  window plus grace passes without a verified run. A capacity crunch cannot
+  pass as "green" for more than one window.
+- **Pause keeps a shadow.** While `paused`, liveness still computes the
+  state the cadence *would* have and logs it. On unpause it reports what was
+  broken and for how long. A pause longer than 7 days reminds the owner
+  daily.
+
 ## Phases (summary)
 
 P0 decisions → **P1** ownership visible, nothing red that is not real →
-**P1.5** safety rails and spikes, fixtures only → **P2a** wrapper, planner,
+**P1.5** write-gating rails and spikes, fixtures only → **P2a** wrapper, planner,
 evidence → **P2b** rollout Tris → Miles → Data → Winston, each promoted by
-the owner → **P2c** retire the old executor → **P3** takeover.
+the owner → **P2c** retire the old executor → **P1.5b** reassignment safety → reassignment → **P3** takeover.
 
 **Calendar estimate:**
-- build: P1 2 sessions, P1.5 2, P2a 3
+- build: P1 2 sessions, P1.5 2, P2a 3, P1.5b 1 (before reassignment)
+- templates and evidence schemas, authored per principal before its step:
+  Tris 3, Miles the computed list (23 today), Data 2, Winston 1. The
+  decision board shows "templates X/Y" as a promotion gate
 - soaks: Tris 7 days (weekly geo-sov-scan), Miles 7, Data 1 (daily only),
   Winston 7
 - worst case about 5 weeks from P0 sign-off, published and re-dated at
@@ -138,9 +166,9 @@ the owner → **P2c** retire the old executor → **P3** takeover.
 5. No trusted literals: every count is computed at check time, and the
    budget comes from a stated formula.
 
-## Implementation plan v3 (2026-09-23, after audit round 2)
+## Implementation plan v4 (2026-09-23, after audit round 3)
 
-Answers `DIP-0050-audit-2026-09-23.md` rounds 1 and 2. The tags are the
+Answers `DIP-0050-audit-2026-09-23.md` rounds 1-3. The tags are the
 findings each item answers. Round-2 tags carry `r2`: C-r2 1 is the critic's
 round-2 finding 1.
 
@@ -148,15 +176,16 @@ round-2 finding 1.
 
 Closed on 2026-09-23: see the appendix. Still open:
 1. **Winston's scope.** Recommended: `firm:cos` only (O7).
-2. **Daily run ceiling per host.**
-   - Formula: runs/day = Σdaily + Σweekly/7 + Σmonthly/30. Continuous
-     classes (`every_15min`, `every_4h`) are bot loops, not agent runs, so
-     they are excluded.
-   - Today, for the enabled ventures: 13 + 8/7 + 5/30 ≈ 14.3, all Miles's.
-     Data adds 2, Tris about 2.1.
-   - Recommended ceiling: 1.4 × the host's computed load, rounded up, which
-     is 21 for nightshift today. It is recomputed at every registration
-     (P-r2-8).
+2. **Daily run ceiling per host: an absolute number the owner sets**,
+   changed only at promotion sign-offs. It never tracks the load
+   (critic r3-2).
+   - The load is computed by `cadence_load.py` (ventures `c66fc7a`), never
+     typed. Formula: daily + weekly/7 + monthly/30. Continuous classes are
+     excluded, and a P1.5 fixture proves they never reach `cadence_run`.
+   - Computed on 2026-09-23: Miles 8.9 runs/day, Tris 2.1, and roles with no
+     owner yet 3.3. P1 makes those Miles's, which brings Miles to 12.2. Data
+     adds 2 with the posting cadences. The fleet total is 14.3.
+   - Recommended ceilings: nightshift 18, hermes 5, plur-claw 5, box 5.
 3. **Rollout promotion.** Recommended: when a step's soak is green, Winston
    proposes promotion on a decision board, and the owner's yes starts the
    next step (O-r2-5).
@@ -213,7 +242,8 @@ Closed on 2026-09-23: see the appendix. Still open:
      the ticker honour?
    - **S2, OpenClaw (Data):** can an automation run a command? Does the
      `Declaration` field round-trip the slug? What are the disable and next-run
-     reads? (C-r2-3, C7)
+     reads? What serialises reconciler writes against OpenClaw's own
+     scheduler? (C-r2-3, C7, critic r3-1)
    - **S3, nightshift scheduler and box cron:** confirm the command form and
      the next-fire read.
 
@@ -227,12 +257,9 @@ Closed on 2026-09-23: see the appendix. Still open:
    (not the core fork) at a clean tree whose HEAD is an ancestor-or-equal of
    the space's `origin/main`. `venture_doctor --strict` must pass (R1).
    Otherwise refuse, exit 2, write nothing.
-4. **Ordering for handoff.** The authorising commit is compared by
-   first-parent position on the **space repo's** `origin/main`, which is
-   linear. Agent hosts run forks of the core repo, not of space repos, so
-   this ordering is defined on every host (D-r2-3). A host removes its job
-   before a newer commit's new owner registers. A `double` for more than
-   48 hours with the old host unreachable alerts the owner (R-r2-8).
+4. **Handoff ordering: moved to P1.5b.** No role changes owner before the
+   reassignment phase (owner decision 3). The rollout moves execution, not
+   ownership, so P1.5 does not need it.
 5. **Blast bound**: removing more than max(2, 25%) needs either a committed
    `cadence-migration.yaml` naming exactly the slugs expected to move (the
    planned path, e.g. Miles's handoff), or `--allow-mass-removal` (the
@@ -257,8 +284,6 @@ Closed on 2026-09-23: see the appendix. Still open:
     records it (grey, one line). Quota exhaustion is one root-cause line.
 11. `--check` exit code is the registration contract. It also compares each
     job's next-fire time, read from the scheduler, with the plan (P-r2-3).
-12. **Schema versions** on registration records, run events and shards.
-    Readers refuse an unknown major version (T10).
 - DONE_WHEN, one fixture per rail, and each **run twice**, with containment
   made deterministic by the host lock (P-r2-6):
   - a truncated or invalid venture.yaml: refused, zero writes
@@ -269,7 +294,35 @@ Closed on 2026-09-23: see the appendix. Still open:
   - three evidence-less runs: tripped
   - three quota runs: not tripped
   - a slug collision: refused
+  - an event written by `cadence_run` carries a non-empty signature; a
+    missing key refuses the run; an unknown event kind is rejected
+  - a push failure is `blocked`, not a strike; `blocked` past the window
+    plus grace is `late`
+  - `git_fleet_sync` skips a repo while `cadence_run` holds its lock
+  - a continuous-class cadence cannot be registered or run
+  - the shadow state is logged during a pause and reported on unpause
 - MUST NOT: write a live scheduler.
+
+### P1.5b — reassignment safety (before the reassignment phase of owner decision 3)
+
+1. **`assignment_seq`**: a monotonic integer per role in venture.yaml.
+   `venture_doctor` requires it to increase whenever `agent` changes. Hosts
+   order handoffs by it, not by commit position, because `git_fleet_sync`
+   lands commits out of decision order (data r3-2).
+2. **An ownership edit is pushed synchronously** by whoever makes it,
+   bypassing the sweep.
+3. **A gap is bounded.** The old host removes its job when it sees the
+   higher `assignment_seq`. If the new owner has not registered within 2h,
+   the old host re-enables the job and the cadence is `double` rather than
+   orphaned (taleb r3-2). A `double` past 48h with the old host unreachable
+   alerts the owner.
+4. **Schema versions** on registration records, run events and shards;
+   readers refuse an unknown major version (T10, deferred here from P1.5 per
+   coo r3-3).
+- DONE_WHEN (fixtures, each run twice): reassignment by `assignment_seq`
+  out of commit order leaves one owner; a new owner that never registers
+  gives `double` within 2h, not a silent gap; the 48h unreachable case
+  alerts (popper r3-2).
 
 ### P2a — wrapper, planner, evidence
 
