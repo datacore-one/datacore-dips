@@ -16,6 +16,17 @@
 | **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate. Non-functional without it: the per-writer pool, the `hlc` field and its ordering guarantee, `fold()`'s left-to-right reduction semantics, and the `policy.set`/`EVENT_TYPES` schema this DIP reuses without modification. |
 | **Relates to** | [DIP-0038](DIP-0038-action-loop-cosign.md) (the other consumer of `policy.set`; this DIP proposes the same payload-discriminator pattern DIP-0038 uses nowhere but that DIP-0034 already established for `metric.attest`), [DIP-0043](DIP-0043-org-projection.md) (drafted alongside this DIP; its genesis import is the first workload likely to exercise the `late` flag in practice), `ENG-2026-0729-016` (the original "do NOT build a blockchain now" owner direction this DIP stays inside the spirit of — see Owner Decision), `.datacore/dip-review/DESIGN-BRIEF-v2.1.md` §B/§C (binding design brief, conversation ratified 2026-08-03/04 — authoritative wording where this DIP and the brief must agree) |
 
+
+> **Published 2026-10-04 as Draft** (ledger upgrade Phase 3, audit A#13). This
+> text was written in August 2026 and is published as it stood, so that the
+> code's citations of DIP-0042 resolve. Part of it is built since: the
+> `ledger.seal` event, the sequencer role and settlement readers live in
+> `.datacore/lib/ledger/seal.py` and `ledger_seal.py`; only the designated
+> sequencer's seals count, and there is no default sequencer (each install
+> declares one, or nothing is sealed). Blocks, snapshots and archives are not
+> built. What the code does today is stated in
+> [DIP-0034](DIP-0034-event-ledger-substrate.md), "Normative current state".
+
 ## Summary
 
 Answers the standing question "canonical ledger, or fold on the fly?" as

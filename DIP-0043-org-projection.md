@@ -17,6 +17,17 @@
 | **Amends (deferred, not in this PR)** | [DIP-0034](DIP-0034-event-ledger-substrate.md)'s Source-of-Truth Boundary (Summary / head of Specification) and Open Question 1, which both name "its own ratified DIP" as the prerequisite for any org-mode migration onto the ledger. This DIP is that prerequisite DIP. Per this drafting wave's rule, DIP-0034's file itself is not edited here — ratifying DIP-0043 requires a small follow-up edit to DIP-0034's boundary statement, tracked as a to-do in Implementation, not performed by this document. |
 | **Relates to** | [DIP-0009](DIP-0009-gtd-specification.md) (GTD Specification — owns the org state vocabulary, Rich Task Standard, and file model this DIP projects), [DIP-0010](DIP-0010-external-sync-architecture.md) (External Sync Architecture — owns the "org-mode is the coordination layer / source of truth" claim this DIP proposes to retire for GTD tasks specifically), [DIP-0011](DIP-0011-nightshift-module.md) (Nightshift Module — its executor's direct writes to task files are the sharpest compatibility conflict this DIP creates, see Compatibility), `ENG-2026-0727-004` (duplicate resurrection / ID-conflict churn), `ENG-2026-0423-001` (git-lock silent failure) |
 
+
+> **Published 2026-10-04 as Draft** (ledger upgrade Phase 3, audit A#13, B-F10).
+> This text was written in August 2026 and is published as it stood, so that
+> the code's citations of DIP-0043 resolve. Since then: a space is in Phase 1
+> when its tracked `.datacore/ledger-phase` reads `1` (`ledger_project_org.py`,
+> `ledger_ingest_org.py`); rollback is `ledger_phase1_flip.py --space <s>
+> --reverse --apply`. The `phase1-active` marker in `ledger/phase1.py` is read
+> by no live code. A profile A install (people only, ledger and verify) uses
+> no projection at all. What the code does today is stated in
+> [DIP-0034](DIP-0034-event-ledger-substrate.md), "Normative current state".
+
 ## Summary
 
 DIP-0034 built an append-only, hash-chained, per-writer event ledger and then explicitly excluded GTD tasks from it, leaving org-mode files as the multi-writer mutable state they always were. This DIP finishes the job DIP-0034 started: it defines a schema for projecting `item.*` ledger events onto org-mode task files, a genesis import that folds the *existing* corpus of active org tasks into the ledger without discarding their identity, and a three-phase migration (shadow projection → read-only generated file with a refuse-to-overwrite guard → org-edit reconciler) that gets from today's hand-edited `next_actions.org` to a generated one without a flag-day cutover or an unverified leap of faith. `inbox.org` is exempt throughout — it stays the single, frictionless, append-only capture surface it already is.
@@ -672,8 +683,8 @@ jots) that have no `:ID:` yet — not a replacement for the existing
 ### Designated inbox processor
 
 Owner decision, folded into this DIP: **inbox processing gets a single
-designated processor per space, and for `0-personal`, Winston (the box) is
-it.** Four points, then the trade-off this decision is not free of.
+designated processor per space, and for the personal space, the always-on
+chief-of-staff host is it.** Four points, then the trade-off this decision is not free of.
 
 1. **Ownership is enforced as data, not convention.** A `policy.set` event
    (DIP-0034's existing event type — its only current consumer is DIP-0038's
@@ -723,7 +734,7 @@ it.** Four points, then the trade-off this decision is not free of.
    this needs its own [DIP-0035](DIP-0035-job-contracts.md) job contract
    (a manifest entry whose freshness check is "does the oldest unprocessed
    `inbox.org` entry's timestamp exceed N hours," alerting through the same
-   `winston_send.py`/`cos_alert.sh` primitives `cos_inbox.sh` already calls
+   alert primitives the chief-of-staff inbox job already calls
    for its own delivery-failure case, not a new alert channel invented for
    this). The failure mode this is designed against is named explicitly:
    **silent backlog** — the same "Complete! 0 tasks, 0 errors,
@@ -731,7 +742,7 @@ it.** Four points, then the trade-off this decision is not free of.
    here applied to capture instead of task claiming.
 4. **Human override is always permitted.** The designation binds
    **automated** actors only — the owner can process the inbox in-session,
-   interactively, at any time, whether or not Winston's scheduled run has
+   interactively, at any time, whether or not the designated processor's scheduled run has
    or hasn't happened. An overlap (a human runs `/process-inbox` manually
    moments before the box's timer also fires) is possible and is rendered
    harmless by the same idempotent content-hash keying named in point 2, not

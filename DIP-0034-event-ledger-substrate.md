@@ -217,6 +217,83 @@ foreign agents joining the ledger, or an external/enterprise audit-trail
 requirement — not a default. `keys.py` (Ed25519 keypairs, sign/verify, public
 registry) is built and tested but dormant until that trigger fires.
 
+## Normative current state (2026-10-04)
+
+> **Draft amendment, pending owner review** (ledger upgrade Phase 3, audit
+> A#13). Written from the code on 2026-10-04: `ledger/events.py`
+> `EVENT_TYPES`, the `ledger_cli.py` parser and `ledger/verify.py`. Where the
+> Specification below disagrees with this section, this section describes what
+> runs. The status of this DIP is unchanged.
+
+**Event types** (`EVENT_TYPES`, 22): `item.create`, `item.claim`, `item.grant`,
+`item.release`, `item.complete`, `item.verify`, `item.dismiss`, `item.update`,
+`item.reopen`, `item.archive`, `item.clock.start`, `item.clock.stop`,
+`owner.set`, `spend.record`, `approval.grant`, `policy.set`, `artifact.attest`,
+`metric.attest`, `projection.attest`, `ledger.seal` ([DIP-0042](DIP-0042-canonical-ledger.md)),
+`ledger.void` and `key.rotate`.
+
+**Files.** One log per writer: `<space>/.datacore/events/<writer>.jsonl`.
+Telemetry writers keep a separate log per space in
+`<space>/.datacore/telemetry/<writer>.jsonl`, verified the same way and folded at
+fold time. A run on a branch writes a branch-scoped log
+(`<writer>-run-<date>.jsonl`) so one writer's chain never forks across branches.
+`genesis` is a shared role log (the org import), not a machine. Each machine keeps
+a sequence mark per log outside git (`<space>/.datacore/state/seq-hwm/`); an
+append to a log that ends below its mark is refused (`StaleLogError`), and a stop
+record keeps refusing until a person has run the recovery procedure.
+
+**Writer identity** ([DIP-0044](DIP-0044-actor-identity.md)): `DATACORE_ACTOR`, then
+`~/.datacore/identity.env`, then the infrastructure registry. A writer is never
+guessed from the hostname: an undeclared machine cannot append.
+`registry/principals.yaml` (private, gitignored) binds writers to principals,
+their kind (`human` or `agent`) and their git author emails by hash.
+
+**Operator surface** (`ledger_cli.py`): `append`, `approve`, `verify`, `stopped`,
+`void`, `items`, `balances`, and for installing a space `init`, `principals add`
+and `doctor`. `doctor` names every missing prerequisite with its fix and exits
+non-zero; `init` declares the writer, registers the person and makes a space
+ledger-ready without any file edited by hand. The install and recovery runbook
+for a team is `.datacore/docs/ledger-team-install.md`.
+
+**Verify rules** (`verify_chain`, per log): every line parses as an event with the
+right field types; the hash matches the canonical body; `prev` links to the
+previous event's stored hash; `seq` has no gap; the HLC is well formed and not
+more than the tolerance in the future; a signature, when present, verifies under
+the key valid at that event's time; with `--strict`, an unsigned event is an
+error; and the log has not been rewound below this machine's sequence mark. A log
+the mark names but that is gone is reported as lost history.
+
+**No exceptions, only voids** (owner decision 6, 2026-09-26). A bad event is never
+edited, deleted or excused out of band. It is cancelled by a `ledger.void` event
+naming it exactly (log, seq, stored hash, body hash) with a reason, written by an
+authorised voider: a human principal, or one listed under `voiders:`, and never
+the event's own writer or principal. A voided event stays in the history and
+verify names it. Editing it afterwards revokes the void.
+
+**Write gate** (LED-3). Datacore's git hooks (`.datacore/githooks`) refuse, at
+commit and at push, any ledger line the ledger writer did not produce: not
+canonical bytes, `actor` other than the log's writer, an edited old line, an HLC
+far in the future, a broken chain or hash. A push may only change the pushing
+writer's own log.
+
+**Signing.** Off by default; an install switches it on with
+`DATACORE_LEDGER_SIGN=1`. Signing on by default is a later step, after per-event
+verdicts, in-ledger voids and key-isolated agents exist (owner decision 7,
+2026-10-04). Private keys live in `~/.datacore/keys/<writer>.key` (mode 0600).
+Public verify keys are read from `principals.yaml` (`verify_keys`, and
+`verify_key_history` for rotations); the local `.datacore/keys/registry.yaml` is a
+fallback and is not tracked. A new key is registered only with the owner's
+explicit approval (`ledger_keys_collect.py --rotate <writer> --owner-approves`),
+recorded as a `key.rotate` event by a writer other than the rotated one; old
+events keep verifying under the old key.
+
+**Transport** ([DIP-0046](DIP-0046-git-transport.md)). `ledger_transport.py converge`
+autosaves, merges (never rebases) and pushes, and refuses to publish a ledger fork.
+A top-level space that declares itself by its marker (`.datacore/config.yaml`)
+needs no entry in the tracked repository registry. A space with no remote is a
+single-host space: converge says so and touches nothing. The first converge into
+an empty remote publishes the space.
+
 ## Specification
 
 > **Source-of-truth boundary** (repeated from Summary). org-mode remains the
