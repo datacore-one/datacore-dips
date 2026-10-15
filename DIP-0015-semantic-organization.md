@@ -8,9 +8,9 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-21 |
-| **Updated** | 2026-08-03 |
-| **Tags** | `organization`, `files`, `structure`, `git-lfs`, `companion`, `media-index`, `generated-content`, `sidecar-metadata`, `space-discovery` |
-| **Affects** | `.gitattributes`, all spaces, `.datacore/lib/spaces.py` |
+| **Updated** | 2026-10-16 |
+| **Tags** | `organization`, `files`, `structure`, `binaries`, `companion`, `media-index`, `generated-content`, `sidecar-metadata`, `space-discovery` |
+| **Affects** | `.gitignore`, all spaces, `.datacore/lib/spaces.py` |
 | **Specs** | `datacore-specification.md` |
 | **Agents** | `ingest-orchestrator`, `knowledge-extractor`, `structural-integrity`, `create-space`, `scaffolding-auditor` |
 
@@ -19,7 +19,7 @@
 Formalizes semantic organization in Datacore - the principle that content is organized by **role and purpose**, not by format or size. This DIP covers:
 
 1. **Structure** - Folder conventions for personal and team spaces
-2. **File Handling** - Git LFS for large files, companion markdown for non-AI-readable formats
+2. **File Handling** - No binaries in git (no Git LFS), companion markdown for non-AI-readable formats
 3. **Ingest Workflow** - Automated import with deep knowledge extraction (`/ingest`)
 4. **Structural Integrity** - Maintenance and audit system (`/structural-integrity`)
 
@@ -38,7 +38,7 @@ This section helps agents understand when and how to apply this DIP.
 
 **Key decisions this DIP informs:**
 - File goes in semantic location by role, NOT in format-based folder
-- Large files (video, Keynote, PSD) use Git LFS, NOT external storage
+- Binary files (video, Keynote, PSD, archives) are NOT committed to git and Git LFS is NOT used — they are gitignored and kept outside git
 - Non-AI-readable files require companion markdown
 
 ### Quick Reference for Agents
@@ -174,8 +174,11 @@ Content is organized by **role and purpose**, not by format:
 │   ├── someday.org            # Future/maybe items
 │   ├── research_learning.org  # Reading queue
 │   └── habits.org             # Recurring habits
-├── journal/                   # Daily journals (Obsidian)
+├── notes/journals/            # Daily session journal (human + wrap-up entries, see DIP-0019)
 │   └── YYYY-MM-DD.md
+├── journal/                   # Overnight agent execution records
+│   └── YYYY-MM-DD.md
+├── content/                   # Generated media collections (see below)
 ├── 0-inbox/                   # Unprocessed captures
 ├── 1-active/                  # Focus areas (self-contained work)
 │   ├── trading/               # Trading work
@@ -305,53 +308,34 @@ For **generated or curated media collections** (AI-generated images, video asset
 
 #### Storage Strategy
 
-**Git LFS** for large files by type. No special folders for binaries.
+> **Amended 2026-10-16 (owner):** Datacore does not use Git LFS. Binary files are not committed to git (no-binaries-in-git policy, in force since 2026-07-16). The earlier LFS strategy is withdrawn.
+
+**No binaries in git.** Binary files stay in their semantic location on disk but are gitignored. Their companion markdown (and any prompt or sidecar that produced them) is committed, so the knowledge travels with the repo even when the bytes do not. No special folders for binaries.
 
 ```
 legal/contracts/
 ├── _index.md
 ├── acme-corp/
-│   ├── investment-agreement.pdf    # Small → git directly
+│   ├── investment-agreement.pdf    # On disk (see PDF question below)
 │   └── investment-agreement.md     # Optional companion
 └── presentations/
-    ├── conference-2024.key         # Large → git LFS
-    └── conference-2024.md          # Required companion (non-AI-readable)
+    ├── conference-2024.key         # Binary → gitignored, never committed
+    └── conference-2024.md          # Required companion (committed)
 ```
 
-#### Git LFS Configuration
+#### Ignoring Binaries
 
-Create `.gitattributes` in repository root:
+Each space's `.gitignore` excludes binary types (video, audio, presentations, design files, archives). A binary already tracked in git is a defect: untrack it (`git rm --cached`) and add its pattern to `.gitignore`. Do not move it to LFS and do not run `git lfs migrate`.
 
-```gitattributes
-# Video/Audio → Git LFS
-*.mp4 filter=lfs diff=lfs merge=lfs -text
-*.mov filter=lfs diff=lfs merge=lfs -text
-*.m4a filter=lfs diff=lfs merge=lfs -text
-*.wav filter=lfs diff=lfs merge=lfs -text
-*.mp3 filter=lfs diff=lfs merge=lfs -text
-
-# Presentations → Git LFS
-*.key filter=lfs diff=lfs merge=lfs -text
-*.pptx filter=lfs diff=lfs merge=lfs -text
-
-# Design files → Git LFS
-*.psd filter=lfs diff=lfs merge=lfs -text
-*.ai filter=lfs diff=lfs merge=lfs -text
-*.sketch filter=lfs diff=lfs merge=lfs -text
-*.graffle filter=lfs diff=lfs merge=lfs -text
-
-# Archives → Git LFS
-*.zip filter=lfs diff=lfs merge=lfs -text
-*.tar.gz filter=lfs diff=lfs merge=lfs -text
-```
+**Open (owner):** where binaries that must survive a lost machine are stored outside git. Until decided, they live only on disk and in machine backups.
 
 #### Tier Summary
 
 | Tier | Criteria | Handling |
 |------|----------|----------|
-| **1** | Small, AI-readable | Git directly, companion optional |
-| **2** | Large by type | Git LFS, companion optional |
-| **3** | Non-AI-readable | Git (or LFS), companion **required** |
+| **1** | Small, AI-readable text | Git directly, companion optional |
+| **2** | Binary, AI-readable (images, PDFs) | See open PDF/image question below; companion optional |
+| **3** | Binary, non-AI-readable | Gitignored, companion **required** (committed) |
 
 #### AI Readability Reference
 
@@ -498,7 +482,7 @@ Non-AI-readable files in this folder.
 
 #### Sync Architecture
 
-With Git LFS, bidirectional sync works automatically:
+Git syncs text (notes, companions, sidecars) in both directions. Binaries are not synced through git:
 
 ```
 LOCAL                          SERVER (nightshift)
@@ -512,9 +496,9 @@ User receives    ←──git pull──   Server commits + pushes
 ```
 
 **Server requirements:**
-1. Git LFS installed
-2. `.gitattributes` committed to repo
-3. Server can `git add`, `git commit`, `git push` LFS files
+1. `.gitignore` excludes binary types in every space
+2. Server commits the companion/sidecar for any binary it generates, never the binary itself
+3. Binaries a server generates reach the owner by a channel outside git (open, see Storage Strategy)
 
 ### Part 3: Ingest Workflow
 
@@ -723,7 +707,7 @@ Maintenance and audit system for organizational structure, inspired by Star Trek
 | **Missing indexes** | Folder without `_index.md` | Info |
 | **Naming violations** | CamelCase instead of kebab-case | Info |
 | **Unprocessed inbox** | Items in `0-inbox/` older than 7 days | Warning |
-| **Git LFS issues** | Large file not tracked by LFS | Error |
+| **Binary in git** | Binary file tracked by git (ignored files are not reported) | Error |
 | **Broken links** | Wiki-links to non-existent files | Warning |
 
 #### Agent: `structural-integrity`
@@ -734,7 +718,7 @@ structural-integrity
 ├── Checks each folder against expected structure
 ├── Validates file placement rules
 ├── Detects companion/source mismatches
-├── Checks Git LFS tracking
+├── Flags binaries tracked by git
 ├── Validates naming conventions
 ├── Reports findings by severity
 └── Optionally auto-fixes (with confirmation)
@@ -750,18 +734,18 @@ structural-integrity
 
 Structural Integrity enforces:
 - Part 1 (Structure): Correct folder hierarchy
-- Part 2 (File Handling): Companions present, LFS tracking
+- Part 2 (File Handling): Companions present, no binaries in git
 - Part 3 (Ingest): Inbox freshness, processing status
 
 ### Changes Required
 
-1. Create `.gitattributes` in each space root with LFS patterns
-2. Install Git LFS on local machines and nightshift server
-3. Update existing large files to use LFS: `git lfs migrate`
+1. Each space's `.gitignore` excludes binary types
+2. Untrack binaries already in git (`git rm --cached`), one space at a time
+3. ~~Git LFS setup and `git lfs migrate`~~ — withdrawn 2026-10-16
 
 ### New Components
 
-- `.gitattributes` - Git LFS configuration file
+- `.gitignore` binary patterns per space
 - Companion markdown files - For non-AI-readable content
 - `/ingest` command - Automated file import with deep processing
 - `/structural-integrity` command - Structure audit and maintenance
@@ -771,7 +755,7 @@ Structural Integrity enforces:
 
 ### Interface Changes
 
-None. Files remain in semantic locations. Git LFS is transparent to users.
+None. Files remain in semantic locations; binaries are simply not committed.
 
 ## Rationale
 
@@ -780,11 +764,10 @@ None. Files remain in semantic locations. Git LFS is transparent to users.
 - Avoids artificial `_files/` or `assets/` segregation
 - Future-proof as AI reads more formats
 
-**Why Git LFS instead of external storage?**
-- Bidirectional sync (server-generated content)
-- Version history preserved
-- Works with existing git workflow
-- No separate sync mechanism needed
+**Why no binaries in git (and no LFS)?** (amended 2026-10-16)
+- LFS stores a new full object per committed version with no deduplication, so frequently changed binaries grow storage without bound
+- LFS objects were silently not uploaded when per-repo hooks were bypassed, leaving remotes that refused pushes
+- Companions and sidecars carry the knowledge; the bytes are reproducible or belong in a store built for them
 
 **Why companion markdown?**
 - Provides AI context for non-readable files
@@ -793,18 +776,12 @@ None. Files remain in semantic locations. Git LFS is transparent to users.
 
 ## Backwards Compatibility
 
-**No breaking changes.** Existing files remain in place. Git LFS is additive.
-
-For existing large files, run migration:
-```bash
-git lfs migrate import --include="*.mp4,*.key,*.psd"
-```
+**No breaking changes.** Existing files remain in place on disk. Binaries already tracked are untracked (`git rm --cached`); their history is not rewritten unless the owner decides so.
 
 ## Security Considerations
 
-- Git LFS stores files in same repository (same access control)
+- Binaries kept outside git are covered only by machine backups until an external store is decided
 - Companion files should not contain sensitive content from source files
-- `.gitattributes` should be committed (not gitignored)
 
 ## Implementation Status
 _Last audited: 2026-03-04_
@@ -813,8 +790,8 @@ _Last audited: 2026-03-04_
 
 | Phase | Component | Status | Notes |
 |-------|-----------|--------|-------|
-| 1 | `.gitattributes` with LFS patterns | Done | 27 file type rules (video, audio, presentations, design, archives, office) |
-| 2 | Git LFS on nightshift server | Done | Server has Git LFS installed and configured |
+| 1 | ~~`.gitattributes` with LFS patterns~~ | Withdrawn 2026-10-16 | Replaced by no-binaries-in-git |
+| 2 | ~~Git LFS on nightshift server~~ | Withdrawn 2026-10-16 | Replaced by no-binaries-in-git |
 | 4 | Ingest agents | Done | `ingest-orchestrator` + `knowledge-extractor` + 5 sub-agents |
 | 4 | `/ingest` command | Done | Processes inbox folders with 6-phase methodology |
 | 5 | `structural-integrity` agent | Done | Audits folder structure, detects misplaced files, orphaned refs |
@@ -830,19 +807,18 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 
 | Feature | Rationale |
 |---------|-----------|
-| Migrate existing large files | Operational task — no large files currently need migration |
+| Untrack binaries already in git | 17 files over 10 MB found tracked on 2026-10-16 (structural-integrity report) |
 | Pilot migration with external contributors | Deferred to post-publication when contributors exist |
 | Companion enforcement in CI | Requires DIP-0001 GitHub Actions pipeline; manual creation sufficient |
 
 ### Resolved Questions
 
-1. **`.gitattributes` per-space or root?** — Root level. Single `.gitattributes` at `~/Data/` covers all spaces.
-2. **Size threshold for PDFs?** — No threshold. PDFs are AI-readable, stored in git directly regardless of size. Only non-text formats use LFS.
+1. ~~**`.gitattributes` per-space or root?**~~ — Withdrawn with LFS (2026-10-16).
+2. **PDFs and images in git?** — Reopened 2026-10-16. The earlier answer ("PDFs stored in git regardless of size") predates the no-binaries policy, and some spaces already gitignore PDFs and images. **Open (owner).**
 3. **Companion suffix?** — Same name (e.g., `deck.key` → `deck.md`). Keeps companion co-located with source file.
 
 ## References
 
-- [Git LFS Documentation](https://git-lfs.com/)
 - [DIP-0002: Layered Context Pattern](./DIP-0002-layered-context-pattern.md) - Privacy layers for context files
 - [DIP-0003: Scaffolding Pattern](./DIP-0003-scaffolding-pattern.md) - Index files and navigation
 - [DIP-0009: GTD Specification](./DIP-0009-gtd-specification.md) - GTD workflow and agents
