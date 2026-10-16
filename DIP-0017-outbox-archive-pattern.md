@@ -353,7 +353,7 @@ Per DIP-0003 Scaffolding categories:
 - Reduces local storage requirements
 - Archives rarely needed immediately
 - Datacortex snapshot enables search without full clone
-- Git LFS already handles large files
+- Large binaries stay out of git (DIP-0015), so archives hold text and companions
 
 **Why no automatic retention?**
 - Archive is permanent historical record
@@ -442,7 +442,7 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 | `delivery` routing destination | No external delivery targets defined yet |
 | `publish` routing destination | Publishing handled via comms module instead |
 | `dispose` routing destination | Manual deletion preferred for safety |
-| Git LFS for archive repos | Not yet needed at current archive sizes |
+| Git LFS for archive repos | Withdrawn: DIP-0015 keeps binaries out of git |
 
 ### Resolved Questions
 

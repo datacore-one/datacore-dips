@@ -285,7 +285,7 @@ _Last audited: 2026-03-04_
 | `context_merge.py` utility | Done | `.datacore/lib/context_merge.py` (555 lines, rebuild/validate/trace) |
 | `.gitignore` templates | Done | `*.local.md`, `CLAUDE.md` ignored across all repos |
 | Pre-commit hook | Done | `.datacore/hooks/pre-commit` validates `.base.md` for PII |
-| Pre-push hook | Done | `.datacore/hooks/pre-push` safety net + Git LFS integration |
+| Pre-push hook | Done | `.datacore/hooks/pre-push` safety net (LFS withdrawn by DIP-0015; binaries stay out of git) |
 | Hook symlinks | Done | `.git/hooks/pre-commit`, `.git/hooks/pre-push` |
 | `datacore` repo layered context | Done | `CLAUDE.base.md` + `CLAUDE.local.md` |
 | `datacore-org` template | Done | `CLAUDE.base.md` + `CLAUDE.space.md` |

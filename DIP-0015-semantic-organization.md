@@ -334,7 +334,7 @@ Each space's `.gitignore` excludes binary types (video, audio, presentations, de
 | Tier | Criteria | Handling |
 |------|----------|----------|
 | **1** | Small, AI-readable text | Git directly, companion optional |
-| **2** | Binary, AI-readable (images, PDFs) | See open PDF/image question below; companion optional |
+| **2** | Binary, AI-readable (images, PDFs) | Git directly unless over 10 MB; over 10 MB is gitignored (see resolved question 2); companion optional |
 | **3** | Binary, non-AI-readable | Gitignored, companion **required** (committed) |
 
 #### AI Readability Reference
@@ -807,14 +807,14 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 
 | Feature | Rationale |
 |---------|-----------|
-| Untrack binaries already in git | 17 files over 10 MB found tracked on 2026-10-16 (structural-integrity report) |
+| Untrack binaries already in git | Done 2026-10-16 for the 12 tracked files over 10 MB (0-personal 8, 3-fds 2, 4-forge 2); they stay on disk, gitignored |
 | Pilot migration with external contributors | Deferred to post-publication when contributors exist |
 | Companion enforcement in CI | Requires DIP-0001 GitHub Actions pipeline; manual creation sufficient |
 
 ### Resolved Questions
 
 1. ~~**`.gitattributes` per-space or root?**~~ — Withdrawn with LFS (2026-10-16).
-2. **PDFs and images in git?** — Reopened 2026-10-16. The earlier answer ("PDFs stored in git regardless of size") predates the no-binaries policy, and some spaces already gitignore PDFs and images. **Open (owner).**
+2. **PDFs and images in git?** — Owner, 2026-10-16: "leave it, unless they are big". PDFs and images stay in git; big ones come out. "Big" is applied as over 10 MB, the old LFS threshold — that number was the implementer's choice, not the owner's, and waits for the owner to confirm.
 3. **Companion suffix?** — Same name (e.g., `deck.key` → `deck.md`). Keeps companion co-located with source file.
 
 ## References
