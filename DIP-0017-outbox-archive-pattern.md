@@ -151,8 +151,8 @@ Server (nightshift):
 ~/Data/
 ├── 0-personal/              # Main space (synced)
 ├── 0-personal-archive/      # Archive repo (separate)
-├── 1-datafund/
-├── 1-datafund-archive/
+├── 1-acme/
+├── 1-acme-archive/
 └── ...
 ```
 
@@ -186,8 +186,8 @@ Local machine:               Nightshift server:
 ├── 0-personal/              ├── 0-personal/
 │   └── 4-outbox/            │   └── 4-outbox/
 │       └── archive/         ├── 0-personal-archive/  ← separate repo
-├── 1-datafund/              ├── 1-datafund/
-│   └── 4-outbox/            ├── 1-datafund-archive/
+├── 1-acme/                  ├── 1-acme/
+│   └── 4-outbox/            ├── 1-acme-archive/
 └── ...                      └── ...
 
 Flow: Local 4-outbox/archive/ → sync → Server processes → Archive repo
@@ -202,7 +202,7 @@ Local machine:
 │   └── 4-outbox/
 ├── .datacore/archives/      # Local archive repos
 │   ├── 0-personal-archive/
-│   └── 1-datafund-archive/
+│   └── 1-acme-archive/
 └── ...
 
 Flow: Local 4-outbox/archive/ → /outbox command → Local archive repo
@@ -415,9 +415,9 @@ _Last audited: 2026-03-04_
 | Feature | Evidence |
 |---------|----------|
 | Module structure (v1.1.0) | `modules/outbox/module.yaml` with tools, skills, agents, commands |
-| `4-outbox/` folder rename in all spaces | `0-personal/`, `1-datafund/`, `2-datacore/` each have `_routing.yaml` and `archive/` subfolder |
-| Archive folder with `_routing.yaml` | All three space outbox folders include routing config |
-| Server-side archive repos | `nightshift:~/Data/{0-personal,1-datafund,2-datacore}-archive.git` |
+| `4-outbox/` folder rename in all spaces | Every space has `_routing.yaml` and an `archive/` subfolder |
+| Archive folder with `_routing.yaml` | Every space outbox folder includes routing config |
+| Server-side archive repos | A server-side bare repo per space (`[N]-[name]-archive.git`) |
 | `outbox-processor` agent | `modules/outbox/agents/outbox-processor.md` — routes `4-outbox/archive/` to server repos |
 | `archive-indexer` agent | `modules/outbox/agents/archive-indexer.md` — builds datacortex snapshot for search |
 | `/outbox` command | `modules/outbox/commands/outbox.md` — `--dry-run`, `--space`, `--verbose` options |

@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0028 |
 | **Title** | Capture Endpoint Contract |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Standards Track |
 | **Status** | Draft |
 | **Created** | 2026-05-01 |

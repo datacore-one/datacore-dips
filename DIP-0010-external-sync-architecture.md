@@ -284,7 +284,7 @@ sync:
       enabled: true
       workspace_id: ${ASANA_WORKSPACE_ID}
       project_mapping:
-        "Datafund": "1-datafund"
+        "Acme": "1-acme"
         "Datacore": "2-datacore"
       custom_field_mapping:
         priority: "Priority"
@@ -298,11 +298,11 @@ Tasks are linked via properties in org-mode and metadata in external tools.
 #### 3.1 Org-mode Task with External Link
 
 ```org
-*** TODO Review Dubai pilot proposal
+*** TODO Review Beacon pilot proposal
 :PROPERTIES:
 :CREATED: [2025-12-04 Thu]
-:EXTERNAL_ID: github:datacore-one/datafund-space#42
-:EXTERNAL_URL: [[https://github.com/datacore-one/datafund-space/issues/42][datafund-space#42]]
+:EXTERNAL_ID: github:acme/team-space#42
+:EXTERNAL_URL: [[https://github.com/acme/team-space/issues/42][acme/team-space#42]]
 :SYNC_STATUS: synced
 :SYNC_UPDATED: [2025-12-04 Thu 14:30]
 :END:
@@ -315,11 +315,11 @@ Note: `:EXTERNAL_URL:` uses org-mode link format `[[url][description]]` so it's 
 
 ```markdown
 <!-- datacore:sync -->
-<!-- org_file: 1-datafund/org/next_actions.org -->
-<!-- org_id: dubai-pilot-proposal-2025-12-04 -->
+<!-- org_file: 1-acme/org/next_actions.org -->
+<!-- org_id: beacon-pilot-proposal-2025-12-04 -->
 <!-- last_sync: 2025-12-04T14:30:00Z -->
 
-## Dubai Data RWA Pilot Proposal
+## Beacon Pilot Proposal
 
 **Deadline:** 2025-12-04
 **Priority:** A
@@ -448,11 +448,11 @@ sync:
       destination: next_actions.org
       tags: [":AI:"]
 
-    # Tasks assigned to @crtahlin → route to team member's view
+    # Tasks assigned to @alice → route to team member's view
     - source: github
-      condition: "assignee == 'crtahlin'"
+      condition: "assignee == 'alice'"
       destination: next_actions.org
-      category: "@crt"
+      category: "@alice"
 
     # Unassigned tasks → inbox for triage
     - source: github
@@ -643,7 +643,7 @@ Calendar entries are org-mode entries with timestamps:
 #+TITLE: Calendar
 #+FILETAGS: :calendar:
 
-* Meeting with investors
+* Meeting with Acme
   :PROPERTIES:
   :EXTERNAL_ID: calendar:primary/abc123
   :SYNC_STATUS: synced
@@ -810,7 +810,7 @@ The tag registry is the single source of truth for all tags across the system:
 - AI delegation tags (`:AI:*:`)
 - Priority tags (`[#A/B/C]`)
 - Context tags (`@person`, `@place`)
-- Domain tags (datafund, verity, etc.)
+- Domain tags (acme, atlas, etc.)
 - Content type tags (article, zettel, etc.)
 - Action tags (read-later, watchlist, etc.)
 

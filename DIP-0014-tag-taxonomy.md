@@ -18,7 +18,7 @@ Defines the unified tag system for Datacore: namespaces, formats, hierarchical s
 
 Tags are currently fragmented across systems:
 
-- **GTD** uses `:AI:content:`, `:datafund:` (org-mode tag format)
+- **GTD** uses `:AI:content:`, `:acme:` (org-mode tag format)
 - **PKM** incorrectly uses `tags: [ai, blockchain]` (frontmatter arrays - **wrong**)
 - **CRM** uses `industries: [privacy_tech]` (snake_case arrays)
 - **Industry Landscape** uses `type: technology` (enum fields)
@@ -32,7 +32,7 @@ Tags are currently fragmented across systems:
 4. No hierarchical tag structure for complex classification
 5. No cross-module integration (GTD ↔ PKM ↔ CRM ↔ Financial)
 
-**Vision:** Tags are **core to Datacore**. They become a coding language like `:verity:ops:legal:contract:` that enables:
+**Vision:** Tags are **core to Datacore**. They become a coding language like `:atlas:ops:legal:contract:` that enables:
 - Holistic view of any space or project
 - Precise task routing to specialized agents
 - Cross-system queries (GTD ↔ PKM ↔ CRM ↔ Financial)
@@ -98,10 +98,10 @@ All tags use **kebab-case**: lowercase, hyphen-separated.
 
 | System | Syntax | Example | Notes |
 |--------|--------|---------|-------|
-| **Org-mode headings** | `:tag1:tag2:` | `:verity:ops:legal:` | Hierarchical, colon-separated |
+| **Org-mode headings** | `:tag1:tag2:` | `:atlas:ops:legal:` | Hierarchical, colon-separated |
 | **Org-mode AI** | `:AI:type:` | `:AI:content:` | Case-sensitive exception |
 | **Org-mode context** | `@context` | `@computer` | In task text |
-| **PKM inline** | `#tag` | `#privacy-tech, #verity` | Correct format for notes |
+| **PKM inline** | `#tag` | `#privacy-tech, #atlas` | Correct format for notes |
 | **PKM frontmatter** | Single values only | `type: zettel` | NOT arrays |
 | **CRM inline** | `#tag` | `#privacy-tech, #partner` | Same as PKM |
 
@@ -120,12 +120,12 @@ source: "[[Literature Note Name]]"
 
 Content here...
 
-#privacy-tech, #verity, #compliance
+#privacy-tech, #atlas, #compliance
 ```
 
 **Incorrect format** (DO NOT USE):
 ```yaml
-tags: [privacy-tech, verity, compliance]  # WRONG - arrays not allowed
+tags: [privacy-tech, atlas, compliance]  # WRONG - arrays not allowed
 ```
 
 ### Org-mode Tag Syntax (IMPORTANT)
@@ -139,10 +139,10 @@ tags: [privacy-tech, verity, compliance]  # WRONG - arrays not allowed
 This task has **TWO separate tags**: `AI` and `research`.
 
 ```org
-* Another task                                    :verity:ops:legal:
+* Another task                                    :atlas:ops:legal:
 ```
 
-This task has **THREE separate tags**: `verity`, `ops`, and `legal`.
+This task has **THREE separate tags**: `atlas`, `ops`, and `legal`.
 
 **Key principle:** `:a:b:c:` = 3 tags, not 1 hierarchical tag.
 
@@ -151,14 +151,14 @@ This task has **THREE separate tags**: `verity`, `ops`, and `legal`.
 While org-mode sees flat tags, Datacore agents **interpret adjacent tags as logical hierarchy** for filtering and reporting:
 
 ```
-:verity:ops:legal:  →  Interpreted as: verity → ops → legal
+:atlas:ops:legal:  →  Interpreted as: atlas → ops → legal
 ```
 
 **This is a convention, not org-mode native behavior.**
 
 **Examples:**
-- `:verity:ops:legal:` - 3 tags, interpreted as Verity/Operations/Legal
-- `:datafund:product:mvp:` - 3 tags, interpreted as Datafund/Product/MVP
+- `:atlas:ops:legal:` - 3 tags, interpreted as Atlas/Operations/Legal
+- `:acme:product:mvp:` - 3 tags, interpreted as Acme/Product/MVP
 - `:personal:health:exercise:` - 3 tags, interpreted as Personal/Health/Exercise
 
 **AI Delegation Tags:**
@@ -181,9 +181,9 @@ While org-mode sees flat tags, Datacore agents **interpret adjacent tags as logi
 Both tags are independent. A task can have `:research:` without `:AI:` (human research task).
 
 **Benefits of this convention:**
-- Org-mode filtering works on any individual tag (`+verity`, `+ops`, `+legal`)
+- Org-mode filtering works on any individual tag (`+atlas`, `+ops`, `+legal`)
 - Datacore agents can interpret tag sequences as hierarchy
-- Financial tracking: Filter by `+verity+ops` for all Verity operations
+- Financial tracking: Filter by `+atlas+ops` for all Atlas operations
 - Reporting: Aggregate by any tag or tag combination
 
 ---
@@ -270,13 +270,13 @@ tags:
       synonyms: [data-markets, data-ownership]
 
   projects:
-    - id: verity
-      label: Verity
-      description: Institutional data marketplace
+    - id: atlas
+      label: Atlas
+      description: Example product project
       tracks: [ops, product, research, legal]
 
-    - id: datafund
-      label: Datafund
+    - id: acme
+      label: Acme
       description: Core business operations
       tracks: [ops, product, fundraising]
 
@@ -433,7 +433,7 @@ The system registry MUST be discoverable by agents. Add to:
 ### Org-mode Task with Hierarchical Tags
 
 ```org
-*** TODO Review partnership contract with Zama    :verity:ops:legal:contract:AI:pm:
+*** TODO Review partnership contract with Acme Crypto :atlas:ops:legal:contract:AI:pm:
 SCHEDULED: <2025-12-20 Sat>
 :PROPERTIES:
 :CREATED: [2025-12-19 Fri]
@@ -446,14 +446,14 @@ SCHEDULED: <2025-12-20 Sat>
 ```
 
 **Tag breakdown (6 separate tags):**
-- `verity` - Project identifier
+- `atlas` - Project identifier
 - `ops` - Operations track
 - `legal` - Legal category
 - `contract` - Specific aspect
 - `AI` - Signals AI delegation
 - `pm` - Routes to gtd-project-manager
 
-Datacore interprets `verity:ops:legal:contract` as logical hierarchy for filtering.
+Datacore interprets `atlas:ops:legal:contract` as logical hierarchy for filtering.
 
 ### Zettel with Inline Tags (Correct Format)
 
@@ -461,7 +461,7 @@ Datacore interprets `verity:ops:legal:contract` as logical hierarchy for filteri
 ---
 type: zettel
 created: 2025-12-19
-source: "[[Pantera Capital - Privacy Renaissance]]"
+source: "[[Example Research - Privacy Renaissance]]"
 maturity: seedling
 ---
 
@@ -474,7 +474,7 @@ FHE enables computation on encrypted data while maintaining verifiability...
 Unlike mixers offering absolute opacity, FHE permits selective disclosure—
 regulators gain visibility while public doesn't.
 
-#privacy-tech, #fhe, #compliance, #verity, #zama
+#privacy-tech, #fhe, #compliance, #atlas, #acme-crypto
 ```
 
 **Note:** Tags at end of content as `#tag, #tag`, NOT in frontmatter array.
@@ -483,18 +483,18 @@ regulators gain visibility while public doesn't.
 
 ```markdown
 ---
-name: Zama
+name: Acme Crypto
 type: company
 relationship_type: partner
 ---
 
-# Zama
+# Acme Crypto
 
 FHE technology company enabling privacy + compliance through encrypted computation.
 
 ## Notes
 
-Key partner for Verity compliance layer. Evaluate SDK integration.
+Key partner for the Atlas compliance layer. Evaluate SDK integration.
 
 #privacy-tech, #cryptography, #blockchain, #fhe, #partner
 ```
@@ -504,7 +504,7 @@ CRM contacts use same inline tag format as PKM notes.
 ### Financial Transaction (Future Module)
 
 ```org
-*** EXPENSE Office supplies                       :datafund:ops:admin:
+*** EXPENSE Office supplies                       :acme:ops:admin:
 SCHEDULED: <2025-12-19 Fri>
 :PROPERTIES:
 :AMOUNT: 150.00
@@ -514,7 +514,7 @@ SCHEDULED: <2025-12-19 Fri>
 :END:
 ```
 
-Tags enable aggregation: "Show all :datafund:ops: expenses this quarter"
+Tags enable aggregation: "Show all :acme:ops: expenses this quarter"
 
 ---
 
@@ -550,17 +550,17 @@ Tags create a unified classification system:
 ```
 
 **Query examples:**
-- "All tasks tagged `:verity:`" → GTD view
-- "All notes tagged `#verity`" → PKM search
+- "All tasks tagged `:atlas:`" → GTD view
+- "All notes tagged `#atlas`" → PKM search
 - "All contacts in `privacy-tech` industry" → CRM filter
-- "Total expenses tagged `:verity:ops:`" → Financial report
+- "Total expenses tagged `:atlas:ops:`" → Financial report
 
 ### Org-mode ↔ PKM Mapping
 
 | Org-mode | PKM Equivalent |
 |----------|----------------|
-| `:datafund:` | `#datafund` |
-| `:verity:ops:legal:` | `#verity, #ops, #legal` |
+| `:acme:` | `#acme` |
+| `:atlas:ops:legal:` | `#atlas, #ops, #legal` |
 | `:AI:research:` | (org-only - routing tag) |
 
 ### Migration from Array Format
@@ -569,12 +569,12 @@ Existing files with `tags: [a, b, c]` should be converted:
 
 **Before:**
 ```yaml
-tags: [privacy-tech, blockchain, verity]
+tags: [privacy-tech, blockchain, atlas]
 ```
 
 **After:**
 ```markdown
-#privacy-tech, #blockchain, #verity
+#privacy-tech, #blockchain, #atlas
 ```
 
 Place at end of note content, after the main body.
@@ -741,9 +741,9 @@ This section provides essential information for agents working with tags.
 
 | System | Format | Example |
 |--------|--------|---------|
-| Org-mode headings | `:tag1:tag2:` | `:verity:ops:legal:` |
+| Org-mode headings | `:tag1:tag2:` | `:atlas:ops:legal:` |
 | Org-mode AI delegation | `:AI:type:` | `:AI:content:` |
-| PKM/CRM notes | `#tag` inline at end | `#privacy-tech, #verity` |
+| PKM/CRM notes | `#tag` inline at end | `#privacy-tech, #atlas` |
 | Frontmatter | Single values only | `type: zettel` |
 
 **CRITICAL**: PKM notes MUST NOT use `tags: [array]` in frontmatter. Use inline `#tag` format at end of content.

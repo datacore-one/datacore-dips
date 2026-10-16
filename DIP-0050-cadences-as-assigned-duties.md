@@ -11,40 +11,36 @@
 | **Depends on** | DIP-0034/0046 (per-writer ledger and cadence shards), DIP-0044 (principals, authorship), DIP-0035 (job contracts) |
 | **Supersedes in part** | the single-executor behaviour of `venture-heartbeat.service` |
 
-## The problem, measured on 2026-09-22
+## The problem
 
 A cadence is a repeating duty of a venture role: code review, refactoring,
-a blog post, comms, research, reconciliation. The owner's model: once a
+a blog post, comms, research, reconciliation. The intended model: once a
 role is assigned to an agent, that agent executes its cadences
-autonomously and reports done; the Chief of Staff edits cadences and
+autonomously and reports done; the chief-of-staff agent edits cadences and
 coordinates; when an agent is away, others pick up its recurring duties.
 
-What runs is different:
+What a single-executor implementation does instead:
 
-1. **One executor.** `venture-heartbeat.service` on nightshift, writing as
-   `miles`, is the only process that executes any cadence. It ticks every
-   30 minutes, senses each venture, and runs `claude -p` on nightshift to
-   "act on the highest-priority cadence". Tris (hermes) and Data
-   (plur-claw) have heartbeat timers of their own, but they run their
-   frameworks' scripts, not the cadence engine; Winston executes none.
-2. **Assigned-away cadences vanish.** `cadence_engine.SELF_AGENTS = {None,
-   "", "nightshift", "miles", "heartbeat"}`; `own_cadences()` drops any
-   role whose `agent:` is not in that set, and `cadence_liveness.py`
-   applies the same filter. So `plur cio: agent: tris` (3 cadences) has
-   been executed by nobody and counted as overdue by nobody since
-   2026-09-04 — no shard `cadence-log/tris.yaml` exists. Assignment is a
-   way of losing work.
-3. **One point of failure, and it failed.** Everything Miles executes
-   needs `claude -p` on nightshift. In one week the venture was skipped
-   (config rejected), the daemon ran stale code after a deploy, a
-   TypeError broke the sense phase, and the plan's session window was
-   spent — each stopped every cadence, and the box reported "13 overdue"
-   a day later.
+1. **One executor.** A single heartbeat service on the executor host,
+   writing as the executor agent, is the only process that executes any
+   cadence. It ticks periodically, senses each venture, and runs a headless
+   agent session to "act on the highest-priority cadence". Other agents
+   may have heartbeat timers of their own, but they run their frameworks'
+   scripts, not the cadence engine.
+2. **Assigned-away cadences vanish.** A hard-coded set of "self" agent
+   names in the cadence engine drops any role whose `agent:` is not in that
+   set, and liveness applies the same filter. A role assigned to any other
+   agent is then executed by nobody and counted as overdue by nobody.
+   Assignment becomes a way of losing work.
+3. **One point of failure.** Everything the single executor runs needs one
+   headless session on one host. A rejected config, a daemon running stale
+   code after a deploy, an exception in the sense phase, or a spent session
+   window each stops every cadence at once.
 
-The pieces the owner's model needs mostly exist: `role.agent` in
-venture.yaml, `principals.yaml: owns.roles`, per-actor cadence shards and
-heartbeat shards, an executor registry per host, and the ledger's item
-claim rules. What is missing is that nothing but Miles ever *acts*.
+The pieces the model needs mostly exist: `role.agent` in venture.yaml,
+principals in `principals.yaml`, per-actor cadence shards and heartbeat
+shards, an executor registry per host, and the ledger's item claim rules.
+What is missing is that only one agent ever *acts*.
 
 ## The model
 
@@ -52,10 +48,11 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
   `role.agent`, or by the venture's explicit `defaults.agent`. There is no
   implicit default. venture.yaml says who does what and when;
   `principals.yaml` says who each principal is and where it runs.
-- **The agent's own scheduler triggers; one wrapper runs.** Hermes cron
-  (Tris), OpenClaw automations (Data), nightshift's scheduler (Miles) and
-  managed cron on the box (Winston) each trigger `cadence_run <slug>`. That
-  is code, and identical on every host. `cadence_run`:
+- **The agent's own scheduler triggers; one wrapper runs.** Each agent's own
+  scheduler (for example a Hermes cron job, an OpenClaw automation, the
+  executor's scheduler, or managed cron on the server for the chief-of-staff
+  agent) triggers `cadence_run <slug>`. That is code, and identical on every
+  host. `cadence_run`:
   - checks the pause switch and the host budget *at run time*
   - writes a signed `cadence.run.start` event to the actor's ledger log
   - invokes the agent through its own CLI and runtime, with the cadence
@@ -66,7 +63,7 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
   - writes `cadence.run.end` with the result, artifact sha256 and commit
 
   The run record is therefore ours, not the scheduler's, and not the agent's.
-  Spikes S1 and S2 confirm that each scheduler can run a command (P1.5).
+  Spikes confirm that each scheduler can run a command (P1.5).
   Mechanics, each a P1.5 work item:
   - the two event kinds are added to the closed ledger vocabulary
     (`ledger/events.py` EVENT_TYPES), with fold and policy handlers
@@ -78,23 +75,21 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
     **scheduled rotation** reaches one principal, soaks one period, then the
     rest. An **emergency revocation** (a leaked key) is the opposite: it is
     fleet-wide and immediate, sets `paused: all`, and each host resumes only
-    once its new key is proven in `verify_keys` (taleb r4-1, r5-1; cto r4-2)
+    once its new key is proven in `verify_keys`
   - the agent is invoked through the existing headless executors
     (`executors/hermes.py`, `executors/openclaw.py`, `claude -p`)
   - the git step runs under the host's repo lock,
-    `ledger_transport._repo_lock`. `git_fleet_sync.py` taking that lock
-    exists **only as an uncommitted change on the mac** (concurrent work,
-    2026-09-23, `git_fleet_sync.py:398-416`, which reports `BUSY` and retries
-    next run). It is committed on no host and deployed on none. P1.5 depends
-    on it landing and being deployed everywhere (critic r5-1). A push is retried with backoff; a push that
-    still fails is `blocked`, never a strike (cto r4-1, critic r4-1)
+    `ledger_transport._repo_lock`. The fleet sync must take the same lock
+    (reporting `BUSY` and retrying next run); P1.5 depends on that being
+    deployed on every host. A push is retried with backoff; a push that
+    still fails is `blocked`, never a strike
   - `cadence_run` is **version-pinned per host**. A change to it rolls to one
     principal, soaks one full period, and only then reaches the others, the
     same rule as a new adapter.
 - **A reconciler per host** (`cadence_schedule_sync.py`, from the host's
   heartbeat timer) turns venture.yaml into scheduler jobs. It refuses rather
   than guesses (P1.5).
-- **The judge is liveness on the box.** It runs hourly as a box job contract,
+- **The judge is liveness on the server.** It runs hourly as a server job contract,
   **not as a cadence**, so no cadence failure can switch off the judge. It
   reads only the replicated ledger events and shards, re-verifies each
   counted run (the event chain, the artifact at the named commit, the sha256,
@@ -103,18 +98,18 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
 - **Escalation reuses the autofix pipeline, with numbers.** A red cadence
   becomes a repair task for its owner. The owner is told when the repair
   gives up (3 failed attempts, or 24 hours without a green run, whichever
-  comes first). A red on one of **Winston's own** cadences goes straight to
-  the owner and bypasses Winston. `tripped` escalates the same way.
-  **Channel:** Telegram through the existing `cos_alert.sh`, plus an entry on
-  the owner's decision board. Every escalation is also written as a ledger
-  event (`item.create` through autofix). **Delivery is verified**: a
-  decision-board entry unacknowledged after 12h becomes a GitHub issue on the
-  datacore repo, **opened from nightshift, not the box**. The owner gets
-  GitHub's own notification email. That shares no host, bot token or sender
-  with the Telegram path, which the box sends (taleb r4-2, r5-2).
-  **Two repair tracks** (data r4-2):
+  comes first). A red on one of **the chief-of-staff agent's own** cadences
+  goes straight to the owner and bypasses that agent. `tripped` escalates the same way.
+  **Channel:** the installation's alert channel (e.g. a messaging bot), plus
+  an entry on the owner's decision board. Every escalation is also written as
+  a ledger event (`item.create` through autofix). **Delivery is verified**: a
+  decision-board entry unacknowledged after 12h becomes a GitHub issue,
+  **opened from a different host than the one that sends alerts**. The owner
+  gets GitHub's own notification email. That second path shares no host, bot
+  token or sender with the first.
+  **Two repair tracks**:
   - Only **red** states escalate. Amber states (`blocked`,
-    `quota-exhausted`) escalate only once they decay to `late` (data r5-1).
+    `quota-exhausted`) escalate only once they decay to `late`.
   - *Execution repair* covers `late`. The owner's agent gets a repair task,
     which may rerun `cadence_run`.
   - *Coordination repair* covers `not-held`, `double`, `not-registered`,
@@ -123,8 +118,9 @@ claim rules. What is missing is that nothing but Miles ever *acts*.
     `double` is a third run. One exception: after the cause of a `tripped`
     job is fixed (a template or venture.yaml change, or `--rearm`), a single
     probe run is allowed. It cannot double-run, because a second registration
-    would show as `double`, which has higher precedence (data r5-2).
-- **Winston** edits cadences and coordinates, and executes only `firm:cos`.
+    would show as `double`, which has higher precedence.
+- **The chief-of-staff agent** edits cadences and coordinates, and executes
+  only its own coordination cadences.
 - **Takeover (phase 3, later):** only while the owner's host is up and has
   missed N windows, with a cooldown.
 
@@ -165,164 +161,107 @@ Two rules keep a grey or amber state from hiding a missed duty:
 
 P0 decisions → **P1** ownership visible, nothing red that is not real →
 **P1.5** write-gating rails and spikes, fixtures only → **P2a** wrapper, planner,
-evidence → **P2b** rollout Tris → Miles → Data → Winston, each promoted by
+evidence → **P2b** rollout one principal at a time, each promoted by
 the owner → **P2c** retire the old executor → **P1.5b** reassignment safety → reassignment → **P3** takeover.
 
-**Calendar estimate:**
-- build: P1 2 sessions, P1.5 2, P2a 3, P1.5b 1 (before reassignment)
-- templates and evidence schemas, authored per principal before its step:
-  Tris 3, Miles the computed list (23 today), Data 2, Winston 1. At about 20
-  minutes per template with its schema, Miles's list is about 8 hours (2
-  sessions), and the others together 1 session. The decision board shows
-  "templates X/Y" as a promotion gate (coo r4-1).
-- **Sum** (coo r5-1):
-  - build: 2 + 2 + 3 = 7 sessions to the first rollout, about 1.5 weeks at one
-    session a day
-  - rollout: soaks of 7 + 7 + 1 + 7 = 22 days. Miles's 2 template sessions
-    and the 1 session for the others fall inside the Tris and Miles soaks
-  - P1.5b is 1 session after that
-  - total: about 1.5 weeks + 3.1 weeks + 1 day, roughly 5 weeks
-- soaks: Tris 7 days (weekly geo-sov-scan), Miles 7, Data 1 (daily only),
-  Winston 7
-- worst case about 5 weeks from P0 sign-off, published and re-dated at
-  each promotion (O-r2-1)
+**Calendar estimate:** computed per installation from the number of
+principals, the templates each needs, and one soak period per rollout step;
+published and re-dated at each promotion.
 
 ## Loop-design gate
 
 1. Exit condition machine-judged: a verified `cadence.run.end`, re-checked
-   on the box.
-2. Judge independent: `cadence_run` (code) writes the run record, and the box
-   verifies it. The agent writes neither. Residual: an agent acting
+   on the server.
+2. Judge independent: `cadence_run` (code) writes the run record, and the
+   server verifies it. The agent writes neither. Residual: an agent acting
    deliberately against the wrapper could forge events, because it runs as
    the same OS user. The boundary is built against mistakes, which is what
-   happened twice on 2026-09-23, not against a malicious agent. Accepted and
+   happens in practice, not against a malicious agent. Accepted and
    stated.
 3. A boundary (MUST NOT) beside every done criterion.
 4. No mid-run questions: assignment, schema, budget and window are data.
 5. No trusted literals: every count is computed at check time, and the
    budget comes from a stated formula.
 
-## Implementation plan v6 (2026-09-23, after audit round 5)
-
-Answers `audits/DIP-0050-audit-2026-09-23.md` rounds 1-5. The tags are the
-findings each item answers. Round-2 tags carry `r2`: C-r2 1 is the critic's
-round-2 finding 1.
+## Implementation plan
 
 ### P0 — decisions (owner)
 
-Closed on 2026-09-23: see the appendix. Still open:
-1. **Winston's scope** (decided by the owner 2026-09-23): Winston's recurring cadences are `firm:cos` only (briefing, verify-daily, scoreboard, weekly plan). He keeps every other chief-of-staff function: editing cadences and assignments, coordination, delegation, merge gatekeeping, approvals, escalation, and ad-hoc tasks. He owns no venture role's cadences, because he judges and reports on them (O7).
-2. **Daily run ceiling per host: an absolute number the owner sets** (accepted by the owner 2026-09-23: nightshift 18, hermes 3, plur-claw and the box set at their rollout step),
-   changed only at promotion sign-offs. It never tracks the load
-   (critic r3-2).
-   - The load is computed by `cadence_load.py` (ventures `c66fc7a`), never
-     typed. Formula: daily + weekly/7 + monthly/30. Continuous classes are
-     excluded, and a P1.5 fixture proves they never reach `cadence_run`.
-   - Computed on 2026-09-23: Miles 8.9 runs/day, Tris 2.1, and roles with no
-     owner yet 3.3. P1 makes those Miles's, which brings Miles to 12.2. Data
-     adds 2 with the posting cadences. The fleet total is 14.3.
+1. **The chief-of-staff agent's scope.** Its recurring cadences are its own
+   coordination duties only (briefing, verify-daily, scoreboard, weekly plan).
+   It keeps every other chief-of-staff function: editing cadences and
+   assignments, coordination, delegation, merge gatekeeping, approvals,
+   escalation, and ad-hoc tasks. It owns no venture role's cadences, because
+   it judges and reports on them.
+2. **Daily run ceiling per host: an absolute number the owner sets**,
+   changed only at promotion sign-offs. It never tracks the load.
+   - The load is computed by `cadence_load.py`, never typed. Formula:
+     daily + weekly/7 + monthly/30. Continuous classes are excluded, and a
+     P1.5 fixture proves they never reach `cadence_run`.
    - **Rule, printed by the script**: ceiling = max(3, ceil(1.4 × load)).
-     `cadence_load.py --assume-default miles` (ventures `e9bdcc4`) prints
-     nightshift 18 (Miles 12.2 once P1 writes the default) and hermes 3
-     (Tris 2.1). plur-claw and the box have no cadences in venture.yaml yet,
-     so their ceilings are printed at their rollout step, once that step adds
-     the cadences. Until then their ceiling is **unset**, and `cadence_run`
-     refuses any run on a host with an unset ceiling. No ceiling is typed
-     (popper r4-1, r5-2).
-3. **Rollout promotion** (accepted by the owner 2026-09-23). Recommended: when a step's soak is green, Winston
-   proposes promotion on a decision board, and the owner's yes starts the
-   next step (O-r2-5).
+     A host with no cadences yet has its ceiling printed at its rollout step.
+     Until then its ceiling is **unset**, and `cadence_run` refuses any run
+     on a host with an unset ceiling. No ceiling is typed.
+3. **Rollout promotion.** When a step's soak is green, the chief-of-staff
+   agent proposes promotion on a decision board, and the owner's yes starts
+   the next step.
 4. Takeover N and stand-ins: P3 only.
 
 ### P1 — ownership visible, nothing red that is not real
 
-> **Status 2026-09-23: P1 done**, except item 3 on hermes, which moves to the
-> P2b-Tris preconditions.
-> - **Items 1–2:** `owner_of`, `all_assignments` and `cadences_owned_by`, with
->   explicit `defaults.agent` in six ventures. Firm names owners with
->   `agent:`. Miles's set is proven unchanged (41 cadences). `SELF_AGENTS`,
->   `is_external_agent` and `own_cadences` are removed. Ventures `ca4c1be`,
->   `0c08a37`.
-> - **Item 4:** liveness gives every cadence one state, keyed by venture
->   name: red is late, not-held (via the replicated `members.yaml`),
->   unowned or unreadable; grey is reminder or pending-rollout. Core
->   `05876bb`. The box shows `0 overdue`, with Tris's three and Winston's four
->   cadences grey.
-> - **Item 5:** real view-only runs were migrated (2-datacore `e6ceb054`, 6-meridian
->   `8308a90e`; tool ventures `7becca7`). Once a space has shards, the view is
->   output only (ventures `c41000b`). Deviation: the prose normaliser stays,
->   because shards already hold prose copied from the view.
-> - **Item 6:** Winston's cadences (briefing, verify-daily, scoreboard,
->   weekly-plan) are in firm `cos` (firm `23a5f1c`). Liveness is not a cadence.
-> - **Item 7:** nothing read `principals.yaml owns`. It is removed, and
->   `principals_check` refuses it (core `05cd49b`).
-> - **Item 8:** members.yaml `space:` and fds's venture `space:` use names.
->   The ledger's item payload `space` still carries folder names. That is the
->   ledger's own identity, out of scope here, and noted.
-> - **Item 3 → P2b-Tris precondition:**
->   - plur-claw discovers its three spaces.
->   - hermes discovers firm **twice** (`3-firm`, plus `4-firm`, a symlink to it),
->     and holds Tris's own `tris-space` as `3-plur`.
->   - Before the reconciler runs on hermes, the symlink goes, or discovery
->     refuses it, so Tris's firm cadences register once.
->   - hermes's system Python lacks pydantic, so the reconciler runs under the
->     Hermes venv.
-> - Also fixed along the way: a spent plan window read as `capture_error`
->   (ventures `494c2a5`).
-> - The heartbeat's 14:26 tick: "2 ventures active, 2 idle, 0 failed".
 
 1. `owner_of(venture, role)`: `role.agent`, then `defaults.agent`, then an
-   **error**. P1 writes `defaults: {agent: miles, defaulted: true}` into the
-   enabled ventures Miles's host holds. `defaulted: true` is the marker the
-   later reassignment analysis looks for (D-r2-4). Aliases
-   `nightshift`/`heartbeat` → `miles`; `human` → `reminder`.
+   **error**. P1 writes `defaults: {agent: <executor>, defaulted: true}` into
+   the enabled ventures the executor host holds. `defaulted: true` is the
+   marker the later reassignment analysis looks for. Legacy aliases of the
+   executor map to it; `human` → `reminder`.
 2. `cadences_owned_by(actor)` and `all_assignments()`. Invariant test: the
-   union over actors equals `all_assignments()` (C-r2-4).
-   **`cadence_runner.py:216-222,338` and every other caller of `own_cadences`
-   moves to `cadences_owned_by('miles')` before `SELF_AGENTS` is deleted**,
-   with a test that Miles's execution set is unchanged, computed before and
-   after on today's venture.yaml files (C-r2-1).
-3. Space declarations on hermes and plur-claw, one per space held. An
-   undeclared space gives `not-held` (C3).
+   union over actors equals `all_assignments()`.
+   **Every caller of `own_cadences` moves to `cadences_owned_by(<executor>)`
+   before the hard-coded self-agent set is deleted**, with a test that the
+   executor's execution set is unchanged, computed before and after on the
+   current venture.yaml files.
+3. Space declarations on every agent host, one per space held. Discovery
+   must refuse a space reached twice (e.g. through a symlink). An
+   undeclared space gives `not-held`.
 4. Liveness re-keyed by `venture.yaml: name`, implementing the enumeration
-   above with its precedence (C4, D-r2-1/2/8, C-r2-2).
+   above with its precedence.
 5. **Pulled forward from P2a: the one-time view→shard migration.**
    - List every view-only record per space.
-   - Move the real ones (meridian's operations cadences) into a
-     `migration-2026-09` shard; keep the list.
+   - Move the real ones into a `migration-<YYYY-MM>` shard; keep the list.
    - `reduce_cadence_log` then stops reading the view.
-   - The interim normalisation (ventures `266b098`) stays only until this
-     lands, then goes.
-   (O-r2-4, R6)
-6. Winston's duties (briefing, verify-daily, liveness, scoreboard,
-   weekly-plan) are listed in venture.yaml under `firm:cos`, for visibility
-   and budget. **Liveness itself stays a box job contract, never a cadence
-   run by `cadence_run`** (O-r2-3, R-r2-4). `owns.cadences` leaves
+   - Any interim normalisation stays only until this lands, then goes.
+  
+6. The chief-of-staff agent's duties (briefing, verify-daily, liveness,
+   scoreboard, weekly-plan) are listed in venture.yaml under its own role,
+   for visibility and budget. **Liveness itself stays a server job contract,
+   never a cadence run by `cadence_run`**. `owns.cadences` leaves
    principals.yaml.
 7. The readers of `principals.yaml: owns` migrate, then `owns.roles` goes.
    `principals_check` asserts it is absent, and `venture_doctor` fails on an
-   owner that is not a principal or does not hold the space (C8, P6).
-8. Venture names everywhere, including this DIP. `3-fds` gets
-   `space: fds-space` or the canonical name (D3, D-r2-7).
+   owner that is not a principal or does not hold the space.
+8. Venture names everywhere, never folder numbers: each venture is keyed
+   by `venture.yaml: name`, and a venture whose `space:` is a folder number
+   gets the canonical name.
 - DONE_WHEN (computed, with fixtures):
   - every enabled cadence has exactly one state
   - fixture: a late cadence reads `late`, a fresh one `ok`, a human one
-    `reminder`, an undeclared space `not-held` (P-r2-4)
-  - Miles's execution set is identical before and after
-  - no record that exists only in the view is counted (R-r2 R6)
-- MUST NOT: change what Miles executes, or turn anything red on day one.
+    `reminder`, an undeclared space `not-held`
+  - the executor's execution set is identical before and after
+  - no record that exists only in the view is counted
+- MUST NOT: change what the executor runs, or turn anything red on day one.
 
 ### P1.5 — rails and spikes (fixture schedulers only)
 
 1. **Spikes, each with a written result before its adapter exists:**
-   - **S1, Hermes (Tris):** can a cron job run a command? Is there a job
+   - **S1, a cron-style agent scheduler (e.g. Hermes):** can a cron job run a command? Is there a job
      create, update, remove, disable and list interface? Which lock does
      the ticker honour?
-   - **S2, OpenClaw (Data):** can an automation run a command? Does the
+   - **S2, an automation-style agent scheduler (e.g. OpenClaw):** can an automation run a command? Does the
      `Declaration` field round-trip the slug? What are the disable and next-run
      reads? What serialises reconciler writes against OpenClaw's own
-     scheduler? (C-r2-3, C7, critic r3-1)
-   - **S3, nightshift scheduler and box cron:** confirm the command form and
+     scheduler?
+   - **S3, the executor's scheduler and server cron:** confirm the command form and
      the next-fire read.
 
    If a scheduler **cannot run a command**, that host falls back to managed
@@ -330,40 +269,40 @@ Closed on 2026-09-23: see the appendix. Still open:
    That fallback needs the owner's OK and is recorded in the spike result.
 2. **Slug** `cadence-<venture>-<role>-<cadence>`, `[a-z0-9-]`. Over 64
    characters, it is truncated to 55 plus `-` plus an 8-hex hash. A
-   collision after truncation refuses registration (D-r2-6).
+   collision after truncation refuses registration.
 3. **Input integrity.** The venture.yaml read comes from the **space repo**
    (not the core fork) at a clean tree whose HEAD is an ancestor-or-equal of
-   the space's `origin/main`. `venture_doctor --strict` must pass (R1).
+   the space's `origin/main`. `venture_doctor --strict` must pass.
    Otherwise refuse, exit 2, write nothing.
 4. **Handoff ordering: moved to P1.5b.** No role changes owner before the
    reassignment phase (owner decision 3). The rollout moves execution, not
    ownership, so P1.5 does not need it.
 5. **Blast bound**: removing more than max(2, 25%) needs either a committed
    `cadence-migration.yaml` naming exactly the slugs expected to move (the
-   planned path, e.g. Miles's handoff), or `--allow-mass-removal` (the
-   emergency path, never used by the timer) (R-r2-7).
+   planned path, e.g. the executor's handoff), or `--allow-mass-removal` (the
+   emergency path, never used by the timer).
 6. **Diff-only writes**; **snapshot before write**; **rollback refuses** if
    the current scheduler state or the authorising commit is newer than the
-   snapshot, unless `--force-stale`, which is logged (R-r2-3).
+   snapshot, unless `--force-stale`, which is logged.
 7. **Adoption** `--adopt <existing>=<slug>`, one time and logged. An
    ordinary sync never touches a job that is not a cadence job.
 8. **Pause**: `cadence-control.yaml` (`paused: all | <actor> | <slug>`).
    `cadence_run` checks it at run time, so a wedged reconciler cannot fail
-   the pause open (R-r2-2). The reconciler also disables matching jobs, and
+   the pause open. The reconciler also disables matching jobs, and
    `--pause` over ssh works without git. Residual: git is the replication
    path for the file, so during a git outage the ssh pause is the lever
-   (R-r2-5, accepted).
+  .
 9. **Circuit breaker**: three consecutive runs ending without valid evidence
    trip the job. `quota-exhausted` and `paused` runs are **not strikes**
-   (R-r2-1). It is re-armed by `--rearm <slug>`, or automatically when the
+  . It is re-armed by `--rearm <slug>`, or automatically when the
    cadence's template or venture.yaml entry changes, followed by one probe
-   run (C-r2-5).
+   run.
 10. **Budget**: `cadence_run` refuses a run over the host's daily ceiling and
     records it (grey, one line). Quota exhaustion is one root-cause line.
 11. `--check` exit code is the registration contract. It also compares each
-    job's next-fire time, read from the scheduler, with the plan (P-r2-3).
+    job's next-fire time, read from the scheduler, with the plan.
 - DONE_WHEN, one fixture per rail, and each **run twice**, with containment
-  made deterministic by the host lock (P-r2-6):
+  made deterministic by the host lock:
   - a truncated or invalid venture.yaml: refused, zero writes
   - a 30% removal: refused, then allowed with a matching migration file
   - pause: `cadence_run` exits without invoking the agent
@@ -379,9 +318,9 @@ Closed on 2026-09-23: see the appendix. Still open:
   - the **real** `git_fleet_sync.py`, not a stub, reports `BUSY` and leaves
     the repo untouched while another process holds `_repo_lock`. The holder
     in P1.5 is a minimal process taking the same primitive; the same test
-    repeats in P2a with `cadence_run` as the holder (critic r5-2)
+    repeats in P2a with `cadence_run` as the holder
   - a cadence newly added to an existing role is grey `not-registered` for
-    2h, then red (popper r5-1)
+    2h, then red
   - a run on a host with an unset ceiling is refused
   - a missing local key, or one that does not match `verify_keys`, refuses
     the run before any event is written, and no new key is minted
@@ -394,37 +333,36 @@ Closed on 2026-09-23: see the appendix. Still open:
 1. **`assignment_seq`**: a monotonic integer per role in venture.yaml.
    `venture_doctor` requires it to increase whenever `agent` changes. Hosts
    order handoffs by it, not by commit position, because `git_fleet_sync`
-   lands commits out of decision order (data r3-2).
+   lands commits out of decision order.
 2. **An ownership edit is pushed synchronously** by whoever makes it,
    bypassing the sweep.
 3. **A gap is bounded.** The old host removes its job when it sees the
    higher `assignment_seq`. If the new owner has not registered within 2h,
    the old host re-enables the job and the cadence is `double` rather than
-   orphaned (taleb r3-2). **A `double` past 48h with the old host
+   orphaned. **A `double` past 48h with the old host
    unreachable is resolved automatically**: the owner named by the highest
    `assignment_seq` records a ledger claim, and the old host removes its job
    when it returns and reads the claim. The owner is told, and is not asked
-   to act (taleb r4-3).
+   to act.
 4. **Schema versions** on registration records, run events and shards;
-   readers refuse an unknown major version (T10, deferred here from P1.5 per
-   coo r3-3).
+   readers refuse an unknown major version (deferred here from P1.5).
 - DONE_WHEN (fixtures, each run twice): reassignment by `assignment_seq`
   out of commit order leaves one owner; a new owner that never registers
   gives `double` within 2h, not a silent gap; a `double` is grey at 1h59m and
-  red at 2h01m after a bump, and red at once without a bump (popper r4-2);
+  red at 2h01m after a bump, and red at once without a bump;
   the 48h unreachable case ends with a claim and one owner.
 
 ### P2a — wrapper, planner, evidence
 
 1. **`cadence_run <slug>`** as specified in the model.
    - It commits and pushes the artifact **itself**; it does not wait for
-     `git_fleet_sync` (T-r2-2).
+     `git_fleet_sync`.
    - It writes signed `cadence.run.start`/`end` events through the
-     existing `EventLog` (T-r2-1).
+     existing `EventLog`.
    - A `last-day` schedule kind fires daily on days 28–31, and the wrapper
-     runs only when tomorrow is in a new month (D-r2-5).
+     runs only when tomorrow is in a new month.
    - A completion for a slug no longer in the plan is recorded as `orphan`
-     (D7).
+    .
 2. **Planner** `cadence_schedule.py plan --actor X`:
    - schedules in UTC
    - slot = hash(slug) mod the host window; collisions are serialised by
@@ -434,26 +372,26 @@ Closed on 2026-09-23: see the appendix. Still open:
 3. **Prompt builder**. Uses `heartbeat_capture.context` only and inlines the
    template text; no slash-command lookup. `heartbeat_capture.enqueue` (the
    capture-proposal path) is retired with the heartbeat's execution branch
-   in P2c (T8).
+   in P2c.
 4. **Templates and evidence schemas, owned per rollout step**
-   (T-r2-3/5, and the heartbeat's "no installed template" warnings).
+  .
    - Before a principal's P2b step, every cadence it owns gets a template in
      `.datacore/templates/cadences/` declaring
      `evidence: {path, require, derive}`.
-   - `derive` names at least one field the box recomputes from the committed
-     artifact (P-r2-1).
+   - `derive` names at least one field the server recomputes from the committed
+     artifact.
    - Template bodies drop every "log the run" instruction; the wrapper
      records runs.
    - The planner refuses to register a cadence without a template.
    - Residual, stated: whether the content is *true* cannot be judged by a
-     machine. Winston's weekly-plan draft lists three sampled completions
+     machine. The chief-of-staff agent's weekly-plan draft lists three sampled completions
      for the owner to glance at. That is information only, and no action is
      needed.
 5. **Heartbeat skip-list**: the heartbeat's sense phase excludes every
-   registered cadence (C2).
-6. **Per-venture isolation** of sensing errors, with a test (P4).
-7. **Data's blog template** publishes the canonical post, then the dev.to
-   mirror, in one job (D6).
+   registered cadence.
+6. **Per-venture isolation** of sensing errors, with a test.
+7. **A publishing template** that posts to several destinations publishes
+   the canonical post, then each mirror, in one job.
 - DONE_WHEN:
   - `plan` counts equal a recount taken from venture.yaml by the test
   - an artifact with the wrong field, no content, an old commit, or a
@@ -465,93 +403,21 @@ Closed on 2026-09-23: see the appendix. Still open:
 
 ### P2b — rollout, one principal at a time, promoted by the owner
 
-> **Status 2026-09-23.**
-> - **Tris is live.** Three Hermes cron jobs run `cadence_run` from
->   `~/.datacore/v50`, deployed by `cadence_deploy.py`. The first real run
->   was `blocked` because hermes had none of core's policy config, so the
->   tool policy failed closed; the config is now followed. The rerun
->   finished `ok` with its artifact's sha256 matching the copy in git.
->   Liveness read the cadences as unregistered until the wrapper started
->   committing and pushing its own event log after the end event; an agent's
->   commit can never carry that event. All three are now green from signed
->   records. The Tris soak starts today. The first unaided wrapper runs are
->   geo-research on 09-24 and geo-sov-scan on Thursday.
-> - **Data was promoted by the owner on 2026-09-23 (ahead of Miles: a
->   different host and scheduler).** The two cadence automations are live,
->   and the seven `plur-daily-x-memory-*` automations are disabled rather
->   than adopted, so they can be restored. The first run, fired through the
->   gateway, failed because Data's only model (`openai/gpt-6-astra`, no
->   fallback) is out of provider credits. That run was counted as a failure
->   strike; out-of-credits text now counts as `quota`. It is the owner's
->   action: add credits or give Data another model. Preparation, all done:
->   - the OpenClaw adapter;
->   - the `x-post` and `blog-post` templates, each judged by a committed
->     record carrying the live URL;
->   - policy config on plur-claw;
->   - the v50 deploy;
->   - `--check` against the real gateway: two creates, the nine existing
->     automations untouched.
->
->   Planned at promotion (superseded above): set Data's ceiling (3), sync with
->   `--adopt plur-daily-x-memory-mon=cadence-plur-cmo-x-post` and a
->   `cadence-migration.yaml` for the other six. X posts move from a
->   different time each weekday to 06:33 UTC daily.
-> - **Promotion, later on 2026-09-23.** The owner promoted Miles and
->   Winston the same day.
->   - **Miles:** 23 cron lines, registrations pushed in three spaces. A
->     run under cron's bare environment reached claude-code and recorded
->     `quota` (plan window spent until 18:40 UTC).
->   - **Winston:** two cadence lines. `cos-server-setup` now retires the
->     old direct lines rather than reinstalling them, and the scripts keep
->     their own logs, which the morning check reads.
->   - **Data:** the owner's credits were never the problem. `agent exec`
->     reads provider credentials from the environment, a drained API key,
->     while the Gateway's Codex-harness agent uses the stored login. The
->     `openclaw-gateway` executor runs one Gateway turn per run. Data then
->     posted through his own scheduler. The judge failed the record on a
->     200-byte floor that a real 184-byte record missed. That third strike
->     tripped the job as designed. The floor is fixed, and
->     `--rearm-only` records the fix without posting twice.
->   - **Proof:** `cadence_watch.py` waits for each principal's next
->     self-scheduled run.
-> - **Miles was staged before promotion.** 23 templates with evidence (18 new, 5 given
->   evidence), none asking an agent to log its own run. The heartbeat now
->   skips any cadence in its owner's signed registration. `--check` on
->   nightshift plans 23 creates, and the wrapper dry-run resolves claude-code
->   in the Meridian space. Promotion follows the Tris soak (from
->   2026-09-23): set the ceiling (18 is already set), then `sync --apply`.
->   Many Meridian reports are weeks old (trade-reconciliation last ran
->   07-14), which the old prose cadence log hid. Signed evidence will show it.
-> - **Winston is staged** (owner decision 2026-09-23: judge the real
->   artifact).
->   - His cadences are `briefing` and `weekly-plan`, which are script
->     templates (`script:`) whose evidence names the personal space
->     (`evidence.space`).
->   - The wrapper commits the validated artifact where it lives, and
->     liveness verifies it there.
->   - verify-daily and scoreboard stay box job contracts.
->   - `--check` on the box plans 2 creates.
->   - Promotion: set a ceiling of 3, `sync --apply`, and retire the two old
->     crontab lines in the same step.
 
 Before a principal's adapter goes live, the P1.5 fixtures are re-run against
 the real adapter in dry-run (`--check` against a scratch job, then removed)
-(P-r2-5). Soak: one full period of the longest frequency owned, capped at
+. Soak: one full period of the longest frequency owned, capped at
 7 days. Monthly cadences are checked by a forced run *plus* the scheduler's
-next-fire time matching the plan (P-r2-3). Promotion follows P0 decision 3.
+next-fire time matching the plan. Promotion follows P0 decision 3.
 
-1. **Tris / hermes.** S1 closed. Templates and schemas for geo-research,
-   geo-methodology and geo-sov-scan. `--adopt geo-research-tris`. Sync.
-2. **Miles / nightshift.** Templates for every Miles cadence (computed
-   list). A committed `cadence-migration.yaml` for the handoff from the
-   heartbeat. The skip-list prevents double runs.
-3. **Data / plur-claw.** S2 closed. Adopt the seven `plur-daily-x-memory-*`
-   automations as one daily X cadence. Add the daily blog-with-mirror. Soak
-   the posting itself: fact-check and cos-approval must clear daily
-   (`blocked` otherwise).
-4. **Winston / box.** After P0 decision 1. Adopt the existing
-   `cron_install` entries for the firm:cos duties, except liveness, which
-   stays a job contract (P1 item 6).
+Rollout order is the owner's: typically principals whose scheduler and
+host differ from the old executor first, the old executor's own handoff
+next (with a committed `cadence-migration.yaml` and the skip-list
+preventing double runs), and the chief-of-staff agent last, after P0
+decision 1. Existing scheduler jobs that already perform a cadence are
+adopted with `--adopt`, or disabled rather than deleted so they can be
+restored. Posting cadences soak the posting itself: fact-check and approval
+must clear (`blocked` otherwise).
 
 ### P2c — retire
 
@@ -569,7 +435,7 @@ least one window.
 
 - For 7 consecutive days, no cadence is in a red state. `reminder`,
   `paused` and `orphan` do not count; `pending-rollout` turns red after 14
-  days, so it cannot hide forever (P-r2-2). Every counted run has a verified
+  days, so it cannot hide forever. Every counted run has a verified
   `cadence.run.end`.
 - One induced failure per motivating mode, each run twice, each contained
   to its venture or host and named in one liveness line:
@@ -582,50 +448,13 @@ least one window.
   6. `venture-heartbeat.service` stopped for a day: nothing scheduled misses
   7. a wedged reconciler while pause is set: `cadence_run` still refuses
 
-## Appendix — evidence behind the plan
+## Lessons that shaped the plan
 
-### Measured 2026-09-23 (morning)
-
-- 62 cadences in enabled ventures before the clean slate, 29 after it. That
-  one morning is why v2 never hardcodes a count.
-- Tris's Hermes cron already runs `geo-research-tris` (daily, 06:00, `ok`).
-  Liveness does not see it.
-- OpenClaw runs cron automations with a `Declaration` column.
-  cron_install's KEY forbids `:`, hence the dash slug.
-- `cadence_completion.record_completion` is nightshift-shaped end to end.
-  Hence the new evidence path.
-
-### Owner decisions, 2026-09-23
-
-1. Every principal gets its cadences; rollout one at a time, in the order
-   Tris, Miles, Data, Winston.
-2. No folder numbers: ventures are named by `venture.yaml: name` (`plur`,
-   `firm`, `fds`, `datacore`, `meridian`).
-3. Reassignment comes after every principal executes; then existing cadences
-   are analysed and reassigned.
-4. Clean slate: every datafund and fds cadence was parked (datafund c06b5fb,
-   fds 35418d9) with its last recorded run, as comments in its venture.yaml.
-5. Data posts daily: the X post, plus a blog post with a dev.to mirror. The
-   07-29 publish policy is unchanged.
-
-### Winston's weekly plan (measured 2026-09-23)
-
-`cos_weekly_plan.sh` ran `claude -p "/weekly-plan …"`, got `Unknown command`
-with exit 0 on 2026-09-16 and 2026-09-20, and its check accepted the
-2026-09-16 fragment. The owner was told a four-day-old plan was ready. Fixed
-separately (chief-of-staff `a87520a`): the command text is the prompt, and
-only this run's fragment counts. Both rules carry into P2a items 2 and 3.
-
-### Findings, 2026-09-23 afternoon
-
-- **Prompt-only rules fail.** The inbox agent cancelled 654 live tasks while
-  reporting that it changed nothing. The ledger refused, and a code guard
-  now holds the boundary (chief-of-staff `ac39961`). The pr-review agent
-  wrote its report into the "never edit" cadence view, twice.
-- **The derived view is read back as input**, and every save copies it into
-  tracked shards. The view held records missing from the shards in five
-  spaces on nightshift. Interim: prose outcomes are read as the run they
-  claim, and differing notes on one run combine (ventures `5d0a96a`,
-  `266b098`). The fix is P2a item 4.
-- **An unrecorded run is invisible to the judge.** The box reads shards; a
-  run that only reached a host's view is late as far as the fleet knows.
+- Never hard-code a cadence count; counts change from one day to the next.
+  Every count is computed at check time.
+- A check that accepts a stale or empty artifact reports success that did
+  not happen: only this run's artifact counts.
+- Prompt-only rules fail; a boundary an agent must not cross is held in code.
+- A derived view read back as input corrupts the record it derives from.
+- An unrecorded run is invisible to the judge: a run that never reached the
+  replicated record is late as far as the fleet knows.

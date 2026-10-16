@@ -866,38 +866,30 @@ Local and server both work on `main` with atomic operations protocol.
 
 Principle 1 used to be implicit. This DIP said "local and server both work on
 `main`" and then specified `git_commit(...)` / `git_push()` with no branch
-argument — an invariant stated in prose and enforced nowhere. It cost two months
-of work.
+argument — an invariant stated in prose and enforced nowhere.
 
-**What happened.** `~/Data/5-plur` on the nightshift server was left checked out
-on `ops/b17-sprint-claim` after a sprint claim in May. Nobody ran
-`git checkout main`. Every claim, cadence run, journal entry and zettel since
-went to that branch: **610 commits — 52 zettels, 19 literature notes, every
-weekly content calendar since mid-June, 15 journal entries — none of it on
-`main`, none of it visible to anyone.**
+**Lesson.** A space checkout on the executor host was left on a feature branch
+after a sprint claim; every later claim, cadence run and knowledge write landed
+on that branch, invisible on the default branch, for weeks.
 
 **Why nothing caught it.** `check_and_repair_git()` ran a health check before
 every run and guarded three failure modes: stuck rebase, detached HEAD, missing
 upstream tracking. A stray branch passes all three — it is not detached, has no
-rebase in flight, and tracks its upstream cleanly. The health check inspected
-that branch every night for two months and correctly reported nothing wrong.
+rebase in flight, and tracks its upstream cleanly.
 
 > **A health check that only tests for BROKEN states will not catch a VALID
 > state that is simply WRONG.** This generalises well beyond git.
 
-**Enforcement.** `check_and_repair_git()` now resolves the default branch from
+**Enforcement.** `check_and_repair_git()` resolves the default branch from
 `origin/HEAD` and adds a fourth check: if HEAD is on any other branch, stash any
 dirty tree and check out the default. No `reset --hard` — unlike the rebase and
 detached-HEAD cases the tree is not broken, only pointed at the wrong branch, so
-the stray branch and its commits are left intact on origin. Shipped in
-`datacore-nightshift@9f56c49`.
+the stray branch and its commits are left intact on origin.
 
-**Known gap.** This guard lives in nightshift's `run.py`, so it protects Miles
-only. Tris (Hermes/hermes) and Mr Data (OpenClaw/plur-claw) run different
-runtimes with no equivalent, and at the time of writing neither host had any
-cron or timer touching git at all — which is how Tris accumulated 53 uncommitted
-competitor scans over two months that reached nobody, and how Mr Data's `~/Data`
-came to sit on stray branch `openclaw/manual-install-adaptations` with no PR.
+**Known gap.** This guard lives in nightshift's `run.py`, so it protects only
+the agent that runs on nightshift. Agents on other runtimes need an equivalent;
+an agent host with no scheduled git job lets uncommitted work and stray
+branches accumulate unseen.
 
 The runtime-independent fix is a commit path that resolves its own destination
 rather than inheriting whatever HEAD happens to be — `git hash-object` /
@@ -905,7 +897,8 @@ rather than inheriting whatever HEAD happens to be — `git hash-object` /
 while HEAD sits on a feature branch, with no checkout and no worktree. Until
 that exists, `.datacore/lib/git_fleet_audit.py` (read-only detector) and
 `.datacore/lib/git_fleet_sync.py` (bidirectional lander) are the backstop and
-are intended to run on a timer on **every** agent host, not just nightshift.
+are intended to run on a timer on **every** agent host, not just the executor
+host.
 
 ### Sync Flow
 
@@ -1224,7 +1217,7 @@ Cost: $0.32 | Duration: 38 min
 - Learning file integration
 
 ### Phase 4: Server Execution
-- Server setup (DigitalOcean)
+- Server setup (any VPS)
 - Git sync protocol
 - Cron-based execution
 

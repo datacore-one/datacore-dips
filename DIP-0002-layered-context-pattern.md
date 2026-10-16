@@ -162,7 +162,7 @@ The pattern extends to non-markdown configuration files:
 ├── rules.local.yaml            # Personal overrides (PRIVATE, gitignored)
 │   └── Personal contacts, custom ignore patterns
 
-1-datafund/
+1-acme/
 ├── mail-rules.yaml             # Space-specific rules (SPACE)
 │   └── Business contacts, partner patterns, project threads
 

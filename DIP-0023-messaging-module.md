@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0023 |
 | **Title** | Messaging Module |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Module |
 | **Status** | Draft |
 | **Created** | 2026-03-10 |
@@ -63,7 +63,7 @@ Federated messaging for Datacore installations with a Universal Inbox model. Use
 
 The existing `datacore-messaging` prototype (v0.1.0) demonstrates the concept but has fundamental issues:
 
-1. **Centralized relay** — A single WebSocket server at `datafund.ai` sees all messages in plaintext. This contradicts Datafund's data sovereignty principles.
+1. **Centralized relay** — A single hosted WebSocket relay sees all messages in plaintext. This contradicts Datacore's data sovereignty principles.
 2. **No real identity** — Shared-secret auth means everyone uses the same key. No per-user authentication, no message signing, no encryption.
 3. **Fragile org-mode handling** — Raw string manipulation with regex causes race conditions, cross-message matching errors, and silent data loss under concurrent access.
 4. **No task governance** — Anyone can flood your Claude agent with unbounded work. No prioritization, no quotas, no cost tracking.
@@ -151,10 +151,10 @@ Replace shared-secret authentication with per-user cryptographic identity.
 Replace the centralized relay with a federated model inspired by Mastodon/ActivityPub.
 
 **Actor model:**
-- Each Datacore user is an ActivityPub actor: `@gregor@datacore.example.com`
-- Each Claude agent is also an actor: `@gregor-claude@datacore.example.com`
+- Each Datacore user is an ActivityPub actor: `@alice@datacore.example.com`
+- Each Claude agent is also an actor: `@alice-claude@datacore.example.com`
 - Actors have inbox (receive) and outbox (send) endpoints
-- Discovery via WebFinger: `GET /.well-known/webfinger?resource=acct:gregor@datacore.example.com`
+- Discovery via WebFinger: `GET /.well-known/webfinger?resource=acct:alice@datacore.example.com`
 
 **Activities mapping:**
 
@@ -202,8 +202,8 @@ This extends the DIP-0009 GTD states (`TODO`, `WAITING`, `DONE`, `CANCELLED`) wi
 * TODO [2026-03-10 Tue 14:30] :unread:message:
 :PROPERTIES:
 :ID: msg-20260310-143000-a1b2c3d4
-:FROM: gregor@datacore.example.com
-:TO: tex@team.example.com
+:FROM: alice@datacore.example.com
+:TO: bob@team.example.com
 :THREAD: thread-msg-20260310-142500-e5f6g7h8
 :REPLY_TO: msg-20260310-142500-e5f6g7h8
 :SIGNATURE: ed25519:base64...
@@ -220,7 +220,7 @@ Messages use standard `TODO` keyword with `:message:` tag to distinguish from re
 * TODO [2026-03-10 Tue 16:00] :unread:file_delivery:
 :PROPERTIES:
 :ID: file-20260310-160000-c4d5e6f7
-:FROM: tex@team.example.com
+:FROM: bob@team.example.com
 :FILENAME: quarterly-report.pdf
 :SIZE: 2400000
 :CONTENT_TYPE: application/pdf
@@ -264,22 +264,22 @@ File deliveries use `TODO` with `:file_delivery:` tag. Lifecycle: `TODO` (not do
 ```yaml
 # Known ActivityPub actors
 actors:
-  - id: "tex@team.example.com"
-    name: "Tex"
+  - id: "bob@team.example.com"
+    name: "Bob"
     public_key: "ed25519:base64..."
     trust_tier: team
     added: 2026-03-10
-    notes: "Datafund team member"
+    notes: "Team member"
 
-  - id: "alice@external.org"
-    name: "Alice"
+  - id: "carol@example.org"
+    name: "Carol"
     public_key: "ed25519:base64..."
     trust_tier: trusted
     added: 2026-03-10
     notes: "External collaborator"
 
-  - id: "tex-claude@team.example.com"
-    name: "Tex's Claude Agent"
+  - id: "bob-claude@team.example.com"
+    name: "Bob's Claude Agent"
     type: agent
     public_key: "ed25519:base64..."
     trust_tier: team
@@ -368,7 +368,7 @@ Single command to triage everything. Note: `/inbox` is a core command (not modul
 Universal Inbox — 14 items
 
   Messages (3)        2 unread, 1 pending approval
-  Agent: gregor-claude (5)   2 completed, 1 running, 2 queued
+  Agent: alice-claude (5)   2 completed, 1 running, 2 queued
   Nightshift results (2)     2 awaiting review
   File deliveries (1)        1 new file via Fairdrop
   GTD captures (3)           3 unprocessed
@@ -405,7 +405,7 @@ Each Claude agent has a dedicated inbox — a structured org-mode file that trac
 
 ```
 org/messaging/agents/
-├── gregor-claude.org      # Owner's Claude agent inbox
+├── alice-claude.org      # Owner's Claude agent inbox
 ├── research-claude.org    # Specialized research agent (optional)
 └── _agent-index.yaml      # Agent registry with capabilities
 ```
@@ -420,7 +420,7 @@ All agent inbox files use the same `#+TODO:` header as messaging files (see Sect
 * QUEUED Research fair data economy competitors [#B] :AI:research:
 :PROPERTIES:
 :ID: task-20260310-150000-b3c4d5e6
-:FROM: tex@team.example.com
+:FROM: bob@team.example.com
 :TRUST_TIER: team
 :SUBMITTED: [2026-03-10 Tue 15:00]
 :ESTIMATED_TOKENS: 25000
@@ -434,7 +434,7 @@ Focus on technical approaches and funding status.
 * WORKING Draft blog post about Swarm incentives [#A] :AI:content:
 :PROPERTIES:
 :ID: task-20260310-143000-a1b2c3d4
-:FROM: gregor@datacore.example.com
+:FROM: alice@datacore.example.com
 :TRUST_TIER: owner
 :SUBMITTED: [2026-03-10 Tue 14:30]
 :STARTED: [2026-03-10 Tue 14:35]
@@ -445,7 +445,7 @@ Focus on technical approaches and funding status.
 * DONE Summarize weekly metrics [#C] :AI:data:
 :PROPERTIES:
 :ID: task-20260310-090000-f7g8h9i0
-:FROM: gregor@datacore.example.com
+:FROM: alice@datacore.example.com
 :TRUST_TIER: owner
 :SUBMITTED: [2026-03-10 Tue 09:00]
 :STARTED: [2026-03-10 Tue 09:05]
@@ -518,7 +518,7 @@ Owner reviews in Universal Inbox:
 The owner always has full visibility into their agent's inbox:
 
 - `/inbox agents` — show all agent inbox items (queued, working, done, waiting for approval)
-- `/inbox agents gregor-claude` — show specific agent
+- `/inbox agents alice-claude` — show specific agent
 - `/msg-budget` — token/cost usage per sender, per agent
 - `/today` briefing — includes agent inbox summary (X completed overnight, Y queued, Z awaiting approval)
 
@@ -541,7 +541,7 @@ Sender uploads file via Fairdrop
   → File NOT downloaded yet (lazy fetch)
 
 Owner triages in Universal Inbox:
-  → Sees: "File delivery from tex@team — quarterly-report.pdf (2.3MB)"
+  → Sees: "File delivery from bob@team — quarterly-report.pdf (2.3MB)"
   → Actions: download, preview metadata, reject, archive
   → On download: fairdrop_download(reference) → [space]/0-inbox/fairdrop/
   → Downloaded file becomes a standard ingest candidate
@@ -599,8 +599,8 @@ trust_tiers:
 
 # Per-actor overrides
 trust_overrides:
-  "tex@team.example.com": team
-  "alice@external.org": trusted
+  "bob@team.example.com": team
+  "carol@example.org": trusted
 ```
 
 #### 7.2 Task Priority Integration
@@ -719,13 +719,13 @@ Each Claude agent instance is a full ActivityPub actor:
     {"datacore": "https://datacore.one/ns/messaging#"}
   ],
   "type": "Service",
-  "id": "https://datacore.example.com/actors/gregor-claude",
-  "preferredUsername": "gregor-claude",
-  "name": "Gregor's Claude Agent",
-  "inbox": "https://datacore.example.com/actors/gregor-claude/inbox",
-  "outbox": "https://datacore.example.com/actors/gregor-claude/outbox",
+  "id": "https://datacore.example.com/actors/alice-claude",
+  "preferredUsername": "alice-claude",
+  "name": "Alice's Claude Agent",
+  "inbox": "https://datacore.example.com/actors/alice-claude/inbox",
+  "outbox": "https://datacore.example.com/actors/alice-claude/outbox",
   "publicKey": {
-    "id": "https://datacore.example.com/actors/gregor-claude#main-key",
+    "id": "https://datacore.example.com/actors/alice-claude#main-key",
     "publicKeyPem": "..."
   },
   "datacore:capabilities": ["research", "content", "data", "pm"],
@@ -909,7 +909,7 @@ inbox_feeds:
 
 Every state transition in the agent inbox (`§5.2`) MUST emit a lens event using the `agent.*` disciplined-core namespace defined in DIP-0027 §8. The point of this contract: the same observation plane that captures Datacore subagent activity (per DIP-0016 §19) also captures peer-agent activity from this module — the desktop app's Live Agent Stream, the Flow primitive, and Tier-3 contributable analytics see all agents through one wire format.
 
-Identity mapping: the ActivityPub actor identifier (`gregor-claude@datacore.example.com` per §8.2) is the value of `metadata.agent_id` in lens events. The actor enum value is always `"agent"` (DIP-0027 §8.1).
+Identity mapping: the ActivityPub actor identifier (`alice-claude@datacore.example.com` per §8.2) is the value of `metadata.agent_id` in lens events. The actor enum value is always `"agent"` (DIP-0027 §8.1).
 
 Mapping from agent-inbox state transitions to lens events:
 
@@ -1026,7 +1026,7 @@ Note: `/inbox` command is registered as a core command at `.datacore/commands/in
 - **Already exists as MCP server** — immediate integration path
 - **Keypair-based** — no blockchain dependency for basic identity
 - **Sign-submit pattern** — well-tested in Fairdrop MCP
-- **Datafund ecosystem alignment** — same organization, compatible philosophy
+- **Fair Data Society ecosystem alignment** — compatible philosophy and tooling
 - Rejected: DID:web (requires web infrastructure), PGP (poor UX), OAuth (requires central IdP)
 
 ### Why org-workspace over raw file manipulation
@@ -1058,7 +1058,7 @@ A basic GUI lowers the barrier to entry — not everyone starts in the terminal.
 
 ### Why Fairdrop/Fairdrive as inbox feed
 
-- **Decentralized file delivery** — Files arrive via Swarm, encrypted at rest, no central server sees content. Aligns with Datafund's data sovereignty principles.
+- **Decentralized file delivery** — Files arrive via Swarm, encrypted at rest, no central server sees content. Aligns with Datacore's data sovereignty principles.
 - **Lazy fetch** — File metadata arrives immediately; actual download happens on owner's triage action. No storage surprise from large unsolicited files.
 - **Fairdrive for ongoing collaboration** — Unlike Fairdrop (one-shot), Fairdrive pods enable persistent shared folders. Collaborators drop files in a pod; they appear in Universal Inbox.
 - **Already in the ecosystem** — Fairdrop MCP server is available, fds-id handles the identity layer. The integration path is short.

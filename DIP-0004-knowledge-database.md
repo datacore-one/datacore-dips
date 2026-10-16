@@ -103,8 +103,8 @@ Benefits of database indexing:
 |----------|------|-------|
 | Root | `~/.datacore/knowledge.db` | All spaces, cross-space queries |
 | Personal | `0-personal/.datacore/knowledge.db` | Personal space only |
-| Datafund | `1-datafund/.datacore/knowledge.db` | Datafund space only |
-| Datacore | `2-datacore/.datacore/knowledge.db` | Datacore space only |
+| Acme | `1-acme/.datacore/knowledge.db` | Acme team space only |
+| Acme Labs | `3-acme-labs/.datacore/knowledge.db` | Acme Labs space only |
 
 Space databases sync to root database, enabling both isolated and cross-space queries.
 
@@ -117,7 +117,7 @@ Space databases sync to root database, enabling both isolated and cross-space qu
 CREATE TABLE files (
     id INTEGER PRIMARY KEY,
     path TEXT UNIQUE NOT NULL,
-    space TEXT,                          -- personal, datafund, datacore
+    space TEXT,                          -- personal, acme, acme-labs
     type TEXT NOT NULL,                  -- zettel, page, journal, task, agent, etc.
     subtype TEXT,                        -- Further classification
     title TEXT,
@@ -257,7 +257,7 @@ CREATE TABLE journal_entries (
     id INTEGER PRIMARY KEY,
     file_id INTEGER REFERENCES files(id),
     date DATE NOT NULL,
-    space TEXT,                          -- personal, datafund, datacore
+    space TEXT,                          -- personal, acme, acme-labs
     type TEXT,                           -- daily, team-journal
     content TEXT,
     word_count INTEGER,
@@ -793,8 +793,8 @@ Space Coverage:
   │ Space     │ Files │ Tasks │ Last Sync      │
   ├─────────────────────────────────────────────┤
   │ personal  │   423 │   156 │ 2 hours ago    │
-  │ datafund  │   298 │    52 │ 2 hours ago    │
-  │ datacore  │   126 │    26 │ 2 hours ago    │
+  │ acme      │   298 │    52 │ 2 hours ago    │
+  │ acme-labs │   126 │    26 │ 2 hours ago    │
   └─────────────────────────────────────────────┘
 
 Alerts:
@@ -879,8 +879,8 @@ Rebuilding knowledge database...
   Initializing schema... done
   Scanning files...
     personal: 423 files
-    datafund: 298 files
-    datacore: 126 files
+    acme: 298 files
+    acme-labs: 126 files
   Parsing content... 847/847
   Resolving links... 2341 links, 94% resolved
   Building FTS index... done

@@ -386,13 +386,13 @@ config.
 ## Architecture Finding: the `.claude` symlink, and the ruling on real generation
 
 Task 8.2 (`.claude` artifact generation from registry) surfaced a finding
-specific to **this installation** that the generator's own design does not
-assume and must not be run against blind: `~/Data/.claude` is a **symlink
-to `.datacore`**, verified directly —
+that the generator's own design does not assume and must not be run against
+blind: in an installation where `~/Data/.claude` is a **symlink to
+`.datacore`** (as in the reference installation) —
 
 ```
 $ ls -la ~/Data/.claude
-lrwxr-xr-x@ 1 gregor  staff  9 10 maj  15:26 /Users/gregor/Data/.claude -> .datacore
+lrwxr-xr-x  1 user  staff  9 Jan  1 12:00 ~/Data/.claude -> .datacore
 ```
 
 — which means `.datacore/agents/*.md` are not a separate, hand-authored
@@ -643,7 +643,7 @@ Final gates run for this release, verbatim:
   exit 0, 110 active / 0 deprecated / 0 orphaned / 0 duplicate keys (the
   ≤60-active aspiration named in DIP-0040 remains an open follow-up, not
   reached by this release; recorded there, restated here for continuity).
-- `python3 job_verify.py --machine mac --alert log --no-emit` —
+- `python3 job_verify.py --machine workstation --alert log --no-emit` —
   `OK 3 jobs 3 artifacts`.
 - `python3 gen_claude_agents.py --registry ../registry/agents.yaml --out
   /tmp/gen-check-scratch --sections agents` — exit 0, 40 files written,

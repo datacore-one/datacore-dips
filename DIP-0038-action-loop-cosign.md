@@ -14,7 +14,7 @@
 | **Specs** | `.datacore/lib/briefing/actions.py`, `.datacore/lib/ledger/policy.py` |
 | **Agents** | any process that materializes briefing items into ledger items (`briefing.actions.materialize`); any human approver granting cosign for a side-effecting item |
 | **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — Event Ledger Substrate. Non-functional without it: the `item.create`/`approval.grant` event schema, `EVENT_TYPES`, and the Task 5.2b cross-actor HLC ordering fix this DIP's grant→create causality relies on. |
-| **Relates to** | winston-open-gaps item 7 (approvals loop built but never wired), DIP-0037 (Grounded Briefings — the upstream producer of the items this DIP materializes, soft/optional), DIP-0032 (Egress Enforcement — structural precedent for "policy file + fail-closed defaults"), DIP-0009 (GTD Specification — adjacent, disambiguated GTD task-state model, see Specification), DIP-0013 (Meetings Module §5.2 — escalation-detection pattern cited in Open Questions), DIP-0006 (Open Questions Management — superseded into DIP-0013 §4, cited for the same reason), `ENG-2026-0729-030` (signing opt-in amendment — the trust boundary this DIP's co-sign gate operates under) |
+| **Relates to** | the "approvals loop built but never wired" gap, DIP-0037 (Grounded Briefings — the upstream producer of the items this DIP materializes, soft/optional), DIP-0032 (Egress Enforcement — structural precedent for "policy file + fail-closed defaults"), DIP-0009 (GTD Specification — adjacent, disambiguated GTD task-state model, see Specification), DIP-0013 (Meetings Module §5.2 — escalation-detection pattern cited in Open Questions), DIP-0006 (Open Questions Management — superseded into DIP-0013 §4, cited for the same reason), `ENG-2026-0729-030` (signing opt-in amendment — the trust boundary this DIP's co-sign gate operates under) |
 
 > **Audit amendment status: Proposed (2026-09-11/12).** The trust-boundary,
 > content-binding, lifecycle and authority-configuration corrections recorded
@@ -61,7 +61,7 @@ items and never lets a dismissed item come back, no matter how many more
 times a briefing pipeline re-derives the same underlying text; `ledger.policy`
 (`Policy`, `guarded_append`) is the single sanctioned gate through which any
 side-effecting `item.create` must pass. This closes the specific,
-long-standing gap named in the Winston deep-audit's open-gaps list: approval
+long-standing gap named in a chief-of-staff audit's open-gaps list: approval
 machinery (`cos_approval_*` MCP tools) that existed, unwired, for months,
 while cron-generated briefings kept ending in questions ("queue those into
 nightshift?") nobody had a mechanical way to act on.
@@ -118,7 +118,7 @@ an environment flag alone does not establish that boundary. See TRUST BOUNDARY.
 | Agent | Uses This DIP For |
 |-------|-------------------|
 | *(none registered yet)* | No entry in `.datacore/registry/agents.yaml` calls `materialize`/`act`/`guarded_append` today. Verified absent, not omitted: Phase 6 wiring (see Rollout Plan) is what gives `cos_approval_*` MCP tools and Telegram dismiss/approve handlers a real caller. |
-| `nightshift-orchestrator` | Named only as the plausible eventual consumer of materialized side-effecting items — the motivating winston-open-gaps quote ("queue those into nightshift?") points here — but no code path in this DIP or [DIP-0011](DIP-0011-nightshift-module.md) connects them yet; do not treat this as a live integration. |
+| `nightshift-orchestrator` | Named only as the plausible eventual consumer of materialized side-effecting items — the motivating open-gaps quote ("queue those into nightshift?") points here — but no code path in this DIP or [DIP-0011](DIP-0011-nightshift-module.md) connects them yet; do not treat this as a live integration. |
 
 ### Integration Points
 
@@ -140,9 +140,9 @@ an environment flag alone does not establish that boundary. See TRUST BOUNDARY.
 
 Datacore had, before this phase, a recurring failure shape: capability that
 exists in code but is never connected to the flow a human actually lives in.
-The Winston 2026-07-12 deep audit named this explicitly as open gap #7:
+A deep audit of the chief-of-staff agent named this explicitly as an open gap:
 
-> **Approvals loop unused** — Winston's cron runs end with questions ("queue
+> **Approvals loop unused** — the chief-of-staff agent's cron runs end with questions ("queue
 > those into nightshift?") that now reach Telegram but still aren't
 > actionable. The `cos_approval_*` MCP tools (datacore-app) exist but aren't
 > wired into inbox/tomorrow flows.
@@ -624,7 +624,7 @@ and the block→grant→create cycle. No existing approval surface
 **Phase 6 (follow-on, flagged): wiring.** `cos_approval_*` MCP tools
 (`cos_approval_submit`, `cos_approval_get`, `cos_approval_list_pending`,
 `cos_approval_decide`) become real callers of `materialize`/`guarded_append`
-instead of standing unwired, closing winston-open-gaps item 7 directly.
+instead of standing unwired, closing the approvals-loop gap directly.
 Telegram gains dismiss/approve actions that call `briefing.actions.act` (for
 dismiss) and append `approval.grant` (for approve) against a specific
 `item_id` surfaced in the briefing message. Dismissal additionally triggers a
@@ -710,7 +710,7 @@ prevent literal re-creation of the same item id.
 
 ## References
 
-- winston-open-gaps item 7 — "Approvals loop unused... The `cos_approval_*`
+- The approvals-loop open gap — "Approvals loop unused... The `cos_approval_*`
   MCP tools (datacore-app) exist but aren't wired into inbox/tomorrow
   flows." The direct motivating gap this DIP closes the mechanism side of.
 - DIP-0034 — Event Ledger Substrate (the `item.create`/`approval.grant` event

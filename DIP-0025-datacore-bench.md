@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0025 |
 | **Title** | Evaluation & Benchmarking (datacore-bench) |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Core |
 | **Status** | Draft |
 | **Created** | 2026-03-16 |

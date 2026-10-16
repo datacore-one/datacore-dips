@@ -61,7 +61,7 @@ A structured system would provide:
 
 ```bash
 # Examples
-/my-questions verity
+/my-questions atlas
 /my-questions --all
 /my-questions datacore --upcoming-meeting
 ```
@@ -78,9 +78,9 @@ A structured system would provide:
 # Your Open Questions - Preparation for Meeting
 
 ## High Priority (Requires Your Decision)
-### VERITY - API Architecture
+### ATLAS - API Architecture
 **Question**: Should we implement rate limiting on the API?
-**Context**: Current API has no throttling, enterprise customers asking about scalability
+**Context**: Current API has no throttling, users asking about scalability
 **Background**: See docs/architecture/api-scaling.md
 **Your Role**: Technical decision maker
 **Suggested Prep**: Review current load patterns, check competitor approaches
@@ -104,7 +104,7 @@ A structured system would provide:
 
 ```bash
 # Examples
-/meeting-agenda verity
+/meeting-agenda atlas
 /meeting-agenda datacore --attendees @bob,@alice
 /meeting-agenda --all
 ```
@@ -146,10 +146,10 @@ A structured system would provide:
 
 | Command | Purpose | Example |
 |---------|---------|---------|
-| `/my-questions [project]` | Personal preparation view | `/my-questions verity` |
-| `/meeting-agenda [project]` | Generate meeting agenda | `/meeting-agenda verity --attendees @bob,@alice` |
+| `/my-questions [project]` | Personal preparation view | `/my-questions atlas` |
+| `/meeting-agenda [project]` | Generate meeting agenda | `/meeting-agenda atlas --attendees @bob,@alice` |
 | `/close-questions [issue]` | Process meeting outcomes | `/close-questions 123` |
-| `/add-question [project]` | Quick question capture | `/add-question verity "Budget for Q1?"` |
+| `/add-question [project]` | Quick question capture | `/add-question atlas "Budget for Q1?"` |
 
 ## Example Complete Workflow
 
@@ -161,13 +161,13 @@ A structured system would provide:
 
 **Wednesday - Individual Prep**:
 ```bash
-/my-questions verity
+/my-questions atlas
 # Shows context, suggests research, allows pre-meeting input
 ```
 
 **Thursday - Agenda Creation**:
 ```bash
-/meeting-agenda verity --attendees @bob,@alice,@carol
+/meeting-agenda atlas --attendees @bob,@alice,@carol
 # Creates structured GitHub issue with preparation status
 ```
 
