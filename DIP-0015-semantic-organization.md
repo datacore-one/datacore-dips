@@ -201,6 +201,8 @@ Content is organized by **role and purpose**, not by format:
 └── CLAUDE.md                  # Personal context
 ```
 
+**Tool config folders (any space, amended 2026-10-16):** editor and agent configuration folders (`.obsidian/`, `.logseq/`, `.superpowers/`, `.gstack/`, `.plur/`) and a repository `LICENSE` may sit at a space root. They hold tool settings, not content, so they are not drift.
+
 **Team Space ([N]-[name]/)**
 ```
 [N]-[name]/
