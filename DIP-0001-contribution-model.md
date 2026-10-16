@@ -138,7 +138,7 @@ _Last audited: 2026-03-04_
 | PR template | `.github/pull_request_template.md` with privacy/structural checklists |
 | Layer 1 Safety Gate | `.github/workflows/validate-layers.yml` validates `.base.md` for PII on PR/push |
 | Pre-commit hook | `.datacore/hooks/pre-commit` validates staged `.base.md` for PII before commit |
-| Pre-push hook | `.datacore/hooks/pre-push` validates all `.base.md` in push range + git-lfs check |
+| Pre-push hook | `.datacore/hooks/pre-push` validates all `.base.md` in push range; passes refs on to `git lfs pre-push` only when git-lfs is installed (no LFS-tracked files, DIP-0015) |
 | `context_merge.py validate` | PII detection for emails, phones, APIs, dollar amounts in PUBLIC layers |
 | Privacy policy | `.datacore/specs/privacy-policy.md` with data classification and sharing guidelines |
 | Autonomous PR review script | `.datacore/lib/pr_review.py` (244 lines) for Layer 3 deep review |
