@@ -809,7 +809,7 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 
 | Feature | Rationale |
 |---------|-----------|
-| Untrack binaries already in git | Done 2026-10-16 for the 12 tracked files over 10 MB (0-personal 8, 3-fds 2, 4-forge 2); they stay on disk, gitignored |
+| Untrack binaries already in git | Done 2026-10-16 for the 12 tracked files over 10 MB; they stay on disk, gitignored |
 | Pilot migration with external contributors | Deferred to post-publication when contributors exist |
 | Companion enforcement in CI | Requires DIP-0001 GitHub Actions pipeline; manual creation sufficient |
 
