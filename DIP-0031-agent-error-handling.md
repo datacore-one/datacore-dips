@@ -23,7 +23,7 @@ design) and ranked missing error standards 9/10 on the pain scale.
 
 ## Motivation
 
-The 2026-04-30 and 2026-05-05 nightshift failures carried `error: ""` —
+Nightshift task failures have been recorded with `error: ""` —
 failure-analyzer had nothing to analyze, retries fired blindly, and the
 operator learned nothing. Separately, fail-open code paths (`except: pass`)
 hid root causes for weeks. Error handling needs a contract, not habits.

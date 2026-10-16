@@ -110,15 +110,15 @@ was wrong, and three of the four **prescribed remedies were actively
 harmful**, not merely mistaken (`ENG-2026-0728-002`):
 
 1. **"639 uncommitted changes in 0-personal, worth a manual commit"** — the
-   639 were actually **deletions** on the nightshift server under
+   639 were actually **deletions** on the executor host under
    `4-outbox/archive/`. Committing them, as the briefing recommended, would
    have deleted 639 files.
 2. **"84 stale cadences, verify their schedules"** — there were **28**
    cadences with no executor scheduled at all, not 84 stale ones. Pruning on
    the strength of this claim would have deleted work on the evidence of a
    runner that had simply never fired.
-3. **"Matthew Elliott awaiting your reply"** — this was **inverted**: Gregor
-   had sent the message and was awaiting a reply *from* Matthew, not the
+3. **"A contact is awaiting your reply"** — this was **inverted**: the owner
+   had sent the message and was awaiting a reply *from* the contact, not the
    other way around.
 4. A **19:00 meeting was listed that exists on no calendar**, and a 16:00
    meeting that had actually been declined was reported as upcoming.

@@ -232,7 +232,7 @@ knowledge_anchors:
     relevance: primary       # primary | supporting | example
     snippet: "3-tier model: raw, enriched, insight-layer"
     snippet_extracted_at: "2026-03-02"
-  - path: "0-personal/3-knowledge/literature/Fund-Tokenization.md"
+  - path: "0-personal/3-knowledge/literature/Data-Provenance.md"
     relevance: supporting
 ```
 

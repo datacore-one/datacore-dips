@@ -13,7 +13,7 @@
 | **Affects** | `.datacore/lib/` (sync scripts), `.datacore/githooks/`, `.datacore/hooks/`, `.datacore/modules/nightshift/lib/`, `.datacore/modules/chief-of-staff/server/lib/`, 10+ module `*-hook` commands, `/today`, `/tomorrow`, `/wrap-up`, `/continue`, `/process-inbox`, and — in separate repositories — `datacore-mcp` (GTD write tools) and `datacore-app` (no ledger awareness today) |
 | **Specs** | `.datacore/lib/jobs/manifest.yaml` (detector contracts) |
 | **Agents** | `nightshift-orchestrator`, `journal-coordinator`, `wrap-up-executor` |
-| **Relates to** | DIP-0011 (Nightshift — the `git push`-as-lock this replaces), DIP-0034 (Event Ledger Substrate — reserves this migration for its own DIP; membership uses the flat file in §11; no `member.*` amendment is required), DIP-0044 (Actor Identity — authentication, where this DIP is authorization), DIP-0035 (Job Contracts — detector contracts), DIP-0043 (Org Projection), DIP-0018 (Credential Management), ENG-2026-0423-001, ENG-2026-0729-009, ENG-2026-0804-033, ENG-2026-0811-005 |
+| **Relates to** | DIP-0011 (Nightshift — the `git push`-as-lock this replaces), DIP-0034 (Event Ledger Substrate — reserves this migration for its own DIP; membership uses the flat file in §11; no `member.*` amendment is required), DIP-0044 (Actor Identity — authentication, where this DIP is authorization), DIP-0035 (Job Contracts — detector contracts), DIP-0043 (Org Projection), DIP-0018 (Credential Management) |
 
 ## Summary
 
@@ -34,25 +34,24 @@ that made them necessary rather than hardening them.
 
 ## Motivation
 
-Every git incident in this installation has the same root cause: **git is
-carrying mutable shared state**. Mutable state produces conflicts; conflicts
+The git incidents seen in multi-machine installations share one root cause:
+**git is carrying mutable shared state**. Mutable state produces conflicts; conflicts
 produce rebases; rebases produce rescue branches, hard resets, gatekeepers, and
 stranded work.
 
-The record, all verified rather than recalled:
+The failure classes this produces:
 
-| Incident | Cost |
+| Failure class | Cost |
 |---|---|
-| Checkout left on `ops/b17-sprint-claim` (DIP-0011, 2026-07-13) | 610 commits invisible — 52 zettels, 19 literature notes, 15 journal entries |
-| `nightshift/run-*` branches, 2026-08-06..11 | **645 commits across 74 branches**, growing nightly |
-| `git_fleet_sync` failure (`caa7d58`, 2026-07-21) | **110 files wiped** from datafund-space |
-| stash→pull→stash-pop on the Mac (ENG-2026-0729-009) | 10 orphaned stashes over six weeks |
-| `git push … \|\| true` in `cos_sync.sh` | failed pushes reported as "synced clean" |
+| A checkout left on a non-default branch | hundreds of commits invisible to every other reader |
+| Per-run executor branches that are never merged | commits stranded across dozens of branches, growing nightly |
+| A fleet sync that propagates a bad tree | many files wiped from a team space |
+| stash→pull→stash-pop on a workstation | orphaned stashes accumulating silently |
+| `git push … \|\| true` in a sync script | failed pushes reported as "synced clean" |
 
-Four independent implementations of the same sync algorithm exist
-(`cos_sync.sh` ×2 paths, `space_sync.py`, `git_fleet_sync.py`), so each defect
-must be fixed four times — and in practice was not: the `|| true` fix lived only
-on the box while the repository carried two older broken copies.
+When several independent implementations of the same sync algorithm exist,
+each defect must be fixed in every copy — and in practice is not: a fix lands
+on one host while the repository carries older broken copies.
 
 The ledger is the opposite shape. It is **append-only, one file per writer**.
 That is the single data structure git handles with no discipline at all: two
@@ -114,7 +113,7 @@ role once the file is generated. An earlier draft carried a projector-election
 open question straight from the old model into this one, which was a
 contradiction of this very section.
 
-Winston's role is unchanged and unrelated: it sequences **finality** over the
+The chief-of-staff agent's role is unchanged and unrelated: it sequences **finality** over the
 combined log (DIP-0042). Appends need no sequencer — they are per-actor and
 disjoint — and projection needs no sequencer either. What a sequencer provides
 is ordering *across* actors for settlement, which is a different question from
@@ -122,7 +121,7 @@ who renders a local view.
 
 The **Derived** row is the load-bearing decision. A projection that is
 deterministic from the ledger is a build artifact. Tracking a build artifact in
-git and then merging it across five machines is the whole disease. Gitignore it
+git and then merging it across every machine is the whole disease. Gitignore it
 and regenerate.
 
 This is what deletes the rescue branch, the hard reset, the merge gatekeeper,
@@ -195,11 +194,11 @@ disposable environment; it must not regenerate a replacement before testing it.
 Every agent commit carries trailers binding it to the ledger:
 
 ```
-Datacore-Actor: data
-Datacore-Space: 5-plur
-Datacore-Event: 1786407657798.0001.data
-Generated-by: openclaw/codex-gpt-5.5
-Signed-off-by: Gregor <gregor@datafund.io>
+Datacore-Actor: gateway
+Datacore-Space: 1-acme
+Datacore-Event: 1786407657798.0001.gateway
+Generated-by: <agent-framework>/<model>
+Signed-off-by: Alice <alice@example.com>
 ```
 
 Git and the ledger become **cross-verifiable in both directions**: every agent
@@ -264,10 +263,10 @@ provenance record is:
 
 Two sinks consume it. The **local sink** writes the trailers and the ledger
 event, and is always on. An **external attestor** is optional and additive:
-Datafund's Verity already models exactly this as a `ProvenanceEvent` with
-`signature`, `notarySigner`, `notaryTimestamp` and blockchain anchoring, so
-wiring it in is an adapter that maps the record above onto that schema and posts
-it — **no caller changes, no record changes**.
+a notary service that models a provenance event with a signature, a notary
+signer, a notary timestamp and optional blockchain anchoring can be wired in
+as an adapter that maps the record above onto its schema and posts it — **no
+caller changes, no record changes**.
 
 This is the same discipline as §9: the thing that varies is behind an interface
 from the start, so adopting it later is wiring rather than redesign. Two
@@ -352,9 +351,9 @@ completion-time verification are independent controls.
 
 Any fallback that silently changes isolation, execution mode, or transport is a
 **failure**, not a warning. A degrade that reports success is indistinguishable
-from success, and this installation has produced that failure at least five
-times (silent push failure, silent auth failure, silent PR-flow failure, silent
-stash loss, silent worktree in-place fallback in an independently-built system).
+from success, and that failure recurs in many forms (silent push failure, silent
+auth failure, silent PR-flow failure, silent stash loss, silent worktree
+in-place fallback).
 
 ### 7. Enforcement by host
 
@@ -364,8 +363,8 @@ and the difference is stated rather than papered over.
 
 | Host | Mechanism | Spaces |
 |---|---|---|
-| Gitea (self-hosted) | `pre-receive` rejecting a push that writes another actor's log — server-side, unbypassable, applies to all protocols and the API | 0-personal, 4-forge, 6-meridian, 7-megaphone |
-| GitHub | Rulesets with `bypass_actors` for agent accounts; merge queue for code repos | 1-datafund, 2-datacore, 3-fds, 5-plur, 8-firm |
+| Gitea (self-hosted) | `pre-receive` rejecting a push that writes another actor's log — server-side, unbypassable, applies to all protocols and the API | spaces hosted on a self-hosted forge |
+| GitHub | Rulesets with `bypass_actors` for agent accounts; merge queue for code repos | spaces hosted on GitHub |
 
 Rulesets supersede classic branch protection. Removing protection entirely to
 let agents push is the wrong fix; adding the agent accounts to `bypass_actors`
@@ -388,7 +387,7 @@ dated artifact and `max_age_hours`:
 | **commit ↔ event cross-ref** | agent wrote without recording, or recorded without writing |
 | **projection drift** — regenerate and diff | fold divergence between machines |
 | **actor-file ownership** | one actor wrote another's log |
-| **config drift** — `core.hooksPath`, ruleset state, on **all five machines** | our own enforcement being switched off |
+| **config drift** — `core.hooksPath`, ruleset state, on **every machine** | our own enforcement being switched off |
 | **actor presence** — every rostered actor has a log that is present, advancing, and **written only by its owner** | a log that was **deleted**, truncated, or written by the wrong actor |
 
 Six, not eight. Two pairs collapsed because each pair asked one question twice:
@@ -407,10 +406,10 @@ Six, not eight. Two pairs collapsed because each pair asked one question twice:
 
 **Absence is a first-class failure.** `verify_chain` verifies a file it is
 given; it has nothing to say about a file that is not there, because a chain of
-zero events is a valid chain. Delete `data.jsonl` and every surviving copy still
-reports OK. This is not hypothetical — a sweep wiped 110 files from
-datafund-space on 2026-07-21, and `git_fleet_sync` refuses to propagate
-deletions precisely because of it.
+zero events is a valid chain. Delete `<actor>.jsonl` and every surviving copy
+still reports OK. This is not hypothetical — a bad sweep can wipe many files
+from a space at once, which is why a fleet sync must refuse to propagate
+deletions.
 
 The roster in `registry/infrastructure.yaml` is therefore **load-bearing for
 integrity, not just for naming**: it is the only statement of which logs must
@@ -455,8 +454,8 @@ Prime Intellect's `prime-rl` does exactly this: a `MicroBatchSender` /
 `transport.type`, so producers and consumers never learn which is in use. The
 simple, durable transport is the default; the fast one is swapped in by config.
 
-The same reasoning applies here for a concrete reason. Two of our five actors
-(`tris`, `data`) hold partial checkouts and have no business carrying full space
+The same reasoning applies here for a concrete reason. Some actors (for
+example agent-gateway hosts) hold partial checkouts and have no business carrying full space
 history; a satellite transport (rsync of `events/`, or an HTTP endpoint) may be
 correct for them later. If callers speak to the interface, that is a
 configuration change. If callers call `git` directly — as sixteen of them do
@@ -502,8 +501,8 @@ Facts live **inside their space**, not in a separate ledger repository. An
 earlier draft proposed extracting them; that draft was wrong, and the reason it
 was wrong is worth recording because it is a trap this design invites.
 
-It argued that `data` cloning 2.3 GB of `5-plur` to read 1.6 MB of events was
-waste, and that the read access to journals and knowledge which came with it was
+It argued that an agent cloning gigabytes of a space to read a megabyte or two
+of events was waste, and that the read access to journals and knowledge which came with it was
 an access-control problem. **The knowledge is not overhead — it is the point.**
 An agent producing work in a space draws on that space's knowledge base; an
 agent holding only the event log can claim items and cannot do them well. The
@@ -549,7 +548,7 @@ decisive.
 It imports admission machinery — bootstrap, authority, revocation ordering —
 built for many mutually-distrusting writers, into a fact that **one person edits
 a few times a year**. This DIP already refuses consensus on exactly that ground
-("all five machines belong to one principal… nothing to vote on"); admission
+("all machines belong to one principal… nothing to vote on"); admission
 control is consensus's sibling and the same argument applies. The audit question
 it was meant to answer — *who admitted this actor, and when* — is answered for
 free by `git log` on a tracked file, which is the audit mechanism this DIP
@@ -638,8 +637,8 @@ requires. Industry practice for agents writing code is adopted here in full,
 because unlike the knowledge rules it is answering the same question we have.
 
 **Worktrees, not clones, for agent code work.** Each agent task gets an isolated
-checkout sharing one object store — measured on this installation at 1.3 MB
-versus 6.2 MB for a clone of the same repository, and commits are visible across
+checkout sharing one object store — measured at a fraction of the size of a
+full clone of the same repository, and commits are visible across
 worktrees without a remote round-trip. Branch namespace is `agent/<task-id>`,
 **unique per run**: an independently-built system stranded work by deriving the
 branch from a stable alias while the path varied, so `worktree add -b` failed on
@@ -647,7 +646,7 @@ the second run and silently fell back to editing the user's source tree. Per §6
 that degrade is a failure, not a warning.
 
 Worktrees are for **code only**. They cannot span machines, so they contribute
-nothing to the ledger's problem, which is five machines agreeing.
+nothing to the ledger's problem, which is several machines agreeing.
 
 **A commit-decision gate.** An agent does not decide to commit. When work
 reaches a verdict on a non-empty working tree, the run **pauses** and records a
@@ -660,12 +659,10 @@ Two properties are the point. The decision is **durable and attributable** —
 answerable afterwards from a file, not from memory. And the default is **stop**:
 an agent that cannot reach an operator does not merge, it waits.
 
-This closes the standing task *"Design a sign-off gate for nightshift/Miles-
-authored features before merge"* (`5-plur`, priority A, created 2026-07-09),
-whose `CONTEXT` has been empty since. It became urgent when agent accounts were
-added to branch-protection bypass and protection was removed from `plur-space`:
-nothing currently stands between an agent and an unreviewed write to a code
-default branch.
+This answers the need for a sign-off gate on executor-authored features before
+merge. It matters most where agent accounts are on a branch-protection bypass
+list: without such a gate, nothing stands between an agent and an unreviewed
+write to a code default branch.
 
 **Merge queue** on code repositories with more than one agent contributing.
 Required status checks force every PR to be current with the target branch,
@@ -935,7 +932,7 @@ migration worked.
 - **OQ-4.** Do agent-personal spaces participate in the shared ledger, or keep
   their own?
 - **OQ-5.** Is a satellite transport (rsync of `events/`, or HTTP) worth adding
-  for `tris` and `data`, which hold partial checkouts and do not need full space
+  for actors that hold partial checkouts and do not need full space
   history? §9 makes this a configuration change rather than a rewrite, but it is
   not obviously worth doing.
 - **OQ-6 — corrected 2026-09-11.** §10 requires serialized append, not a
@@ -1191,12 +1188,12 @@ This amendment adds a distinction the transport always implied and never stated;
 merge-never-rebase rule, or any host's authorship. Ratification is the owner's.
 
 **Why.** §1–§13 describe how facts move between hosts and treat every host
-alike. They are not alike. Four hosts are promised to be up. The fifth is a
-laptop: it arrives when a person opens the lid, contributes while they work and
+alike. They are not alike. Most hosts are promised to be up. A workstation
+laptop is not: it arrives when a person opens the lid, contributes while they work and
 leaves without notice. Monitoring applied server deadlines to it anyway, and for
-a month each detector grew its own exemption for the lid — awake-time ages
-(2026-09-16), a dark-wake hold (09-17), launchd in place of cron (09-09), a
-publisher grace moved to the right clock (09-21). Four patches approximating one
+a month each detector grew its own exemption for the lid — awake-time ages,
+a dark-wake hold, launchd in place of cron, a publisher grace moved to the
+right clock. Four patches approximating one
 missing rule. The roster already said *"a workstation is not a degraded
 server"*; this makes that sentence normative.
 

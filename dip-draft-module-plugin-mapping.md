@@ -26,7 +26,7 @@ The Claude Agent SDK plugin system (`.claude-plugin/plugin.json`, `agents/`, `sk
 Datacore modules define agents, skills, hooks, MCP server configs, and context (CLAUDE.base.md). The Claude Code SDK independently defines a plugin system with equivalent constructs. Today these are maintained separately: `module.yaml` is the source of truth for Datacore, and `.claude-plugin/plugin.json` is the source of truth for SDK-native loading. Maintaining both in parallel has three costs:
 
 1. **Redundancy**: Agent names, descriptions, model hints, and tool restrictions live in `module.yaml` and `agents.yaml` but must be re-expressed in any SDK-native wrapper.
-2. **Drift**: Changes to module.yaml do not propagate to plugin.json. The PLUR project (5-plur workspace) already exhibits this: `.claude-plugin/plugin.json` carries only identity metadata (`name`, `version`, `description`, `author`) — no agent, skill, hook, or MCP definitions — which means SDK-native loading of PLUR does not expose any capabilities beyond the manifest.
+2. **Drift**: Changes to module.yaml do not propagate to plugin.json. An existing plugin project in this workspace already exhibits this: `.claude-plugin/plugin.json` carries only identity metadata (`name`, `version`, `description`, `author`) — no agent, skill, hook, or MCP definitions — which means SDK-native loading of that plugin does not expose any capabilities beyond the manifest.
 3. **Discovery gap**: Claude Code can only load Datacore modules via `CLAUDE.md` injection and manual `mcpServers` config in `settings.json`/`.mcp.json`. A canonical plugin.json would allow SDK-native `plugins` loading, making Datacore modules first-class plugins installable by any Claude Code user without Datacore-specific setup.
 
 ---
@@ -81,11 +81,11 @@ Agent files (`.datacore/agents/<name>.md`) carry YAML frontmatter with: `name`, 
     └── .mcp.json        # MCP server configs for this plugin
 ```
 
-The `plugin.json` manifest is JSON. As observed in the PLUR workspace (the only live example in this installation), it currently carries only identity fields:
+The `plugin.json` manifest is JSON. As observed in an existing plugin project, it currently carries only identity fields:
 
 ```json
 {
-  "name": "plur",
+  "name": "example-plugin",
   "version": "0.9.13",
   "description": "...",
   "author": { "name": "...", "url": "..." },
@@ -96,7 +96,7 @@ The `plugin.json` manifest is JSON. As observed in the PLUR workspace (the only 
 }
 ```
 
-No `agents`, `skills`, `hooks`, or `mcp` sections are present in the observed examples. This indicates the PLUR plugin is using `.claude-plugin/` primarily as a discovery manifest (identity + npm-style metadata), not as a full capability declaration. The SDK may support additional fields that are not yet populated in these examples.
+No `agents`, `skills`, `hooks`, or `mcp` sections are present in the observed examples. This indicates that plugin is using `.claude-plugin/` primarily as a discovery manifest (identity + npm-style metadata), not as a full capability declaration. The SDK may support additional fields that are not yet populated in these examples.
 
 From the frontmatter schema pattern (`_patterns/frontmatter-schema.md`) and `settings.json`, the agent definition format is already SDK-native: Claude Code reads the YAML frontmatter in `.datacore/agents/<name>.md` directly. The `tools`, `model`, `name`, `description`, `effort`, and `color` fields are read natively by the Claude CLI as of claude 2.1.x.
 
@@ -180,7 +180,7 @@ From the frontmatter schema pattern (`_patterns/frontmatter-schema.md`) and `set
 
 ### Alternative: Keep formats separate
 
-Maintain module.yaml as Datacore's internal format and plugin.json as a thin wrapper that carries only identity metadata (the current PLUR approach). Modules load via CLAUDE.md injection and settings.json mcpServers config; plugins load via SDK `plugins` option. Both coexist independently.
+Maintain module.yaml as Datacore's internal format and plugin.json as a thin wrapper that carries only identity metadata (the current approach in existing plugins). Modules load via CLAUDE.md injection and settings.json mcpServers config; plugins load via SDK `plugins` option. Both coexist independently.
 
 **Why this fails at scale**: As Datacore modules mature and the Claude Code plugin ecosystem grows, duplicate maintenance compounds. Every agent update, skill addition, or MCP server config change must be applied in two places. The PLUR example already shows the result: the plugin.json is effectively a no-op for capability loading.
 
@@ -204,7 +204,7 @@ Add a `plugin` block to `module.yaml` that carries fields the SDK needs but Data
 
 ```yaml
 plugin:
-  homepage: "https://plur.ai"
+  homepage: "https://example.com"
   keywords: [gtd, tasks, org-mode]   # Augments or overrides engrams.match_terms for discovery
   sdk_min_version: "2.1"              # Minimum claude CLI version for plugin loading
   capabilities:
@@ -344,7 +344,7 @@ Do **not** update the `module-deployment-checklist.md` until the spike validates
 
 ## Open Questions
 
-1. Does the Claude Agent SDK `plugin.json` support `agents`, `skills`, `hooks`, or `mcp` top-level keys beyond the identity fields observed in the PLUR workspace? The current evidence (two plugin.json files, both identity-only) is insufficient to confirm the full schema. A quick SDK documentation check or Anthropic changelog review should resolve this before the spike.
+1. Does the Claude Agent SDK `plugin.json` support `agents`, `skills`, `hooks`, or `mcp` top-level keys beyond the identity fields observed in existing plugin projects? The current evidence (two plugin.json files, both identity-only) is insufficient to confirm the full schema. A quick SDK documentation check or Anthropic changelog review should resolve this before the spike.
 
 2. How does the SDK load agents from `plugins/agents/`? Does it merge them with the project's own `.datacore/agents/`, or keep them namespaced? If namespaced (e.g., `Agent(nightshift:nightshift-orchestrator)`), spawning logic in existing agents (which use bare `Agent(nightshift-orchestrator)`) may need updating.
 
@@ -362,8 +362,7 @@ Do **not** update the `module-deployment-checklist.md` until the spike validates
 - [DIP-0002: Layered Context Pattern](./DIP-0002-layered-context-pattern.md) — CLAUDE.base.md privacy model
 - [DIP-0019: Learning Architecture](./DIP-0019-learning-architecture.md) — engram portability constraints
 - `.datacore/agents/_patterns/frontmatter-schema.md` — agent frontmatter schema (current spec)
-- `5-plur/plur/.claude-plugin/` — live example of Claude Code plugin layout (identity-only)
-- `5-plur/2-projects/.wt-941-engine-warn/.claude-plugin/plugin.json` — second live example (same pattern)
+- `<project>/.claude-plugin/plugin.json` — an existing Claude Code plugin layout (identity-only)
 - `.datacore/settings.json` — `"enabledPlugins": {}` confirms SDK plugin loading mechanism exists
 - `.mcp.json` — root-level MCP server config (separate from plugin-scoped `.mcp.json`)
 - Claude Agent SDK plugin system (`plugins` option in settings.json)

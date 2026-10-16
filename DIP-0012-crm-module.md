@@ -53,7 +53,7 @@ A CRM module that:
 - "Before my flight to Abu Dhabi, who should I meet?"
 - "What's the history with Animoca Brands?"
 - "Add a follow-up task for John Smith"
-- "Move this contact to the Datafund space"
+- "Move this contact to the Acme space"
 
 ## Specification
 
@@ -349,12 +349,12 @@ relationship_status: active       # discovered | lead | contacted | in_discussio
 relationship_type: partner        # partner | investor | customer | vendor | advisor | peer | competitor | target_*
 relevance: 4                      # 1-5 (minimal to critical)
 privacy: team                     # personal | team
-space: 1-datafund
+space: 1-acme
 organization: "[[Acme Corp]]"
 role: "VP of Partnerships"
 industries: [defi, data_infrastructure]
 channels:
-  email: john@acme.com
+  email: john@acme.example.com
   telegram: "@jsmith"
   linkedin: "/in/johnsmith"
   phone: "+1-555-0123"
@@ -406,7 +406,7 @@ VP of Partnerships at [[Acme Corp]]. Met at ETH Denver 2024, introduced by [[Jan
 
 ```org
 * TODO Follow up on partnership proposal   :CRM:
-  SCHEDULED: <2025-12-20 Fri>
+  SCHEDULED: <2025-12-20 Sat>
   :PROPERTIES:
   :CONTACT: John Smith
   :END:
@@ -433,7 +433,7 @@ relevance: 4                      # 1-5 (minimal to critical)
 industries: [defi, data_infrastructure]
 market_position: competitor       # competitor | leader | emerging | adjacent
 stage: "Series B"                 # seed | series_a | series_b | growth | enterprise
-space: 1-datafund
+space: 1-acme
 website: "https://acme.com"
 linkedin: "/company/acmecorp"
 location: "San Francisco, USA"
@@ -638,15 +638,15 @@ sources:
   - space: 0-personal
     path: 0-personal/contacts/
     count: 47
-  - space: 1-datafund
-    path: 1-datafund/contacts/
+  - space: 1-acme
+    path: 1-acme/contacts/
     count: 23
 
 contacts:
   - name: "John Smith"
     type: person
-    space: 1-datafund
-    path: 1-datafund/contacts/people/John Smith.md
+    space: 1-acme
+    path: 1-acme/contacts/people/John Smith.md
     status: active
     last_interaction: 2025-12-10
     relationship_score: 0.85
@@ -669,19 +669,19 @@ Contacts can be staged from personal to team space when relationship formalizes.
 1. Contact exists in `0-personal/contacts/`
 2. User decides to share with team
 3. Run `/crm` → "Promote to team space"
-4. Contact copied to `1-datafund/contacts/`
+4. Contact copied to `1-acme/contacts/`
 5. Personal note becomes reference with private notes preserved
 
 ```yaml
 # 0-personal/contacts/people/John Smith.md (after promotion)
 ---
 type: contact-ref
-canonical: 1-datafund/contacts/people/John Smith.md
+canonical: 1-acme/contacts/people/John Smith.md
 ---
 
 # John Smith
 
-**Promoted to team space.** See: [[1-datafund/contacts/people/John Smith]]
+**Promoted to team space.** See: [[1-acme/contacts/people/John Smith]]
 
 ## Personal Notes (not synced)
 
@@ -706,7 +706,7 @@ CRM tasks use `:CRM:` tag in `next_actions.org`:
 
 ```org
 * TODO Follow up with [[John Smith]] on partnership   :CRM:
-  SCHEDULED: <2025-12-20 Fri>
+  SCHEDULED: <2025-12-20 Sat>
   :PROPERTIES:
   :CONTACT: John Smith
   :EFFORT: 0:15
@@ -739,7 +739,7 @@ CRM - Contact Relationship Management
 
 If user provides context, infer intent:
 - "John Smith" → View/edit contact
-- "trip to Dubai" → Trip preparation
+- "trip to Berlin" → Trip preparation
 - "scan" or "update" → Scan for interactions
 
 If no context, present menu:
@@ -1239,7 +1239,7 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 |---------|-----------|
 | Privacy staging workflow | Contact-ref mechanism specified; not operationalized in workflow |
 | External module adapters | CRMAdapter interface defined; no modules have registered `crm_adapter:` yet |
-| 1-datafund contacts structure | Symlink to reference; not per-spec CRM structure with full interactions |
+| Team-space contacts structure | Symlink to reference; not per-spec CRM structure with full interactions |
 
 ### Resolved Questions
 

@@ -419,7 +419,7 @@ The `Actor` enum gains a fifth member:
 | `external` | Cross-host signals from non-Datacore sources |
 | **`agent`** | **Autonomous agent — subagent (DIP-0016) or peer (DIP-0023)** |
 
-The `agent` actor is the type discriminator. The agent's stable identifier (e.g., `mr-data@plur-claw` for peer agents per DIP-0023's ActivityPub model, plain registry name for DIP-0016 subagents) is carried in the event's `target_id` or in `metadata.agent_id`. Implementations SHOULD prefer ActivityPub-shaped identifiers when the agent is also an AP actor.
+The `agent` actor is the type discriminator. The agent's stable identifier (e.g., `agent-a@host-a` for peer agents per DIP-0023's ActivityPub model, plain registry name for DIP-0016 subagents) is carried in the event's `target_id` or in `metadata.agent_id`. Implementations SHOULD prefer ActivityPub-shaped identifiers when the agent is also an AP actor.
 
 #### 8.2 Disciplined-core types under `agent.`
 

@@ -128,7 +128,7 @@ When project docs need to appear in space folders (e.g., roadmap in product trac
 
 ```bash
 # In space's 1-tracks/product/roadmaps/
-ln -s ../../../2-projects/verity/ROADMAP.md verity-roadmap.md
+ln -s ../../../2-projects/atlas/ROADMAP.md atlas-roadmap.md
 ```
 
 The `create-space` agent generates these symlinks based on scaffolding configuration.
@@ -148,7 +148,7 @@ When a team discovers a missing document type:
 ┌─────────────────────────────────────────────────────────────────┐
 │  2. CREATE DOCUMENT                                             │
 │     Team creates their space-specific version                   │
-│     Example: 1-datafund/1-tracks/legal/privacy-policy.md        │
+│     Example: 1-acme/1-tracks/legal/privacy-policy.md            │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -394,8 +394,8 @@ Rather than keyword-only search, agents should:
 
 **Example:**
 ```
-Start: [[Datafund-Core-Purpose]]
-  → Follow: [[Fair-Data-Society-In-Datafund]]
+Start: [[Acme-Core-Purpose]]
+  → Follow: [[Open-Data-Principles-At-Acme]]
     → Follow: [[Data-Ownership-and-Control]]
       → Discover: Values and principles content
 ```
@@ -426,7 +426,7 @@ _Last audited: 2026-03-04_
 
 | Feature | Evidence |
 |---------|----------|
-| SCAFFOLDING.base.md template deployment | Deployed to `0-personal`, `1-datafund`, `2-datacore`, `3-fds`, `4-forge` from `.datacore/templates/space/` |
+| SCAFFOLDING.base.md template deployment | Deployed to all spaces from `.datacore/templates/space/` |
 | Scaffolding agent template reference | `scaffolding-auditor.md` references canonical template path |
 
 ### Future Work

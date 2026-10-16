@@ -11,7 +11,7 @@
 | **Updated** | 2026-05-13 |
 | **Tags** | `plur`, `evomap`, `interop`, `provenance`, `fitness`, `exchange`, `angle-c` |
 | **Affects** | `packages/core/src/schemas/engram.ts` (PLUR), Evolver GEP schema (EvoMap), DIP-0019 §8 (exchange protocol) |
-| **Specs** | DIP-0019 (Learning Architecture), ENG-2026-0512-008 (EvoMap competitive map), ENG-2026-0221-618 (fitness function) |
+| **Specs** | DIP-0019 (Learning Architecture), ENG-2026-0221-618 (fitness function) |
 | **Conditional** | This DIP only proceeds if the local-only Evolver spike (Angle A) demonstrates measurable lift over the PLUR-only baseline. See §0. |
 
 ## 0. Precondition: Spike Lift Gate
@@ -45,7 +45,7 @@ PLUR and EvoMap independently arrived at the same absorption hierarchy:
 | Validated unit | Engram (active, high retrieval_strength) | Capsule (validated fix) |
 | Compiled rule | Skill / CLAUDE.md entry | Skill (SKILL.md) |
 
-Both already use the **agentskills.io SKILL.md format** at the top of the stack (ENG-2026-0512-008). But the middle tier — validated, exchangeable knowledge units — has no shared schema. Today, moving a Capsule into PLUR or an engram into EvoMap means:
+Both already use the **agentskills.io SKILL.md format** at the top of the stack. But the middle tier — validated, exchangeable knowledge units — has no shared schema. Today, moving a Capsule into PLUR or an engram into EvoMap means:
 
 1. Dropping provenance chains (EvoMap chain ≠ PLUR `provenance.chain`)
 2. Recomputing fitness from scratch (EvoMap's adoption signal ≠ PLUR's `adoption_count × environmental_diversity`)
@@ -249,14 +249,13 @@ manifest.yaml          # pack-level metadata, signature
 
 A translation layer (adapter pattern) means every new system pair needs N×N adapters. An envelope means each system writes one exporter and one importer (N+N), and any pair interoperates automatically. The N×N → 2N reduction is the well-trodden "narrow waist" argument that made TCP/IP, JSON, and OCI images work.
 
-### Why co-author with EvoMap rather than unilaterally publish
+### Why co-author rather than unilaterally publish
 
-PLUR-defined "open" envelope that EvoMap doesn't adopt is just a PLUR export format. The leverage of an envelope comes from second-party buy-in. Co-authorship — even informal — buys:
-- EvoMap-side semantics for `unit_kind: capsule` (we don't know their internal model)
-- Endorsement signal for prospective third systems (Cofounder 2, other memory MCPs)
-- A defensible neutral name (`validation-envelope.org`) instead of `plur-export-v1`
+An "open" envelope defined by one side and adopted by no other system is just an export format. An envelope is useful only when a second system carries it. Co-authorship — even informal — gives:
+- Authoritative EvoMap-side semantics for `unit_kind: capsule`
+- A neutral name (`validation-envelope.org`) instead of `plur-export-v1`, which makes adoption by further systems easier
 
-If EvoMap declines, fall back to publishing as PLUR-side only and accept reduced reach.
+Without a co-author, the envelope is published as a PLUR-side format only.
 
 ### Why fitness components, not just score
 
@@ -272,7 +271,7 @@ Extensions follow the HTTP/JSON Schema convention. Familiar to API maintainers; 
 |-------------|--------------|
 | **No shared schema (status quo)** | Translation loss compounds with every roundtrip; each new partner is N more adapters |
 | **PLUR-only export format** | EvoMap won't adopt; doesn't unlock Angle C |
-| **Adopt EvoMap GEP wholesale** | GPL-3.0 contagion risk (ENG-2026-0512-008); cedes PLUR's local-first / permissionless principles |
+| **Adopt EvoMap GEP wholesale** | GPL-3.0 licence-compatibility risk; cedes PLUR's local-first / permissionless principles |
 | **Use W3C PROV-O directly** | PROV-O covers provenance well but has no fitness/validation semantics; would need extension anyway |
 | **C2PA-style content credentials** | Designed for *content* provenance (was this AI-generated?), not *capability* provenance with fitness/contraindications |
 | **One-side schema with adapter** | N×N adapter proliferation |
@@ -319,7 +318,7 @@ To be added at `packages/core/src/envelope/` in the PLUR repo and `evolver/envel
 ## Open Questions
 
 1. **Hosting**: Where does the canonical schema live? Options: GitHub org `validation-envelope`, neutral domain `validation-envelope.org`, or one side's repo with cross-links.
-2. **Governance**: Two-maintainer (PLUR + EvoMap) lightweight steering, or open to additional ratifying members from day one (Cofounder 2, datacortex, other memory MCPs)?
+2. **Governance**: Two-maintainer (PLUR + EvoMap) lightweight steering, or open to additional ratifying members from day one (other memory systems)?
 3. **Fitness formula registry**: Inline in the schema repo, or separate registry (like SPDX)?
 4. **Signature algorithm**: ed25519 only (small, fast, well-supported) or also allow ECDSA / RSA for organizations with existing PKI?
 5. **Versioning**: Strict semver on `validation_envelope.version`, or date-based versioning?
@@ -329,7 +328,6 @@ To be added at `packages/core/src/envelope/` in the PLUR repo and `evolver/envel
 ### Datacore
 - [DIP-0019: Learning Architecture](./DIP-0019-learning-architecture.md) — engram schema v2, exchange protocol §8, fitness function §8
 - [DIP-0026: Architectural Primitives](./DIP-0026-architectural-primitives.md)
-- ENG-2026-0512-008 — EvoMap competitive/complementary map
 - ENG-2026-0221-618 — Datacore fitness function weights
 - ENG-2026-0221-621 — Engram provenance fields
 - ENG-2026-0221-613 — Engram → skill absorption (maps 1:1 to EvoMap Gene → Capsule → Skill)
@@ -347,7 +345,6 @@ To be added at `packages/core/src/envelope/` in the PLUR repo and `evolver/envel
 
 Engrams referenced or relied on while drafting this DIP:
 
-- **ENG-2026-0512-008** — EvoMap competitive map (Genes/Capsules/Skills hierarchy, GPL-3.0 license context, partnership posture: spike local Evolver first)
 - **ENG-2026-0221-618** — Datacore fitness function weights (adoption×diversity 0.4 / strength 0.3 / log(age) 0.2 / 1−contradiction 0.1)
 - **ENG-2026-0221-621** — Engram provenance fields: origin, chain, signature (nullable), license (default cc-by-sa-4.0)
 - **ENG-2026-0221-613** — Engram → skill promotion (production compilation in ACT-R), maps to EvoMap Gene → Capsule → Skill
@@ -366,10 +363,6 @@ follow_up_tasks:
     tags: ":AI:technical:plur:evomap:"
     effort: "0:45"
     context: "DIP-0027 §0 gates this DIP on a measurable lift signal but the spike-evaluation harness doesn't yet exist. Need: (1) baseline PLUR-only LongMemEval Hit@10 number, (2) instrumented Evolver-integrated variant, (3) decision criteria document. Without this, §0 is unenforceable."
-  - heading: "Reach out to EvoMap maintainers re: co-authoring DIP-0027 envelope schema"
-    tags: ":AI:partnerships:plur:"
-    effort: "1:00"
-    context: "Cold/warm intro to evomap.ai maintainers. Pitch: shared validation envelope (DIP-0027 draft attached) as neutral interop spec. Test their appetite before investing in joint schema work. Time-box to 1h: short message, one follow-up, no campaign."
   - heading: "Audit DIP-0019 §8 exchange packet format for envelope-compatibility"
     tags: ":AI:technical:datacore:"
     effort: "2h"
