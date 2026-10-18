@@ -8,7 +8,7 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-22 |
-| **Updated** | 2026-03-04 |
+| **Updated** | 2026-10-18 |
 | **Tags** | `outbox`, `archive`, `organization`, `routing` |
 | **Affects** | All spaces, nightshift server |
 | **Specs** | `datacore-specification.md`, `DIP-0015` |
@@ -16,12 +16,24 @@
 
 ## Summary
 
-Defines an **outbox pattern** for routing content out of active workspaces, with archive as the primary destination. Reframes `4-archive/` as `4-outbox/` to create symmetry with `0-inbox/`:
+Defines an **outbox pattern** for routing content out of active workspaces, with archive as the primary destination. Each space has one exit folder, `4-archive/`, the counterpart of `0-inbox/`:
 
 - `0-inbox/` = Content coming IN (capture, import, processing queue)
-- `4-outbox/` = Content going OUT (archive, delivery, publication)
+- `4-archive/` = Content going OUT (finished work, kept under its original path)
 
-The outbox supports modular routing destinations. Archive (permanent storage on nightshift server) is implemented first; other destinations (delivery, publish, dispose) are TBD.
+The outbox processor supports modular routing destinations. Archive (permanent storage in a per-space archive repo) is implemented first; other destinations (delivery, publish, dispose) are TBD.
+
+## Amendment 2026-10-18: one exit folder, `4-archive/`
+
+The original text renamed `4-archive/` to `4-outbox/`, with old content in `4-outbox/archive/`. That rename was never finished: every space ended up with both folders, and five scripts kept writing to `4-archive/`. The owner decided (space-structure decisions, 2026-10-18) to keep **only `4-archive/`**, since no workflow needed a separate outbox:
+
+1. `4-archive/` is the single exit folder. `4-outbox/` is not an allowed space folder; the structure checker, the space pre-commit hook and the conformance test refuse it.
+2. Everything that was in `4-outbox/archive/` moved to the same relative path under `4-archive/` (`.datacore/lib/merge_outbox_into_archive.py`, which refuses to overwrite).
+3. The outbox processor (`archive_sync.py`) reads `4-archive/`. The folder's own top-level `_index.md` and `README.md` stay in the space.
+4. Shipping to archive repos stays part of the pattern, and the owner chose to set it up. A non-dry run copies content to the archive repo and **deletes the local copy**, so it is never scheduled unattended: each space gets a dry run first, and the owner says go.
+5. `_routing.yaml` copies were dropped: nothing read them. Per-space routing rules return with the first destination that needs them.
+
+Where the text below says `4-outbox/` or `4-outbox/archive/`, read `4-archive/`.
 
 ## Agent Context
 
@@ -31,13 +43,13 @@ This section helps agents understand when and how to apply this DIP.
 
 **Always reference when:**
 - Moving content to archive
-- Processing `4-outbox/` folders
+- Processing `4-archive/` folders
 - Setting up archive repos on nightshift server
 - Searching archived content
 - Determining if content should leave active workspace
 
 **Key decisions this DIP informs:**
-- Content leaving active workspace goes through `4-outbox/`, NOT direct deletion
+- Content leaving active workspace goes through `4-archive/`, NOT direct deletion
 - Archive is permanent storage, no automatic retention cleanup
 - Archive repos live on server, not local machines (unless local-only deployment)
 - Search archived content via datacortex snapshot
@@ -46,8 +58,8 @@ This section helps agents understand when and how to apply this DIP.
 
 | Question | Answer |
 |----------|--------|
-| What replaced 4-archive? | `4-outbox/` - staging for routing OUT |
-| Where do archived files go? | `4-outbox/archive/` → processed to server archive repo |
+| What is the exit folder? | `4-archive/` (amended 2026-10-18; there is no `4-outbox/`) |
+| Where do archived files go? | `4-archive/<original path>` → processed to the archive repo on the owner's go |
 | Is archive permanent? | Yes, no automatic cleanup or retention limits |
 | Can I search archives locally? | Yes, via datacortex snapshot (embeddings only) |
 | Where are archive repos? | Server: `[space]-archive/` (e.g., `0-personal-archive/`) |
@@ -68,7 +80,7 @@ This section helps agents understand when and how to apply this DIP.
 - **Datacortex module** - Archive search indexing (supersedes DIP-0004)
 - **[DIP-0009: GTD](./DIP-0009-gtd-specification.md)** - Outbox as final processing stage
 - **[DIP-0011: Nightshift](./DIP-0011-nightshift-module.md)** - Server-side archive processing
-- **[DIP-0015: Semantic Org](./DIP-0015-semantic-organization.md)** - Folder structure (4-outbox)
+- **[DIP-0015: Semantic Org](./DIP-0015-semantic-organization.md)** - Folder structure (4-archive)
 - **[DIP-0016: Agent Registry](./DIP-0016-agent-registry.md)** - New agents registration
 
 ## Motivation
@@ -98,8 +110,8 @@ Current state:
 #### Inbox/Outbox Symmetry
 
 ```
-0-inbox/   = Content coming IN  (capture, import, processing queue)
-4-outbox/  = Content going OUT  (archive, delivery, publication)
+0-inbox/    = Content coming IN  (capture, import, processing queue)
+4-archive/  = Content going OUT  (archive; delivery and publication TBD)
 ```
 
 The outbox is a **staging area** for content leaving the active workspace. Like inbox items, outbox items are processed and routed to their destinations.
@@ -125,12 +137,12 @@ Each destination is a separate routing module. This DIP implements archive; othe
 ├── 1-tracks/                # Active work
 ├── 2-projects/              # Code repos
 ├── 3-knowledge/             # Permanent knowledge
-└── 4-outbox/                # OUT: staging for routing (was 4-archive)
-    ├── _routing.yaml        # Routing rules for this space
-    └── archive/             # Queue for archive repo
+└── 4-archive/               # OUT: the single exit folder (amended 2026-10-18)
+    ├── _index.md            # Stays in the space
+    └── <original path>/     # Archived content, queue for the archive repo
 ```
 
-**Rename only**: `4-archive/` → `4-outbox/`. Existing archive content moves to `4-outbox/archive/`.
+**Amended 2026-10-18**: the planned rename to `4-outbox/` is withdrawn; `4-archive/` stays.
 
 #### Numbering Convention (Updated)
 
@@ -140,7 +152,7 @@ Each destination is a separate routing module. This DIP implements archive; othe
 | `1-` | Active | Current work, tracks |
 | `2-` | Projects | Code repositories |
 | `3-` | Knowledge | Permanent reference |
-| `4-` | **Outbox** | Routing OUT (was Archive) |
+| `4-` | **Archive** | Routing OUT (the single exit folder) |
 
 ### Part 3: Archive Repository
 
@@ -184,13 +196,13 @@ Server (nightshift):
 Local machine:               Nightshift server:
 ~/Data/                      ~/Data/
 ├── 0-personal/              ├── 0-personal/
-│   └── 4-outbox/            │   └── 4-outbox/
-│       └── archive/         ├── 0-personal-archive/  ← separate repo
+│   └── 4-archive/           │   └── 4-archive/
+│                            ├── 0-personal-archive/  ← separate repo
 ├── 1-datafund/              ├── 1-datafund/
-│   └── 4-outbox/            ├── 1-datafund-archive/
+│   └── 4-archive/           ├── 1-datafund-archive/
 └── ...                      └── ...
 
-Flow: Local 4-outbox/archive/ → sync → Server processes → Archive repo
+Flow: Local 4-archive/ → sync → Server processes → Archive repo
 ```
 
 **Option B: Local Archive (No Server)**
@@ -199,13 +211,13 @@ Flow: Local 4-outbox/archive/ → sync → Server processes → Archive repo
 Local machine:
 ~/Data/
 ├── 0-personal/
-│   └── 4-outbox/
+│   └── 4-archive/
 ├── .datacore/archives/      # Local archive repos
 │   ├── 0-personal-archive/
 │   └── 1-datafund-archive/
 └── ...
 
-Flow: Local 4-outbox/archive/ → /outbox command → Local archive repo
+Flow: Local 4-archive/ → /outbox command → Local archive repo
 ```
 
 #### Configuration
@@ -223,7 +235,7 @@ outbox:
 
 #### Processing Flow
 
-1. User moves content to `4-outbox/archive/`
+1. User moves content to `4-archive/`
 2. Sync pushes to server (or stays local)
 3. Archive processor runs (nightshift or local):
    - Moves files to archive repo
@@ -236,7 +248,7 @@ outbox:
 
 ```
 outbox-processor
-├── Scans 4-outbox/archive/ in all spaces
+├── Scans 4-archive/ in all spaces
 ├── For each item:
 │   ├── Determines target archive repo
 │   ├── Preserves semantic path structure
@@ -316,8 +328,8 @@ Per DIP-0003 Scaffolding categories:
 
 ### Changes Required
 
-1. Rename `4-archive/` to `4-outbox/` in all spaces
-2. Create `4-outbox/archive/` subfolder in each space
+1. ~~Rename `4-archive/` to `4-outbox/` in all spaces~~ (withdrawn 2026-10-18: `4-archive/` stays)
+2. ~~Create `4-outbox/archive/` subfolder in each space~~ (withdrawn 2026-10-18)
 3. Update DIP-0015 folder structure documentation
 4. Add outbox configuration to `settings.yaml`
 5. Create archive repos on nightshift server
@@ -327,7 +339,7 @@ Per DIP-0003 Scaffolding categories:
 
 | Component | Type | Purpose |
 |-----------|------|---------|
-| `4-outbox/` | Folder | Replaces `4-archive/`, staging for routing |
+| `4-archive/` | Folder | The single exit folder (amended 2026-10-18) |
 | `[space]-archive/` | Git repo | Separate archive storage |
 | `outbox-processor` | Agent | Routes outbox content |
 | `archive-indexer` | Agent | Maintains searchable index |
@@ -339,7 +351,7 @@ Per DIP-0003 Scaffolding categories:
 
 - `/outbox` - New command to process outbox queue
 - `/archive-search` - New command to search archives
-- `4-archive/` renamed to `4-outbox/`
+- `4-archive/` stays the exit folder (the rename to `4-outbox/` was withdrawn 2026-10-18)
 
 ## Rationale
 
@@ -369,14 +381,11 @@ Per DIP-0003 Scaffolding categories:
 
 ## Backwards Compatibility
 
-**Rename only**: `4-archive/` → `4-outbox/`
+**Amended 2026-10-18**: spaces that had both folders fold `4-outbox/` into `4-archive/`:
 
-Existing content in `4-archive/` moves to `4-outbox/archive/`. No content is lost or moved to server until explicitly processed.
-
-Migration steps:
-1. Rename `4-archive/` to `4-outbox/`
-2. Move contents to `4-outbox/archive/` subfolder
-3. Run `/outbox` to process to archive repos
+1. `python3 .datacore/lib/merge_outbox_into_archive.py <space> --dry-run`, then without `--dry-run` (it refuses to overwrite, and names any loose entry that needs a `--route`)
+2. Commit the move in the space with explicit paths
+3. Shipping to archive repos: `/outbox --dry-run` per space, then a real run only on the owner's go. No content leaves a space until then.
 
 ## Security Considerations
 
@@ -392,7 +401,7 @@ Migration steps:
 Phases completed:
 
 1. **Phase 1** ✓: Write DIP-0017, create outbox module skeleton
-2. **Phase 2** ✓: Rename `4-archive/` → `4-outbox/` in all spaces
+2. **Phase 2** ✗: Rename `4-archive/` → `4-outbox/` in all spaces — never finished; withdrawn 2026-10-18 (both folders folded into `4-archive/`)
 3. **Phase 3** ✓: Create archive repos on nightshift server
 4. **Phase 4** ✓: Implement outbox-processor agent (DIP-0016 compliant)
 5. **Phase 5** ✓: Implement archive search with datacortex
@@ -415,10 +424,9 @@ _Last audited: 2026-03-04_
 | Feature | Evidence |
 |---------|----------|
 | Module structure (v1.1.0) | `modules/outbox/module.yaml` with tools, skills, agents, commands |
-| `4-outbox/` folder rename in all spaces | `0-personal/`, `1-datafund/`, `2-datacore/` each have `_routing.yaml` and `archive/` subfolder |
-| Archive folder with `_routing.yaml` | All three space outbox folders include routing config |
+| Single exit folder `4-archive/` (amended 2026-10-18) | No space has `4-outbox/`; `test_dip_0017_no_space_has_a_second_exit_folder` |
 | Server-side archive repos | `nightshift:~/Data/{0-personal,1-datafund,2-datacore}-archive.git` |
-| `outbox-processor` agent | `modules/outbox/agents/outbox-processor.md` — routes `4-outbox/archive/` to server repos |
+| `outbox-processor` agent | `modules/outbox/agents/outbox-processor.md` — routes `4-archive/` to server repos |
 | `archive-indexer` agent | `modules/outbox/agents/archive-indexer.md` — builds datacortex snapshot for search |
 | `/outbox` command | `modules/outbox/commands/outbox.md` — `--dry-run`, `--space`, `--verbose` options |
 | `/archive-search` command | `modules/outbox/commands/archive-search.md` — queries via datacortex snapshot |
