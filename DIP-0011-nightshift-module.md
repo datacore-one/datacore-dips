@@ -1424,3 +1424,11 @@ checking pending and completed effects and preserving the original evidence.
 | Compatibility impact | Existing untouched tasks need no migration. Uncertain new attempts require explicit reconciliation. Automatic quota fallback after invocation is removed. |
 | Tests affected | Concurrent stale snapshots, interrupted process, failed acknowledgement, quota/timeout/error-envelope variants, queue and GC refusal, proposal-to-approved-work transition. |
 | Runtime/deployment impact | Qualify the real controller and worker path. This marker is not an OS boundary and does not replace the designated-installation authority or protect against two independent restored controller stores. |
+
+## 31 October 2026 amendment: one schedule, assignments as the queue
+
+> Ratified by the owner on 2026-10-31.
+
+1. **The overnight run's schedule is the job manifest's** (hourly, owner, 2026-10-02). The configuration example above (00:00 and 06:00) and the module's timer file are brought into line with it; the manifest is the only source.
+2. **The separate 3-hourly preflight is folded into the run**, whose first step is the same git check.
+3. **The run's queue is the ledger items assigned to Miles** (DIP-0009, 31 October 2026 amendment). `nightshift.org` is their generated view.

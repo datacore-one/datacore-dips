@@ -3702,3 +3702,14 @@ All GTD agents MUST:
 - `.datacore/commands/continue.md` — `/continue` command implementation (Part 19)
 - `.datacore/modules/mail/commands/mails.md` — Mail processing command (Part 20)
 - `.datacore/gtd-spec.md` - Previous operational specification (to be archived)
+
+## 31 October 2026 amendment: one delegation route
+
+> Ratified by the owner on 2026-10-31. It reconciles Part 0 and Part 4 with what runs (the DIP check in `2-datacore/1-tracks/dev/reports/2026-10-31-task-delegation-true-state-and-dip-check-report.md`, rows 4 to 7).
+
+1. **Ledger assignment is the only way an agent receives work** (DIP-0038's claim loop), Miles included.
+   - A queue is a view. `nightshift.org` is generated from the ledger items assigned to Miles and stays in 0-personal.
+   - The one-task-at-a-time rule is a work-in-progress limit stored on Miles, not a discipline on a file.
+2. **`ai.org` is retired**, and so is Part 4's scanning of `next_actions.org` for `:AI:` tags. Part 0's file routing gives way to assignment.
+3. **Approval of agent-made tasks is a signed `approval.grant` event on the task**, written by the delegation review. It replaces the `:APPROVED_BY:` property and the review's receipt files.
+4. **A failed delegation check pauses agent-made work.** A failed canary, drill or weekly round sets the fleet pause for agent-made tasks until the owner clears it. The owner's own tasks keep running. This replaces "checks only alert".
