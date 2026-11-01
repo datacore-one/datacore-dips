@@ -1003,7 +1003,7 @@ server_reads_only:
 Even without `/tomorrow`, server runs at scheduled times:
 
 ```
-00:00 → Server pulls
+Every hour, on the hour (the job manifest's schedule) → Server pulls
       → Checks for :AI: tasks
       → Executes if any exist
       → Pushes results
@@ -1016,7 +1016,7 @@ Even without `/tomorrow`, server runs at scheduled times:
 | Trigger | Initiator | When |
 |---------|-----------|------|
 | Manual | `/tomorrow` | User runs command |
-| Scheduled | Cron | Midnight, 6am |
+| Scheduled | systemd timer | Hourly (the job manifest's schedule) |
 | Continuous | Daemon | Polling (24/7 mode) |
 | Wake | `/today` | User pulls results |
 
@@ -1027,7 +1027,7 @@ operation:
   mode: hybrid  # manual | scheduled | continuous | hybrid
 
   scheduled:
-    times: ["00:00", "06:00"]
+    schedule: hourly   # the job manifest's schedule (31 October 2026 amendment)
 
   continuous:
     enabled: false
