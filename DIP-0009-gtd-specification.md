@@ -1663,11 +1663,16 @@ not a valid way to resolve conflicting intent or completion evidence.
 > 4. **Every project has a canvas** (`:CANVAS:`, see 10.2).
 > 5. **Every project has a completion check:** `:DONE_WHEN:`, or the roadmap item's
 >    `done_when` where `:ROADMAP:` is set. The roadmap owns status and dates.
-> 6. **Lifecycle.** A project closes when someone other than its worker confirms the
->    check, and closed work moves to `4-archive/`. When all children of a node have
->    closed, the node is checked in turn (the combine step). If it is not achieved, the
->    gap becomes a new child project. An agent may propose such a project; the owner
->    accepts it. Intents and the vision give direction and do not close.
+> 6. **Lifecycle.** Only projects close. Intents and the vision give direction and do
+>    not close. Winston confirms a project's check, or escalates to the owner, and a
+>    project Winston worked on goes to the owner. Checks test outcomes, not only outputs.
+>    Closed work moves to `4-archive/`. When all children of a node have closed, the node
+>    is checked in turn (the combine step). If it is not achieved, the gap becomes a new
+>    child project.
+> 6a. **New projects.** Agents propose projects, and the owner approves them. The owner
+>    may later let the fleet add and complete projects below a set level in the graph
+>    (for example level 4). No threshold is set yet. Every other rule still applies to
+>    such projects, including effect gates and the rule that agents do not merge.
 > 7. **Epic** is the code's word for a roadmap item, which is a project in this model.
 
 ### 9.1 Structure
