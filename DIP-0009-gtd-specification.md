@@ -1646,9 +1646,33 @@ Unresolved Git conflict syntax outside literal Org blocks must stop task review,
 mutation and projection reconciliation. Reading both sides as ordinary tasks is
 not a valid way to resolve conflicting intent or completion evidence.
 
+> **Amendment v2.1 (2026-11-05): DRAFT, pending ratification.** Decided by the owner
+> in session on 2026-11-05. The amendment text awaits ratification and stays Draft
+> until the owner marks it otherwise.
+>
+> **The graph is divide and conquer toward the vision and intents.**
+>
+> 1. **Free depth.** Each node breaks down until it reaches work. The lower a node, the
+>    more granular it is. A branch has as many levels as the work needs. The level names
+>    in 9.1 are labels for depth, not a fixed ladder.
+> 2. **The stop rule is the GTD project:** a multi-action outcome that can finish. Single
+>    next actions live in `next_actions.org`, never in the graph.
+> 3. **Leaves are work or rules.** A `:project:` ends. A `:duty:` recurs and belongs to a
+>    role as a cadence. A `:constraint:` is a rule the work must keep. A project may hold
+>    projects.
+> 4. **Every project has a canvas** (`:CANVAS:`, see 10.2).
+> 5. **Every project has a completion check:** `:DONE_WHEN:`, or the roadmap item's
+>    `done_when` where `:ROADMAP:` is set. The roadmap owns status and dates.
+> 6. **Lifecycle.** A project closes when someone other than its worker confirms the
+>    check, and closed work moves to `4-archive/`. When all children of a node have
+>    closed, the node is checked in turn (the combine step). If it is not achieved, the
+>    gap becomes a new child project. An agent may propose such a project; the owner
+>    accepts it. Intents and the vision give direction and do not close.
+> 7. **Epic** is the code's word for a roadmap item, which is a project in this model.
+
 ### 9.1 Structure
 
-The Intent Graph has five levels of granularity:
+The Intent Graph has five levels of granularity (labels for depth; see Amendment v2.1):
 
 | Level | Name | Granularity | Review Cycle |
 |-------|------|-------------|--------------|
@@ -1744,12 +1768,13 @@ GTD defines six horizons of perspective, from ground-level actions to life purpo
 
 Projects with complexity beyond a simple task list use a **Project Canvas** — a structured one-page document based on the HBR/Nieto-Rodriguez methodology.
 
-**When to create a Canvas:**
-- Project has >5 tasks or >2 weeks estimated duration
-- Multiple people involved (team spaces)
-- Requires budget or resource allocation
-- Has external dependencies or stakeholders
-- `gtd-project-manager` flags it (see Part 11.6)
+**When to create a Canvas (Amendment v2.1, Draft):** every project has one; a small project's canvas may be a few lines. Besides defining the project, the canvas manages people's workload, is the bridge between work and accounting, and supports strategic planning and management. It holds purpose, people and money; status and dates live in the roadmap. Sprints read the canvas and do not have a canvas of their own: a sprint's goal and human gates live in `sprint.yaml`. This replaces the earlier thresholds:
+
+- ~~Project has >5 tasks or >2 weeks estimated duration~~
+- ~~Multiple people involved (team spaces)~~
+- ~~Requires budget or resource allocation~~
+- ~~Has external dependencies or stakeholders~~
+- ~~`gtd-project-manager` flags it (see Part 11.6)~~
 
 **Canvas location:** `CANVAS.md` in the project directory, or inline in the relevant track folder for non-code projects.
 
@@ -1802,7 +1827,7 @@ Intent: [Intent Graph path]
 - Each Key Result has a single owner (team member or AI agent)
 - Key Results must be measurable (number, date, binary)
 - Maximum 3-5 Key Results per Objective
-- Key Results become tasks in `next_actions.org` (or GitHub Issues for team spaces)
+- Key Results become sub-projects or roadmap items, and those hold the tasks in `next_actions.org` (or GitHub Issues for team spaces). Each task needs its own completion check, because a Key Result's test is shared across its tasks (Amendment v2.1, Draft)
 
 ### 10.4 Horizon Coverage Check
 
