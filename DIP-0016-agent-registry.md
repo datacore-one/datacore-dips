@@ -485,11 +485,11 @@ reasoning_paths:
         results: ["Data-Tokenization.md", "RWA-Overview.md"]
       - hop: 1
         source: "Data-Tokenization.md"
-        followed_links: ["Verity-Protocol.md", "SPV-Structure.md"]
+        followed_links: ["Atlas-Protocol.md", "SPV-Structure.md"]
       - hop: 2
-        source: "Verity-Protocol.md"
+        source: "Atlas-Protocol.md"
         followed_links: ["Data-Marketplace.md"]
-    final_context: ["Data-Tokenization.md", "Verity-Protocol.md", "SPV-Structure.md"]
+    final_context: ["Data-Tokenization.md", "Atlas-Protocol.md", "SPV-Structure.md"]
 ```
 
 #### 6.3 When to Use Multi-Hop
@@ -497,7 +497,7 @@ reasoning_paths:
 | Task Type | Hops | Example |
 |-----------|------|---------|
 | Factual lookup | 0 | "What is data tokenization?" |
-| Contextual understanding | 1 | "How does tokenization relate to Verity?" |
+| Contextual understanding | 1 | "How does tokenization relate to Atlas?" |
 | Strategic synthesis | 2+ | "What's our competitive advantage in data markets?" |
 
 ### 7. Tiered Memory Architecture
@@ -589,7 +589,7 @@ session_memories:
       - "Regulatory clarity needed for RWA data assets"
 
     # Tags for retrieval
-    tags: ["tokenization", "rwa", "verity", "research"]
+    tags: ["tokenization", "rwa", "atlas", "research"]
 
     # Links to outputs
     outputs:
@@ -1774,7 +1774,7 @@ hook_state:
     gtd-inbox-processor: "2025-12-31T10:30:00Z"
 
   space_cache:
-    discovered_spaces: ["0-personal", "1-datafund"]
+    discovered_spaces: ["0-personal", "1-acme"]
     cache_time: "2025-12-31T10:00:00Z"
 ```
 

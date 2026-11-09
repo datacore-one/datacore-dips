@@ -191,8 +191,8 @@ Research is used broadly — from medical literature reviews to crypto market an
 | **Crypto markets** | "SOL sentiment analysis", "DeFi regulatory outlook" | CoinGlass, DeFiLlama, Dune Analytics, crypto Twitter/X, on-chain data |
 | **Product/competitive** | "Data tokenization market size", "RWA competitors" | Crunchbase, PitchBook, Product Hunt, G2, SEC/EDGAR filings |
 | **Academic** | "Zero-knowledge proofs for healthcare", "FHE benchmarks" | arXiv, Semantic Scholar, Google Scholar, SSRN |
-| **Legal/regulatory** | "MiCA compliance requirements", "VARA licensing" | EUR-Lex, regulatory agency sites, legal databases |
-| **Technology** | "Swarm storage benchmarks", "ERC-3643 implementations" | GitHub, Stack Overflow, technical blogs, documentation |
+| **Legal/regulatory** | "MiCA compliance requirements", "EU AI Act obligations" | EUR-Lex, regulatory agency sites, legal databases |
+| **Technology** | "Decentralized storage benchmarks", "ERC-3643 implementations" | GitHub, Stack Overflow, technical blogs, documentation |
 
 The research orchestrator does **not** hardcode which sources to query for which domain. Instead, it uses a **pluggable source registry** (see Section 3.6).
 
@@ -1150,8 +1150,6 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 - **DIP-0016**: Agent Registry — naming and registration patterns
 - **Agentic Search zettel**: `0-personal/3-knowledge/zettel/agentic-search.md`
 - **Index Layer zettel**: `0-personal/3-knowledge/zettel/index-layer-for-search.md`
-- **Exa Integration Plan**: `1-datafund/1-tracks/research/Datafund Exa Integration Plan.md`
-- **Jina Integration Plan**: `1-datafund/1-tracks/research/Datafund Jina Integration Plan.md`
 - **Readwise Research** (Feb 2026): Validated accumulate→batch→synthesize pattern with 1,797 clippings
 - [Perplexity API docs](https://docs.perplexity.ai/)
 - [Exa API docs](https://docs.exa.ai/)

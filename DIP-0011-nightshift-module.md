@@ -866,38 +866,30 @@ Local and server both work on `main` with atomic operations protocol.
 
 Principle 1 used to be implicit. This DIP said "local and server both work on
 `main`" and then specified `git_commit(...)` / `git_push()` with no branch
-argument — an invariant stated in prose and enforced nowhere. It cost two months
-of work.
+argument — an invariant stated in prose and enforced nowhere.
 
-**What happened.** `~/Data/5-plur` on the nightshift server was left checked out
-on `ops/b17-sprint-claim` after a sprint claim in May. Nobody ran
-`git checkout main`. Every claim, cadence run, journal entry and zettel since
-went to that branch: **610 commits — 52 zettels, 19 literature notes, every
-weekly content calendar since mid-June, 15 journal entries — none of it on
-`main`, none of it visible to anyone.**
+**Lesson.** A space checkout on the executor host was left on a feature branch
+after a sprint claim; every later claim, cadence run and knowledge write landed
+on that branch, invisible on the default branch, for weeks.
 
 **Why nothing caught it.** `check_and_repair_git()` ran a health check before
 every run and guarded three failure modes: stuck rebase, detached HEAD, missing
 upstream tracking. A stray branch passes all three — it is not detached, has no
-rebase in flight, and tracks its upstream cleanly. The health check inspected
-that branch every night for two months and correctly reported nothing wrong.
+rebase in flight, and tracks its upstream cleanly.
 
 > **A health check that only tests for BROKEN states will not catch a VALID
 > state that is simply WRONG.** This generalises well beyond git.
 
-**Enforcement.** `check_and_repair_git()` now resolves the default branch from
+**Enforcement.** `check_and_repair_git()` resolves the default branch from
 `origin/HEAD` and adds a fourth check: if HEAD is on any other branch, stash any
 dirty tree and check out the default. No `reset --hard` — unlike the rebase and
 detached-HEAD cases the tree is not broken, only pointed at the wrong branch, so
-the stray branch and its commits are left intact on origin. Shipped in
-`datacore-nightshift@9f56c49`.
+the stray branch and its commits are left intact on origin.
 
-**Known gap.** This guard lives in nightshift's `run.py`, so it protects Miles
-only. Tris (Hermes/hermes) and Mr Data (OpenClaw/plur-claw) run different
-runtimes with no equivalent, and at the time of writing neither host had any
-cron or timer touching git at all — which is how Tris accumulated 53 uncommitted
-competitor scans over two months that reached nobody, and how Mr Data's `~/Data`
-came to sit on stray branch `openclaw/manual-install-adaptations` with no PR.
+**Known gap.** This guard lives in nightshift's `run.py`, so it protects only
+the agent that runs on nightshift. Agents on other runtimes need an equivalent;
+an agent host with no scheduled git job lets uncommitted work and stray
+branches accumulate unseen.
 
 The runtime-independent fix is a commit path that resolves its own destination
 rather than inheriting whatever HEAD happens to be — `git hash-object` /
@@ -905,7 +897,8 @@ rather than inheriting whatever HEAD happens to be — `git hash-object` /
 while HEAD sits on a feature branch, with no checkout and no worktree. Until
 that exists, `.datacore/lib/git_fleet_audit.py` (read-only detector) and
 `.datacore/lib/git_fleet_sync.py` (bidirectional lander) are the backstop and
-are intended to run on a timer on **every** agent host, not just nightshift.
+are intended to run on a timer on **every** agent host, not just the executor
+host.
 
 ### Sync Flow
 
@@ -1003,7 +996,7 @@ server_reads_only:
 Even without `/tomorrow`, server runs at scheduled times:
 
 ```
-00:00 → Server pulls
+Every hour, on the hour (the job manifest's schedule) → Server pulls
       → Checks for :AI: tasks
       → Executes if any exist
       → Pushes results
@@ -1016,7 +1009,7 @@ Even without `/tomorrow`, server runs at scheduled times:
 | Trigger | Initiator | When |
 |---------|-----------|------|
 | Manual | `/tomorrow` | User runs command |
-| Scheduled | Cron | Midnight, 6am |
+| Scheduled | systemd timer | Hourly (the job manifest's schedule) |
 | Continuous | Daemon | Polling (24/7 mode) |
 | Wake | `/today` | User pulls results |
 
@@ -1027,7 +1020,7 @@ operation:
   mode: hybrid  # manual | scheduled | continuous | hybrid
 
   scheduled:
-    times: ["00:00", "06:00"]
+    schedule: hourly   # the job manifest's schedule (31 October 2026 amendment)
 
   continuous:
     enabled: false
@@ -1224,7 +1217,7 @@ Cost: $0.32 | Duration: 38 min
 - Learning file integration
 
 ### Phase 4: Server Execution
-- Server setup (DigitalOcean)
+- Server setup (any VPS)
 - Git sync protocol
 - Cron-based execution
 
@@ -1424,3 +1417,18 @@ checking pending and completed effects and preserving the original evidence.
 | Compatibility impact | Existing untouched tasks need no migration. Uncertain new attempts require explicit reconciliation. Automatic quota fallback after invocation is removed. |
 | Tests affected | Concurrent stale snapshots, interrupted process, failed acknowledgement, quota/timeout/error-envelope variants, queue and GC refusal, proposal-to-approved-work transition. |
 | Runtime/deployment impact | Qualify the real controller and worker path. This marker is not an OS boundary and does not replace the designated-installation authority or protect against two independent restored controller stores. |
+
+## 31 October 2026 amendment: one schedule, assignments as the queue
+
+> Ratified by the owner on 2026-10-31.
+
+1. **The overnight run's schedule is the job manifest's** (hourly, owner, 2026-10-02). The configuration example above (00:00 and 06:00) and the module's timer file are brought into line with it; the manifest is the only source.
+2. **The separate 3-hourly preflight is folded into the run**, whose first step is the same git check.
+3. **The run's queue is the ledger items assigned to Miles** (DIP-0009, 31 October 2026 amendment). `nightshift.org` is their generated view.
+
+## 3 November 2026 amendment: the review setting on Miles, and no committed queue file
+
+> Proposed 2026-11-03 (plan 2026-10-31, phase H: delegation-safety 2 and evening-handoff 3). **Not ratified**: the owner ratifies or changes it.
+
+1. **The review-before-execution setting on Miles is decided here, not in an environment file.** The compatibility decision above leaves `DATACORE_REVIEW_BEFORE_EXECUTION` as an opt-in read from each host's environment, which no review reads. For Miles's overnight run the setting is **on** (`1`): a machine-originated task runs only after a fresh, contract-bound review, and a stale review refuses it. The environment value on Miles's host follows this line, and a check reports any host whose value differs. *(Owner: confirm "on", or write "off" here.)*
+2. **The overnight run does not commit or push `nightshift.org`.** Since the 31 October amendment the queue is the ledger items assigned to Miles, and `nightshift.org` is their generated view. Assignment reaches other machines through the hub and the ledger events, not through a committed copy of the file. Committing the view only made a second record that could disagree with the ledger. The file stays local, regenerated each run, and is not tracked.

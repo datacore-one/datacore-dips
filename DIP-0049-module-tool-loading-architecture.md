@@ -37,9 +37,9 @@ Reproduction:
 ```bash
 # This fails even though the MCP server ships zod
 node --input-type=module \
-  -e "import '/home/gregor/Data/.datacore/modules/crm/tools/index.js'"
+  -e "import '$DATACORE_ROOT/.datacore/modules/crm/tools/index.js'"
 # → ERR_MODULE_NOT_FOUND: Cannot find package 'zod' imported from
-#     /home/gregor/Data/.datacore/modules/crm/tools/index.js
+#     $DATACORE_ROOT/.datacore/modules/crm/tools/index.js
 ```
 
 The MCP server itself does not fail — it bundles zod via esbuild at build time into `dist/index.js`. Module tools are **not** bundled; they are plain ESM files loaded at runtime.

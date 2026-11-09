@@ -15,7 +15,7 @@
 | **Agents** | any agent that creates, claims, completes, or verifies a ledger item; any process that spends budget on an agent's behalf |
 | **Depends** | — (foundation DIP; no dependencies. [DIP-0035](DIP-0035-job-contracts.md), [DIP-0038](DIP-0038-action-loop-cosign.md), and [DIP-0041](DIP-0041-executor-adapters.md) depend on this DIP — see Phase → DIP table in Specification) |
 | **Renumbered from** | DIP-0033 (claimed by a parallel session for "Delivery Verification & Smoke Scenarios" before this DIP landed) |
-| **Relates to** | ENG-2026-0729-016 (ledger-mindset direction), ENG-2026-0729-030 (signing opt-in amendment), ENG-2026-0727-004 (Mac↔box sync failure genre), ENG-2026-0423-001 (nightshift git-lock silent failure), DIP-0011 (Nightshift), DIP-0018 (Credential Management) |
+| **Relates to** | ENG-2026-0729-016 (ledger-mindset direction), ENG-2026-0729-030 (signing opt-in amendment), ENG-2026-0727-004 (workstation↔server sync failure genre), ENG-2026-0423-001 (nightshift git-lock silent failure), DIP-0011 (Nightshift), DIP-0018 (Credential Management) |
 
 > **Ratification note (2026-08-27).** Status moved `Draft` → `Implemented` on the
 > owner's instruction. **No human review was performed on this DIP.** It is recorded
@@ -116,11 +116,11 @@ artifacts, agent consolidation, and executor adapters are follow-on DIPs
 Datacore's existing coordination primitives — org-mode files mutated in
 place, JSON state files rewritten wholesale, `git push` used as a distributed
 lock — were built for a single writer at a time and degrade in
-well-documented, recurring ways once more than one process (Mac, box,
-nightshift, multiple agents) touches the same state:
+well-documented, recurring ways once more than one process (workstation, server,
+executor host, multiple agents) touches the same state:
 
 - **Duplicate resurrection / ID-conflict churn** (`ENG-2026-0727-004`): the
-  Mac and the box are separate working copies of the same git remotes,
+  workstation and the server are separate working copies of the same git remotes,
   syncing on different schedules. A stale local capture can re-add entries a
   prior sync already routed elsewhere, and because both sides mint their own
   IDs for org headings on read, the same logical task ends up under two
@@ -148,12 +148,12 @@ copy of what happened.
 
 ### Use cases
 
-1. **Concurrent, offline-tolerant item coordination** — Mac, box, and
-   nightshift workers can each append item lifecycle events (create, claim,
+1. **Concurrent, offline-tolerant item coordination** — workstation, server, and
+   executor workers can each append item lifecycle events (create, claim,
    release, complete, verify, dismiss) to their own file without contending
    for a shared write path; a deterministic fold reconciles ownership after
    the fact instead of requiring a live lock at write time.
-2. **Mechanical auditability** — "did the box actually attempt this item, and
+2. **Mechanical auditability** — "did the server actually attempt this item, and
    what happened?" is answerable by reading an append-only, hash-chained file
    — no dependence on a git ref having succeeded, a JSON file not having been
    clobbered by a concurrent writer, or a cron log line having survived.
@@ -172,7 +172,7 @@ copy of what happened.
 
 - Task state lives in org-mode headings (`TODO`/`NEXT`/`DONE`, `:PROPERTIES:`)
   mutated in place by whichever process reads them, with IDs assigned
-  independently by each reader (`adapters/org.py` on both Mac and box).
+  independently by each reader (`adapters/org.py` on both workstation and server).
 - Nightshift's task claim is a `git push`: success means "I have the lock,"
   but a broken git state fails that push silently with no independent record
   that a claim was even attempted (`ENG-2026-0423-001`).
@@ -431,8 +431,8 @@ physical time and increments the counter. This gives:
 ### Per-writer files
 
 Each actor owns exactly one file: `<space_dir>/.datacore/events/<actor>.jsonl`
-— e.g. `0-personal/.datacore/events/mac.jsonl`,
-`0-personal/.datacore/events/box.jsonl`. Only the actor that owns a file ever
+— e.g. `0-personal/.datacore/events/workstation.jsonl`,
+`0-personal/.datacore/events/server.jsonl`. Only the actor that owns a file ever
 appends to it; multiple *processes* for that same actor can race to append,
 so an exclusive `fcntl.flock` around the read-tail + compute-next + write
 critical section serializes them (per `ENG-2026-0304-027` — the same
@@ -603,19 +603,19 @@ propagate, since hiding those is not this script's job.
 
 ### Worked example
 
-A single actor (`box`) creating, claiming, and completing one ledger item —
-three lines appended to `<space>/.datacore/events/box.jsonl` (whitespace
+A single actor (`server`) creating, claiming, and completing one ledger item —
+three lines appended to `<space>/.datacore/events/server.jsonl` (whitespace
 added for readability; the real file has one canonical-encoded line per
 event, `sig` empty because signing is off, the MVP default):
 
 ```jsonc
-{"seq":0,"hlc":"1785400000000.0000.box","actor":"box","type":"item.create",
+{"seq":0,"hlc":"1785400000000.0000.server","actor":"server","type":"item.create",
  "payload":{"id":"t-042","title":"Verify DIP-0035 job_verify.py output schema"},
  "prev":"GENESIS","hash":"9f2c...a1","sig":""}
-{"seq":1,"hlc":"1785400015000.0000.box","actor":"box","type":"item.claim",
+{"seq":1,"hlc":"1785400015000.0000.server","actor":"server","type":"item.claim",
  "payload":{"id":"t-042"},
  "prev":"9f2c...a1","hash":"3b7e...d4","sig":""}
-{"seq":2,"hlc":"1785400600000.0000.box","actor":"box","type":"item.complete",
+{"seq":2,"hlc":"1785400600000.0000.server","actor":"server","type":"item.complete",
  "payload":{"id":"t-042"},
  "prev":"3b7e...d4","hash":"c081...9e","sig":""}
 ```
@@ -626,7 +626,7 @@ these three events produces:
 
 ```python
 LedgerState(
-    items={"t-042": ItemState(id="t-042", status="completed", owner="box",
+    items={"t-042": ItemState(id="t-042", status="completed", owner="server",
                                title="Verify DIP-0035 job_verify.py output schema",
                                history=[...])},
     spend={},
@@ -826,7 +826,7 @@ statement — not part of this DIP.
   independent of the file itself vouches for who actually authored the
   events in it. Without signing there is **no cryptographic non-repudiation**:
   attribution rests entirely on trusting that no other process wrote to
-  `mac.jsonl` on behalf of an attacker, and on trusting the filesystem/OS
+  `workstation.jsonl` on behalf of an attacker, and on trusting the filesystem/OS
   access controls around `<space>/.datacore/events/`. This is the exact gap
   signing closes, which is why the trigger for enabling it (`ENG-2026-0729-030`)
   is "a foreign agent joins the ledger" or "an external/enterprise audit-trail
@@ -948,7 +948,7 @@ substrate for briefing/approval/attestation/spend objects.
 - `ENG-2026-0729-030` — signing opt-in amendment (owner ruling, supersedes
   "signatures from day one" with "signature field from day one, signing
   behavior opt-in").
-- `ENG-2026-0727-004` — Mac↔box sync topology and its two failure modes
+- `ENG-2026-0727-004` — workstation↔server sync topology and its two failure modes
   (duplicate resurrection, ID-conflict churn) that motivate durable,
   uniquely-identified, append-only events over content-inferred identity in
   mutable shared files.
@@ -1006,3 +1006,27 @@ ratify this amendment or certify active rollout.
 | Compatibility impact | Valid registries/signatures are unchanged; invalid mutation inputs require repair. |
 | Tests affected | Malformed/null/list registries, same-actor and different-actor concurrency, existing key mismatch; core key/persistence suites. |
 | Runtime/deployment impact | Qualify actual key storage permissions and deployed readers; signing alone does not establish independent OS or credential isolation. |
+
+## 31 October 2026 amendment: always signed, no voids, corrections forward only
+
+> Ratified by the owner on 2026-10-31 ("proposed rule changes are good, apply them"), from the review in `2-datacore/1-tracks/dev/reports/2026-10-31-tasks-and-ledger-ground-up-report.md`. Implementation follows the phases in `2-datacore/1-tracks/dev/superpowers/plans/2026-10-31-tasks-and-ledger-rebuild-plan.md`. Where this section and an earlier one disagree, this section holds. The October 2026 hub amendment (sections D to J) is referenced by the code but its text was not found in this repository on 2026-10-31; it should be merged here so the two can be read together.
+
+1. **Signing is always on.** This supersedes the signing amendment of 2026-07-30 and owner decision 7 of 2026-10-04.
+   - A writer signs unless it is told not to with an explicit `DATACORE_LEDGER_SIGN=0`, in the environment or in `identity.env`. A hub space refuses an unsigned writer regardless.
+   - The trigger the 2026-07-30 amendment named has fired: agents on separate machines write to one ledger, and the hub admits only signed events.
+   - Each actor's ledger key is to be bound to its fds-id identity (DIP-0023) by a signed record. Old events keep verifying under the keys they were signed with.
+2. **No voids.** This supersedes owner decision 6 of 2026-09-26 ("no exceptions, only voids").
+   - The hub's admission refuses anything malformed, unsigned, unchained or not allowed, so a bad event never enters. `ledger.void` is no longer written.
+   - Voids already in the history stay valid and fold exactly as before.
+3. **Corrections are forward only.** This supersedes the reversal window of 2026-10-23 (a reversal inside `REVERSAL_MAX_AGE_MS` on the hub's clock, never after a seal).
+   - An admitted event is final at admission.
+   - A correction is a new forward event that names the event it corrects, who corrected it and why: `item.reopen`, `item.update`, `owner.set` or a compensating action.
+   - A client's "undo" writes such an event.
+   - Reversals already in the history stay valid.
+   - The rule that control records are never reversible now holds for every event.
+4. **Work and telemetry apart.** Telemetry already has its own log per writer (LED-8). In addition, the task fold does not read telemetry: job verdicts, check-ins, projection attestations and spend have their own readers and their own retention.
+5. **One work ledger per owner.** The direction is ratified: one ledger for an installation's owner, with `space` as a field on each event, and a separate ledger only where the set of people differs. The migration (an owner-signed genesis, the old logs frozen and still verifiable, a two-space trial first) gets its own amendment before it runs.
+6. **One way in.**
+   - Every task change is a command that writes a signed event (the org adapter, the app, MCP, an editor hook).
+   - Org lists are read-only views. `inbox.org` stays free text: the single capture point, consumed and returned to empty.
+   - Once that is in place, the ingest of hand edits to generated lists is retired.

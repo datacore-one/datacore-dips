@@ -40,27 +40,25 @@ described separately below and cannot establish execution authority.
 
 ## Motivation
 
-Measured on 2026-08-13, before this DIP:
+A typical multi-machine installation before this DIP (illustrative):
 
 | machine | ssh alias | `hostname -s` | git user.name | git user.email | ledger actor |
 |---|---|---|---|---|---|
-| mac | (local) | `Mac` | plur9 | dev@datacore.one | `mac` |
-| winston | winston | `chief-of-staff` | Winston (CoS) | winston@datacore.one | `winston` |
-| nightshift | nightshift | `nightshift` | Miles | gregor+miles@datafund.io | `miles` |
-| hermes | hermes | `hermes-test` | **Gregor** | **gregor@datacore.one** | `tris` |
-| plur-claw | plur-claw | `plur-claw` | Data | data-on-claw@…github.com | `data` |
+| workstation | (local) | `Workstation` | owner-handle | dev@example.com | `workstation` |
+| server | cos | `chief-of-staff` | CoS Agent (CoS) | cos@example.com | `cos` |
+| executor host | executor | `executor` | Executor Agent | owner+executor@example.com | `executor` |
+| gateway host | gateway | `gateway-test` | **Owner Name** | **owner@example.com** | `gateway` |
 
-Five namespaces, five conventions, and every mismatch had already cost
-something:
+Several namespaces, several conventions, and every mismatch costs something:
 
-- Resolving the actor from `hostname` filed Winston's events under
-  `chief-of-staff`.
-- A `Mac` vs `mac` case difference broke the ownership guard.
-- The guard could not map `Winston (CoS)` to `winston` at all, which is why it
-  now keys on author **email** rather than name.
-- Tris's commits were authored as **Gregor** — an agent's work attributed to
-  the human it works for, which is a provenance failure, not a cosmetic one.
-- `hermes` is named `hermes-test` while serving production.
+- Resolving the actor from `hostname` files the chief-of-staff agent's events
+  under the hostname instead of its actor.
+- A case difference (`Workstation` vs `workstation`) breaks the ownership guard.
+- A display name such as `CoS Agent (CoS)` maps to no actor key at all, which
+  is why the guard keys on author **email** rather than name.
+- An agent's commits authored under the owner's identity attribute an agent's
+  work to the human it works for — a provenance failure, not a cosmetic one.
+- A host named `*-test` while serving production misleads every reader.
 
 The registry described how to **reach** a machine (`ssh_user`, `service_user`,
 `data_root`) but never said who it **is**, so every caller re-derived identity
@@ -78,12 +76,12 @@ authorize an actor or grant access to a principal's credentials.
 
 ```yaml
 servers:
-  winston:
+  cos:
     access:
-      actor: winston          # canonical: the ledger writer identity
-      ssh_user: gregor
-      service_user: gregor
-      hostname: bridge
+      actor: cos              # canonical: the ledger writer identity
+      ssh_user: alice
+      service_user: alice
+      hostname: host-a
 ```
 
 ### 2. Names are layered, and each layer has one job
@@ -91,14 +89,13 @@ servers:
 | Layer | Rule | Rationale |
 |---|---|---|
 | **actor** | lowercase, stable, matches `<actor>.jsonl` | the ledger's writer identity |
-| **ssh alias** | the agent's name (`winston`, `miles`, `tris`, `data`) | what a human types |
+| **ssh alias** | the agent's name (e.g. `cos`, `executor`, `gateway`) | what a human types |
 | **hostname** | a machine name, never a role or an agent | roles move between boxes; a role-named host becomes a lie |
 | **git user.name** | the agent's display name | commit provenance |
 | **git user.email** | unique per actor | what the ownership guard keys on |
 
-Hostnames were renamed to Star Trek locations precisely because they **cannot
-be mistaken for an agent or a role**: `bridge`, `engineering`, `transporter`,
-`holodeck`, `mac`.
+Choose hostnames from a theme that **cannot be mistaken for an agent or a
+role** (for example `host-a`, `host-b`, or names from any neutral theme).
 
 ### 3. Administration and runtime identities — amendment under review
 
@@ -128,11 +125,8 @@ must not prevent least-privilege service deployment.
 The previous requirement was: **`ssh_user` and `service_user` must be equal.**
 Its incident rationale is retained for traceability:
 
-They differed only on hermes, and that single divergence produced three wrong
-diagnoses in one session — reading gregor-owned repos as root reported Tris's
-repos as "not git repos". Both are now `gregor` fleet-wide; `/root/Data` became
-`/home/gregor/Data` as a consequence, since the path existed only because the
-service user was root.
+A single host where the two differed produced repeated wrong diagnoses:
+probes reading user-owned repos as root reported them as "not git repos".
 
 #### Identity amendment change record
 
@@ -154,31 +148,30 @@ Each agent holds its own GitHub account and its own git identity:
 
 | actor | GitHub | git identity |
 |---|---|---|
-| winston | *(under the owner's account, deliberately — Winston assists and must not post as itself)* | `Winston <winston@datacore.one>` |
-| miles | `miles-on-nightshift` | `Miles <miles@datacore.one>` |
-| tris | `tris-on-hermes` | `Tris <tris@datacore.one>` |
-| data | `data-on-claw` | `Data <mrdata@datacore.one>` |
+| cos | *(may act under the owner's account, deliberately, when it assists and must not post as itself)* | `CoS Agent <cos@example.com>` |
+| executor | `executor-bot` | `Executor Agent <executor@example.com>` |
+| gateway | `gateway-bot` | `Gateway Agent <gateway@example.com>` |
 
-A failed token is worse than a missing one: `gh` fell back silently to the
-owner's account for weeks, so Miles pushed as the human while `gh auth status`
-showed both accounts and no error. Verify the **active** account, not that an
-account exists.
+A failed token is worse than a missing one: `gh` can fall back silently to the
+owner's account, so an agent pushes as the human while `gh auth status` shows
+both accounts and no error. Verify the **active** account, not that an account
+exists.
 
 ### 5. Ownership is judged by authorship, not by who pushed
 
 The pre-push guard filters commits by **author email**. Actor names cannot do
-this job — `Winston (CoS)` matches no registry key — and after DIP-0046 removed
+this job — a display name like `CoS Agent (CoS)` matches no registry key — and after DIP-0046 removed
 rebase, a push range legitimately contains other actors' commits. Blaming the
 courier both blocks honest work and trains agents to reach for
 `SKIP_PRE_PUSH=1`, disabling the check for the case it exists to catch.
 
 ### 6. One resolver, and the hostname is a lookup key, never the answer
 
-Twenty-four sites resolved identity on their own with
+Many call sites resolved identity on their own with
 `DATACORE_ACTOR or gethostname()`, disagreeing on case and on domain
-stripping, and every one fell back to the hostname. One laptop wrote under
-`mac`, `Mac`, `Mac.home` and `air-23.local`; the executor on nightshift wrote
-under its hostname. `.datacore/lib/actor_identity.py` is the one resolver:
+stripping, and every one fell back to the hostname. One laptop could write
+under several spellings of its own name (`laptop`, `Laptop`, `Laptop.home`,
+`laptop.local`); the executor wrote under its hostname. `.datacore/lib/actor_identity.py` is the one resolver:
 
 1. `DATACORE_ACTOR` in the environment (a unit drop-in, a test);
 2. `~/.datacore/identity.env` — the machine's declaration, written once by
@@ -203,24 +196,21 @@ agent, executor or migration — with the git identities that may append to it,
 its GitHub account, its host, what it owns, which executors write for it, its
 charter, its contracts, its memory scope, and (when decided) its budget and
 permission mode. A field not yet decided is null and stays null until the
-owner decides it. Two writers may belong to one principal: `miles` and
-`nightshift` on the same machine are the bot's log and the executor's log,
-both Miles's; the executor declares its own actor in a unit drop-in
-(`Environment=DATACORE_ACTOR=nightshift`) rather than inheriting the
-machine's.
+owner decides it. Two writers may belong to one principal: an agent's bot
+log and the executor log on the same machine (e.g. `executor-agent` and
+`executor`) can both belong to the executor agent; the executor declares its
+own actor in a unit drop-in (`Environment=DATACORE_ACTOR=executor`) rather
+than inheriting the machine's.
 
 ### 8. Authorship is verified per log, from the day it is declared
 
 A per-writer hash chain is tamper-evident, not authenticated: any account that
 can push can append to any log. The checklist's `writer logs authored by
 their principal` reads, for every `<space>/.datacore/events/<writer>.jsonl`,
-the non-merge commits that touched it since 2026-09-05 and fails when an
-author email is outside the principal's `emails`. Merge commits are couriers,
-not authors, and are not counted. Run against the whole tree on 2026-09-05
-it passed on 46 logs and found two earlier courier commits made by autosave
-before the rule existed (0-personal/nightshift by winston, 6-meridian/mac by
-miles); they are on the record in the architecture audit of that date and are
-not re-flagged.
+the non-merge commits that touched it since the rule's declaration date and
+fails when an author email is outside the principal's `emails`. Merge commits
+are couriers, not authors, and are not counted. Commits made before the rule
+was declared are recorded once and not re-flagged.
 
 ### 9. Provenance on the event
 
@@ -236,32 +226,29 @@ event without them is not wrong, it is merely less answerable.
 - A probe must read the registry, never guess. `fleet_status.py` reports `?`
   for "could not determine" and never renders it as agreement.
 - Adding a machine means adding an `actor` entry; there is no fallback.
-- Gitea and PLUR are **not yet aligned**: both still collapse every agent into
-  a single `gregor` identity, so attribution is correct on GitHub and lost
-  everywhere else. That is the next gap this DIP implies but does not close.
+- Secondary systems (a self-hosted git mirror, the memory store) may still
+  collapse every agent into a single owner identity; attribution is then
+  correct on the primary forge and lost elsewhere. That is a gap this DIP
+  implies but does not close.
 - A principal without a charter, a contract and a scoreboard row is a name,
-  not yet a principal. The product description of 2026-09-05 ("the contract
-  of being a principal") lists the ten things; sections 6–9 here cover the
-  first of them.
+  not yet a principal. Sections 6–9 here cover the first of the things that
+  make one.
 
 ## Open questions
 
-1. Should Gitea gain per-agent accounts (`miles`, `tris`, `mrdata`) to match
-   GitHub, or is a single owner identity acceptable for a private mirror?
-2. PLUR scopes are `user:plur:gregor` / `user:plur:plur9`. Should agents write
-   engrams under their own scope?
-3. One SSH key (`id_rsa`, comment `gregor@plur.si`) authenticates the entire
-   fleet — 94,311 logins on one box alone. Per-target keys would bound a
-   compromise; is the operational cost worth it?
+1. Should a self-hosted git mirror gain per-agent accounts to match the
+   primary forge, or is a single owner identity acceptable for a private
+   mirror?
+2. Should agents write memory (engrams) under their own scope rather than
+   the owner's?
+3. Should each target host use its own SSH key rather than one key shared
+   across machines? Per-target keys bound a compromise; is the operational
+   cost worth it?
 
 ## Status notes
 
-Sections 1–5 were implemented and verified on 2026-08-13. Sections 6–9 were
-implemented on 2026-09-05/06 (datacore PR #106, nightshift PR #6,
-chief-of-staff PR #18; identity declared on all five machines, the checklist
-green on the box). The DIP stays **Draft** until owner ratification, per the
-governance rule that `Implemented`/`Accepted` requires review rather than
-self-certification.
+The DIP stays **Draft** until owner ratification, per the governance rule
+that `Implemented`/`Accepted` requires review rather than self-certification.
 
 
 ### Actor resolution clarification — proposed (2026-09-14)

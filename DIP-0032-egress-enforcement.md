@@ -7,44 +7,45 @@
 | **Author** | @datacore-one |
 | **Type** | Infrastructure |
 | **Status** | Draft |
-| **Implementation** | Partial — Phase 1 landed, Phase 2 (hermes-agent) outstanding |
+| **Implementation** | Partial — Phase 1 (daemon side) landed; Phase 2 (agent-gateway side) is deployment work outside this repo |
 | **Created** | 2026-07-25 |
 | **Updated** | 2026-07-25 |
 | **Tags** | `security`, `egress`, `agent-safety`, `chief-of-staff`, `approvals` |
-| **Affects** | `datacore-app/daemon/datacored/adapters/`, `datacore-app/daemon/datacored/api/mail.py`, `~/.datacore/egress-policy.yaml`, `~/.datacore/cos/approvals/`, `/usr/local/lib/hermes-agent` (Phase 2) |
+| **Affects** | `datacore-app/daemon/datacored/adapters/`, `datacore-app/daemon/datacored/api/mail.py`, `~/.datacore/egress-policy.yaml`, `~/.datacore/cos/approvals/`, the agent gateway's tool registry (Phase 2) |
 | **Specs** | `~/.datacore/egress-policy.yaml` |
-| **Agents** | `chief-of-staff`, `hermes` (Telegram Winston) |
-| **Relates to** | `datacore-one/datacore#30` (guardrails); `2026-07-25-winston-deep-audit.md` (Security §, HIGH); `2026-07-25-winston-egress-enforcement-design.md` (design proposal); DIP-0023 (messaging/trust tiers); DIP-0031 (agent error handling); ENG-2026-0718-024 |
+| **Agents** | `chief-of-staff`, the agent gateway that drives it over a chat channel |
+| **Relates to** | `datacore-one/datacore#30` (guardrails); an internal security audit (HIGH finding); an internal design proposal; DIP-0023 (messaging/trust tiers); DIP-0031 (agent error handling); ENG-2026-0718-024 |
 
 ## Summary
 
-Establishes a **technical egress boundary** for autonomous agents (Winston /
-chief-of-staff / hermes). Every action that leaves the box or affects the
+Establishes a **technical egress boundary** for autonomous agents (the
+chief-of-staff agent and the agent gateway that drives it). Every action that
+leaves the server or affects the
 outside world — email send, social post, Telegram, arbitrary HTTP, remote
 code execution — must pass through an in-process enforcement gate that
 classifies it against an owner-editable policy as **ALLOW / DENY / ASK**
 before it can execute. ASK actions are **held as drafts** and queued for
-owner approval on **both** the desktop app and Telegram; they leave the box
+owner approval on **both** the desktop app and Telegram; they leave the server
 only when approved, delivering the *exact* held payload. Every decision is
 written to an audit log. This turns "drafts only, never sends without
 approval" from a **prompt-level instruction** into an **enforced boundary a
 prompt cannot bypass**, directly implementing the open guardrails issue
-`datacore-one/datacore#30` and closing the audit's #1 HIGH finding.
+`datacore-one/datacore#30` and closing a HIGH security-audit finding.
 
 ## Motivation
 
 ### Problem: "no autonomous egress" is a prompt, not a boundary
 
-The Winston deep audit (`2026-07-25-winston-deep-audit.md`, Security §,
-HIGH) found that **"Winston has no autonomous external egress" is a
-prompt-level policy, not a technical boundary.** In reality the hermes agent
-that drives Winston holds live capability to reach the outside world:
+A security audit found that **"the assistant has no autonomous external
+egress" was a prompt-level policy, not a technical boundary.** An agent
+gateway of this kind typically holds live capability to reach the outside
+world, for example:
 
-- **Gmail `send()` / reply** (Late API / SMTP)
-- **Social posting** (Late API)
-- **Telegram** outbound
-- **Browserbase** (headless browser + proxies) / arbitrary HTTP
-- **Modal** remote sandboxes (remote code execution)
+- **Email send / reply** (provider API / SMTP)
+- **Social posting** (a posting API)
+- **Chat** outbound (e.g. Telegram)
+- **Headless browser** / arbitrary HTTP
+- **Remote sandboxes** (remote code execution)
 
 The only "never send autonomously" control was a **string in a prompt**
 (`queue_ai_tasks.py`: *"produce a ready-to-send draft, never send/publish"*).
@@ -86,7 +87,7 @@ instruction and the boundary is gone with no record.
 
 ## Owner Decisions (folded into this DIP)
 
-The design proposal (`2026-07-25-winston-egress-enforcement-design.md`) raised
+The design proposal raised
 three open questions. The owner's decisions, now normative:
 
 1. **Approval surface = BOTH.** ASK actions surface on the **desktop app AND
@@ -253,8 +254,8 @@ therefore forces (a) registering its action, and (b) giving it a policy entry
 - **Modified**: `datacored/api/mail.py` — `POST /mail/send` route routes
   outbound mail through the gate (an autonomous send returns a queued draft,
   not a send).
-- **Phase 2 (box, not this repo)**: `/usr/local/lib/hermes-agent` tool
-  registry routed through the same policy (§ Phase 2).
+- **Phase 2 (server-side deployment, not this repo)**: the agent gateway's
+  tool registry routed through the same policy (§ Phase 2).
 
 ### New Components
 
@@ -361,19 +362,18 @@ the mail reference integration + the "no unpoliced egress tool" regression
 guard. This is the reusable core: any daemon egress call site adopts it by
 routing through `enforce`.
 
-**Phase 2 (box / hermes side — follow-on, NOT in this repo).**
-The hermes agent (Telegram Winston) has its **own** send/browse/exec tools in
-the **box-installed** `/usr/local/lib/hermes-agent` package (not in
-datacore-app). Fully routing Winston's autonomous egress through the boundary
-requires wiring **hermes's tool registry** through this same policy: each
-egress-capable hermes tool (`gmail.send`, `late.post`, `browserbase.fetch`,
-`modal.run`, `telegram.send`) calls `enforce(...)` with the shared
-`~/.datacore/egress-policy.yaml` and enqueues ASKs to the same
-`~/.datacore/cos/approvals/` store — so the app and Telegram surfaces, and the
-audit log, are identical to Phase 1. This is a box/hermes deployment task
-(requires access to the box-installed package and its release process) and is
-tracked separately. Until Phase 2 lands, hermes-initiated egress remains
-prompt-gated; the daemon-side boundary (Phase 1) is enforced.
+**Phase 2 (agent-gateway side — follow-on, NOT in this repo).**
+An agent gateway (an external agent harness installed on the server) has its
+**own** send/browse/exec tools outside datacore-app. Fully routing its
+autonomous egress through the boundary requires wiring **the gateway's tool
+registry** through this same policy: each egress-capable gateway tool (email
+send, social post, browser fetch, remote run, chat send) calls `enforce(...)`
+with the shared `~/.datacore/egress-policy.yaml` and enqueues ASKs to the same
+`~/.datacore/cos/approvals/` store — so the app and chat surfaces, and the
+audit log, are identical to Phase 1. This is a deployment task on the server
+(it requires access to the installed gateway package and its release process).
+An installation must not claim the boundary covers gateway-initiated egress
+until Phase 2 is wired there.
 
 **Phase 3 (v2 — defense-in-depth).**
 Network-level egress restriction (egress proxy with allowlist, or a network
@@ -395,10 +395,8 @@ logic; cost/risk-escalation dashboards.
 
 - `datacore-one/datacore#30` — per-action ALLOW/DENY/ASK guardrails (cost caps,
   external-action approval, risk escalation). This DIP implements layers 1+2.
-- `2026-07-25-winston-deep-audit.md` — Security §, HIGH finding (egress is a
-  prompt, not a boundary).
-- `2026-07-25-winston-egress-enforcement-design.md` — design proposal this DIP
-  formalizes.
+- Internal security audit — HIGH finding (egress is a prompt, not a boundary).
+- Internal design proposal this DIP formalizes.
 - DIP-0023 — Messaging module & trust tiers (owner > team > trusted > unknown).
 - DIP-0030 (chief-of-staff module) — the approval substrate reused here.
 - DIP-0031 — Agent error handling.

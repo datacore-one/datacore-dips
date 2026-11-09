@@ -66,7 +66,7 @@ This section helps agents understand when and how to apply this DIP.
 ### When to Reference This DIP
 
 **Always reference when:**
-- Diagnosing why a scheduled job, cron script, or daemon on mac/box/nightshift
+- Diagnosing why a scheduled job, cron script, or daemon on workstation/server/executor
   can't find a credential or config value it expects (the failure genre
   `ENG-2026-0728-001` names)
 - Setting up, auditing, or migrating a machine's env-file configuration —
@@ -94,7 +94,7 @@ This section helps agents understand when and how to apply this DIP.
 
 | Agent | Uses This DIP For |
 |-------|-------------------|
-| `nightshift-orchestrator` | Consulting canonical config coverage before dispatching scheduled mac/box/nightshift jobs that declare `required_env`, so a job isn't routed to a machine missing a credential it needs |
+| `nightshift-orchestrator` | Consulting canonical config coverage before dispatching scheduled workstation/server/executor jobs that declare `required_env`, so a job isn't routed to a machine missing a credential it needs |
 | `dip-preparer` | Cross-checking new credential- or config-touching DIPs against this DIP's declared DIP-0018 boundary before ratification, so the config/credential domain doesn't re-fragment |
 | `scaffolding-auditor` | Extending spec-compliance checks to the canonical env-file convention this DIP defines, once Phase 6 migration begins retiring legacy sources |
 
@@ -132,9 +132,9 @@ This section helps agents understand when and how to apply this DIP.
   genre DIP-0035 names for job outputs (assert the real thing, not a proxy
   for it), applied here to configuration instead of artifacts.
 - **A fourth, previously undocumented collision, found by the real audit at
-  this DIP's own Phase 3 close**: `job_verify.py --machine mac --doctor`,
+  this DIP's own Phase 3 close**: `job_verify.py --machine workstation --doctor`,
   run for real against this DIP's originally-drafted canonical path
-  (`~/.datacore/env`), found that path **already occupied on the Mac** —
+  (`~/.datacore/env`), found that path **already occupied on the workstation** —
   not by drift between files, but by a pre-existing *directory* of
   per-service credential files (an older, different convention: one file
   per external service, under a directory of that name) rather than a
@@ -177,7 +177,7 @@ redundant with each other:
 
 1. **`CANONICAL_PATH` becomes `~/.datacore/datacore.env`**, not the
    originally-drafted bare `env`. Collision-free with the pre-existing
-   `~/.datacore/env` directory found on the real Mac; the filename is also
+   `~/.datacore/env` directory found on the real workstation; the filename is also
    more self-describing on its own merits (a directory listing of
    `~/.datacore/` now shows `datacore.env` unambiguously as *the* config
    file, rather than a bare `env` that reads as a generic/ambiguous name
@@ -222,8 +222,8 @@ use for. Doing both is cheap and each closes a distinct failure mode.
 > [DIP-0018](DIP-0018-credential-management.md) remains the system of record for credential storage, discoverability and cross-machine portability. This DIP does not replace it and defines no new storage tier. `~/.datacore/datacore.env` is a **machine-local materialised consumption view**: values originate in the DIP-0018 stores, are materialised onto one machine for runtime processes (cron jobs, daemons) that cannot query an index, and are never synced, never committed, and never authoritative. Losing it is recoverable by re-materialising from DIP-0018's stores. It MUST be registered in DIP-0018's credential index like any other credential location, and its `0600` mode requirement is inherited from DIP-0018 §8 (Security), not invented here.
 
 This is why the worked example below (Implementation) is dominated by
-credential-shaped `hermes.env` variables (`DISCORD_BOT_TOKEN`,
-`ELEVENLABS_API_KEY`, `TELEGRAM_BOT_TOKEN`, ...): `datacore.env`'s content is
+credential-shaped `hermes.env` variables (bot tokens, provider API keys,
+...): `datacore.env`'s content is
 expected to be mostly secrets, because it is the local read side of
 DIP-0018's storage, not a competing store for a different, non-secret class
 of config. [DIP-0010](DIP-0010-external-sync-architecture.md)'s "All
@@ -250,8 +250,8 @@ this kind of artifact — `DATACORE_CANONICAL_ENV` and
 ratifies; DIP-0005 is merged, so that addition is a follow-on amendment to
 DIP-0005, not part of this DIP. [DIP-0011](DIP-0011-nightshift-module.md)'s
 "Server deployment" section (systemd service/timer files, setup scripts) is
-the closer analog for this DIP's actual target machines (mac, box/cos,
-nightshift) and the natural place `cos-server-setup.sh`'s Phase 6 section
+the closer analog for this DIP's actual target machines (workstation, server,
+executor host) and the natural place `cos-server-setup.sh`'s Phase 6 section
 (Rollout Plan, below) should cross-reference once written.
 
 ### Canonical path
@@ -477,13 +477,13 @@ guards` (this Amendment) — both branch `feat/datacore-v2`; the
 `config_plane.py` module itself (`load`, `check_permissions`, `doctor`)
 landed in prior commits on the same branch (Tasks 3.1–3.2).
 
-### Worked example (real Mac audit, Phase 3 close, re-run after the Amendment — secrets redacted/verified per the binding rule above)
+### Worked example (workstation audit, Phase 3 close, re-run after the Amendment — secrets redacted/verified per the binding rule above)
 
 **Before the Amendment**, the literal CLI command specified for this audit
 crashed when run for real:
 
 ```
-$ python3 job_verify.py --machine mac --doctor
+$ python3 job_verify.py --machine workstation --doctor
 error: cannot read manifest <manifest path>: [Errno 21] Is a directory: '<canonical path>'
 (exit 1)
 ```
@@ -499,8 +499,8 @@ non-file guard and corrected error labeling both live), the same literal
 command was re-run for real, unmodified, no workaround needed:
 
 ```
-$ python3 job_verify.py --machine mac --doctor
-# Config Doctor -- machine: mac
+$ python3 job_verify.py --machine workstation --doctor
+# Config Doctor -- machine: workstation
 Canonical: ~/.datacore/datacore.env
 
 ## Missing (required by manifest jobs, absent from canonical)
@@ -514,27 +514,10 @@ Canonical: ~/.datacore/datacore.env
 ## Legacy-only (present in a legacy source, absent from canonical)
 
 ### hermes.env
-- BROWSERBASE_ADVANCED_STEALTH
-- BROWSERBASE_PROXIES
-- BROWSER_INACTIVITY_TIMEOUT
-- BROWSER_SESSION_TIMEOUT
-- DISCORD_BOT_TOKEN
-- ELEVENLABS_API_KEY
-- EXA_API_KEY
-- HERMES_SPOTIFY_CLIENT_ID
-- IMAGE_TOOLS_DEBUG
-- MOA_TOOLS_DEBUG
-- OPENROUTER_API_KEY
-- TELEGRAM_ALLOWED_USERS
-- TELEGRAM_BOT_TOKEN
-- TELEGRAM_HOME_CHANNEL
-- TELEGRAM_HOME_CHANNEL_THREAD_ID
-- TERMINAL_ENV
-- TERMINAL_LIFETIME_SECONDS
-- TERMINAL_MODAL_IMAGE
-- TERMINAL_TIMEOUT
-- VISION_TOOLS_DEBUG
-- WEB_TOOLS_DEBUG
+- EXAMPLE_PROVIDER_API_KEY
+- EXAMPLE_CHAT_BOT_TOKEN
+- EXAMPLE_TOOL_TIMEOUT
+- ...  (variable names only; values never printed)
 
 ## Unparseable legacy sources
 
@@ -543,14 +526,14 @@ Canonical: ~/.datacore/datacore.env
 (exit 0)
 ```
 
-`~/.datacore/datacore.env` does not exist yet on this Mac (migration is
+`~/.datacore/datacore.env` does not exist yet on this workstation (migration is
 Phase 6 work, not this DIP's), so `load()` returns `{}` and everything the
-21 `hermes.env` variables represent shows up as `legacy_only` rather than
+`hermes.env` variables represent shows up as `legacy_only` rather than
 `missing` (the manifest currently declares no `required_env` for either
-mac job, `mac-agent-stream-rsync`/`mac-lens-sync` — that is why `missing`
+workstation job, `workstation-agent-stream-rsync`/`workstation-lens-sync` — that is why `missing`
 is `(none)`, not evidence migration is complete). `cos.env` and
 `datacored.env` are both absent on this machine — `cos.env` is evidently
-box-only, since only `cos_*.sh` cron scripts running there source it.
+server-only, since only `cos_*.sh` cron scripts running there source it.
 Zero secret values appear anywhere above — verified before inclusion here,
 per this DIP's own SECRETS RULE (home directory redacted to `~` for the
 public-repo path-hygiene convention; nothing else altered).
@@ -572,7 +555,7 @@ only after that migration — never by this DIP.
 ## Open Questions / Known Gaps
 
 1. ~~**Canonical-path collision, found by real use, not simulated.**~~
-   **RESOLVED same-day by the Amendment, above.** On the Mac,
+   **RESOLVED same-day by the Amendment, above.** On the workstation,
    `~/.datacore/env` was already a pre-existing *directory* (holding
    per-service credential files under an older convention) rather than
    available as a flat file, so the pre-amendment `config_plane.load()`/
@@ -588,16 +571,16 @@ only after that migration — never by this DIP.
    closed, not just the end state.
 2. **`cos.env`'s legacy path is not universal across machines.** `doctor()`'s
    `LEGACY_SOURCES` constant hardcodes `~/.config/cos.env` for every
-   machine; the real audit found no such file on the Mac at all (`cos.env`
-   is evidently box-only, since only `cos_*.sh` cron scripts running there
+   machine; the real audit found no such file on the workstation at all (`cos.env`
+   is evidently server-only, since only `cos_*.sh` cron scripts running there
    source it). Whether `LEGACY_SOURCES` should become per-machine, or
    whether "absent" is simply the correct and expected state for cos.env on
-   non-box machines, is unresolved. **Still open** — the Amendment did not
+   non-server machines, is unresolved. **Still open** — the Amendment did not
    touch `LEGACY_SOURCES`.
-3. **The job manifest currently declares no `required_env` for any mac
+3. **The job manifest currently declares no `required_env` for any workstation
    job**, so `doctor()`'s `missing` section was empty in the real audit not
    because migration is complete, but because nothing has been declared
-   required yet. Whether mac jobs should gain `required_env` entries (and
+   required yet. Whether workstation jobs should gain `required_env` entries (and
    which variables) is manifest-authoring work under DIP-0035, not this
    DIP. **Still open.**
 4. **Migration mechanics** (how a human or `cos-server-setup.sh` actually

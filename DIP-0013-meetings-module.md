@@ -73,7 +73,7 @@ External Integrations:
 | **Daily Standup** | Daily (sync) | Journal, /today schedule, blocked tasks | Standup in journal |
 | **Weekly Exec** | Weekly | Escalated items, metrics, strategic questions | Decisions, priorities |
 | **Comms Weekly** | Weekly | Content pipeline, campaigns | Content assignments |
-| **Verity Product** | Weekly | GitHub issues, PRs, technical questions | Issue updates, tech decisions |
+| **Atlas Product** | Weekly | GitHub issues, PRs, technical questions | Issue updates, tech decisions |
 
 #### 2.1 Daily Standup
 
@@ -100,12 +100,12 @@ External Integrations:
 
 **Output**: Decisions documented, priorities updated, action items created
 
-#### 2.3 Verity Product Call
+#### 2.3 Atlas Product Call
 
 **Purpose**: Working session on product development
 
 **Input**:
-- GitHub issues from verity repo (bugs, features, blocked items)
+- GitHub issues from the product repo (bugs, features, blocked items)
 - PRs needing review or discussion
 - Technical decisions requiring team input
 - Architecture questions
@@ -150,17 +150,17 @@ def generate_standup(date: date) -> StandupReport:
 ## Standup - 2025-12-18
 
 ### Yesterday
-- Completed Dubai pilot proposal review
-- Fixed Verity API authentication bug
-- Investor meeting (notes in [[2025-12-17]])
+- Completed Beacon pilot proposal review
+- Fixed Atlas API authentication bug
+- Customer meeting (notes in [[2025-12-17]])
 
 ### Today
-- [ ] Follow up on DSSC partnership
+- [ ] Follow up on Acme partnership
 - [ ] Review calendar sync PR #42
 - [ ] Prepare weekly exec agenda
 
 ### Blockers
-- WAITING: Legal review for Dubai contract (since Dec 15)
+- WAITING: Contract review for Beacon pilot (since Dec 15)
 - NEED: Design input from @dave for landing page
 ```
 
@@ -226,16 +226,16 @@ Auto-detect project/space attribution:
 
 | Project | Keywords | Space |
 |---------|----------|-------|
-| Verity | verity, data marketplace, data RWA | datafund |
-| Santorio | santorio, health data, longevity | datafund |
+| Atlas | atlas, data marketplace | acme |
+| Beacon | beacon, health data | acme |
 | Datacore | datacore, module, agent, GTD | datacore |
-| Fair Data Society | FDS, fair data, swarm | datafund |
+| Website | website, landing page, docs | acme |
 
 Detection sources:
-- Wiki-links: `[[Verity]]`, `[[Santorio]]`
-- Explicit tags: `[Datafund]`, `(verity)`
+- Wiki-links: `[[Atlas]]`, `[[Beacon]]`
+- Explicit tags: `[Acme]`, `(atlas)`
 - Keywords in accomplishment text
-- File paths: `/1-datafund/`, `/2-datacore/`
+- File paths: `/1-acme/`, `/2-datacore/`
 
 #### 3.7 Confidence Indicator
 
@@ -316,12 +316,12 @@ Question captured
 For questions that can be researched:
 
 ```markdown
-**Question**: Should we use JWT or session-based auth for Verity API?
+**Question**: Should we use JWT or session-based auth for Atlas API?
 
 **AI Research Summary**:
 - JWT: Stateless, scales horizontally, standard for microservices
 - Sessions: Simpler revocation, better for monoliths
-- Verity architecture: Microservices (from codebase analysis)
+- Atlas architecture: Microservices (from codebase analysis)
 
 **Recommendation**: JWT aligns with architecture
 
@@ -429,9 +429,9 @@ From weekly exec: Carol will review the rate limiting proposal by Friday.
 |---------|---------|---------|
 | `/standup` | Generate standup report | `/standup` |
 | `/meeting-prep <type>` | Prepare for specific meeting | `/meeting-prep weekly-exec` |
-| `/meeting-agenda <type>` | Generate full agenda | `/meeting-agenda verity-product` |
+| `/meeting-agenda <type>` | Generate full agenda | `/meeting-agenda atlas-product` |
 | `/meeting-process` | Process transcription | `/meeting-process ~/transcript.md` |
-| `/my-questions` | Personal prep view (DIP-0006) | `/my-questions verity` |
+| `/my-questions` | Personal prep view (DIP-0006) | `/my-questions atlas` |
 
 #### 7.1 /standup
 
@@ -441,7 +441,7 @@ Generate standup report from journal and scheduled tasks.
 
 **Options**:
 - `--date`: Generate for specific date (default: today)
-- `--team`: Filter for specific team/space (e.g., `datafund`, `datacore`)
+- `--team`: Filter for specific team/space (e.g., `acme`, `datacore`)
 - `--meeting`: Meeting type preset: `daily`, `weekly`, `investor`, `product`
 - `--format`: Output format: `full` (default), `chat` (Slack/Discord), `brief`
 - `--personal`: Force personal mode (include all items)
@@ -459,7 +459,7 @@ Prepare for a specific meeting type.
 - `daily`: Daily standup
 - `weekly-exec`: Weekly executive meeting
 - `comms-weekly`: Communications team weekly
-- `verity-product`: Verity product working session
+- `atlas-product`: Atlas product working session
 
 **Actions**:
 1. Pull relevant context from calendar.org
@@ -540,12 +540,12 @@ meetings:
       attendees: ["@alice", "@bob", "@dave"]
       calendar_match: "Comms Weekly"
 
-    verity-product:
-      name: "Verity Product Call"
+    atlas-product:
+      name: "Atlas Product Call"
       duration: 60
       attendees: ["@alice", "@bob", "@carol"]
-      calendar_match: "Verity"
-      github_repo: "datacore-one/verity"
+      calendar_match: "Atlas"
+      github_repo: "acme/atlas"
       pull_issues: true
 
   transcription:

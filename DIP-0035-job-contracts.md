@@ -12,7 +12,7 @@
 | **Tags** | `jobs`, `verification`, `manifest`, `artifacts`, `metric-attest`, `datacore-v2` |
 | **Affects** | `.datacore/lib/jobs/` (`manifest.py`, `checks.py`, `manifest.yaml`), `.datacore/lib/job_verify.py` |
 | **Specs** | `.datacore/lib/jobs/*.py`, `.datacore/lib/job_verify.py` |
-| **Agents** | any process operating a scheduled job on mac/box/nightshift; `job_verify.py` itself as the verification runner |
+| **Agents** | any process operating a scheduled job on workstation/server/executor; `job_verify.py` itself as the verification runner |
 | **Depends** | [DIP-0034](DIP-0034-event-ledger-substrate.md) — hard: event schema, `EventLog`, actor resolution (DIP-0034 is itself unratified/Draft, so this dependency chain is Draft → Draft) |
 | **Relates to** | DIP-0034 (Event Ledger Substrate — `metric.attest` sink), `ENG-2026-0729-016` (ledger-mindset direction, item 2: verification contracts), `ENG-2026-0728-001` (silent-degradation failure genre), `ENG-2026-0423-001` (nightshift git-lock silent failure — same failure genre) |
 
@@ -51,7 +51,7 @@ This section helps agents understand when and how to apply this DIP.
 
 **Always reference when:**
 - Adding a new scheduled job (cron entry, systemd timer, launchd agent) on
-  `mac`, `box`, or `nightshift` and deciding whether it needs artifact
+  `workstation`, `server`, or `executor` (machine names are installation-defined) and deciding whether it needs artifact
   verification
 - About to write a new one-off watchdog script for a job — check
   `jobs/manifest.yaml` first; ending that pattern is this DIP's reason to
@@ -78,7 +78,7 @@ This section helps agents understand when and how to apply this DIP.
 
 | Agent | Uses This DIP For |
 |-------|-------------------|
-| `nightshift-orchestrator` | Nightshift is one of the three `--machine` targets `job_verify.py` checks; this agent's own org-state completion signal is a separate, complementary success signal for the same runs |
+| `nightshift-orchestrator` | The executor host is one of the `--machine` targets `job_verify.py` checks; this agent's own org-state completion signal is a separate, complementary success signal for the same runs |
 | `failure-analyzer` | Classifies *why* an individual nightshift task execution failed (DIP-0031); complements, does not duplicate, `job_verify.py`'s output-side artifact check on the job as a whole |
 
 No registry agent currently invokes `job_verify.py` itself — it runs as a
@@ -92,13 +92,13 @@ below for why no agent-registry mechanism covers this yet.
 - [DIP-0031](DIP-0031-agent-error-handling.md) — complementary, not overlapping: per-execution diagnostic classification vs. this DIP's output-side artifact verification
 - [DIP-0024](DIP-0024-reactive-hooks-infrastructure.md) — no shared mechanism: its hook families have no scheduled-job event type; `job_verify.py` is scheduler-triggered, not hook-triggered
 - [DIP-0022](DIP-0022-module-specification.md) — silent on scheduled-work declaration; `jobs/manifest.yaml` is a new, orthogonal registry, not an extension of anything DIP-0022 defines
-- [DIP-0011](DIP-0011-nightshift-module.md) — nightshift is one of the three `--machine` targets; adjacent to, not a replacement for, its own org-state and `execution_recorder` signals
+- [DIP-0011](DIP-0011-nightshift-module.md) — the executor host is one of the `--machine` targets; adjacent to, not a replacement for, its own org-state and `execution_recorder` signals
 
 ## Motivation
 
 ### Problem: the silent-degradation failure genre, and retrofitted-watchdog sprawl
 
-Datacore's scheduled jobs (box crontab, nightshift systemd timers, mac
+Datacore's scheduled jobs (server crontab, executor systemd timers, workstation
 launchd agents) have historically been verified, if at all, by whether their
 own script exited zero. That check is necessary but not sufficient — a job
 can exit 0 while producing nothing useful, and every concrete failure so far
@@ -156,7 +156,7 @@ success.**
    the other allocated classes, e.g. DIP-0037's `fact` class), giving each
    per-run verdict a durable, hash-chained, queryable record, rather than
    only a line in a log file that might itself be the artifact under test.
-4. **A foundation for consolidating the box's watchdogs** — Phase 6 revisits
+4. **A foundation for consolidating the server's watchdogs** — Phase 6 revisits
    whether `cos_verify_morning.py` and similar scripts can retire once the
    manifest covers their jobs with enough confidence (see Rollout Plan);
    this DIP does not retire anything itself.
@@ -172,7 +172,7 @@ A manifest is a YAML document `{version: 1, jobs: [...]}`.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `name` | str | yes | unique across the manifest |
-| `machine` | str | yes | one of `mac`, `box`, `nightshift` |
+| `machine` | str | yes | an installation-defined machine name (e.g. `workstation`, `server`, `executor`) |
 | `schedule` | str | yes | descriptive — cron syntax or free-text (e.g. a launchd interval description); not machine-parsed in Phase 2 |
 | `cmd` | str | yes | the command the schedule invokes (documentation only — never executed by the verifier) |
 | `artifacts` | list[Artifact] | yes | at least one |
@@ -208,8 +208,8 @@ their enumerated values; every job needs at least one artifact; an artifact's
 ```yaml
 version: 1
 jobs:
-  - name: box-cos-morning-briefing
-    machine: box
+  - name: server-cos-morning-briefing
+    machine: server
     schedule: "30 8 * * *"          # cron: 08:30 daily
     cmd: "python3 cos_morning.py"
     on_fail: telegram
@@ -291,7 +291,7 @@ checkable.
 ### Runner behavior (`job_verify.py`)
 
 ```
-job_verify.py --machine {mac,box,nightshift}
+job_verify.py --machine {workstation,server,executor}
     [--manifest PATH] [--alert {log,telegram}] [--no-emit] [--space DIR]
 ```
 
@@ -422,7 +422,7 @@ DIPs cover nearby ground without conflicting:
 - **DIP-0011 (Nightshift Module)** already gives nightshift two of its own
   success signals — org-mode task states (`NIGHTSHIFT_STATUS`/
   `NIGHTSHIFT_SCORE` properties) and DIP-0031's execution records via
-  `failure-analyzer`. Declaring nightshift's 6 scheduled jobs in this DIP's
+  `failure-analyzer`. Declaring nightshift's scheduled jobs in this DIP's
   manifest adds a *third*, coarser-grained signal: "did this scheduled
   invocation produce its expected artifact," checked independently of both.
   The three signals answer different-grained questions and none
@@ -534,7 +534,7 @@ job-contract-specific tests, 363 total in the full suite at HEAD of
 `feat/datacore-v2`, zero pre-existing or new failures.
 
 `manifest.yaml` declares all 18 real scheduled jobs across the three
-machines (10 on box, 6 on nightshift, 2 on mac), each with at least one
+machines (most on the server and executor, a few on the workstation), each with at least one
 evidence-derived artifact contract traced to a script, systemd unit,
 launchd plist, or source file read directly during authoring. 4 artifacts
 carry `# TODO(verify-on-<machine>)` markers where no direct code-traced
@@ -542,14 +542,14 @@ writer for a persisted artifact was found; those use the job's own
 script/state-directory as an honest fallback pending Phase 6 on-machine
 confirmation, rather than inventing a path.
 
-**Live verification run** (2026-07-30, `--machine mac --alert log
+**Live verification run** (2026-07-30, `--machine workstation --alert log
 --no-emit`):
 
 ```
 OK 2 jobs 2 artifacts
 ```
 
-exit 0 — both mac-declared jobs (`mac-agent-stream-rsync`, `mac-lens-sync`)
+exit 0 — both workstation-declared jobs (`workstation-agent-stream-rsync`, `workstation-lens-sync`)
 passed their exists-only contracts.
 
 Commit reference: `feat(v2): populate job manifest for all machines`
@@ -565,7 +565,7 @@ fallback. No cron entry, systemd unit, or launchd agent is changed;
 
 **Phase 6 (follow-on, interface-locked at this writing).** (1) Resolve the
 4 `TODO(verify-on-*)` markers by confirming actual writers and freshness
-thresholds directly on box, mac, and nightshift. (2) Switch the box's own
+thresholds directly on every machine. (2) Switch the server's own
 verification step to invoke `job_verify.py` (directly, or wired into
 `cos_sync`'s own health surface) once (1) is resolved. (3) Retire
 `cos_verify_morning.py` only after 7 consecutive green days of
@@ -587,7 +587,7 @@ silently reintroduce the exact failure genre this DIP exists to close.
    three machines' `metric.attest` events (via `ledger.index`, DIP-0034) is
    deferred until Phase 6 produces enough real multi-day data to design
    against.
-4. **Schedule-string tooling** — the mac jobs' `schedule` field is currently
+4. **Schedule-string tooling** — the workstation jobs' `schedule` field is currently
    descriptive prose (a launchd interval description) rather than cron
    syntax; if a future tool wants to compute "is this job overdue" from
    `schedule` directly, it will need either a stricter per-platform schema

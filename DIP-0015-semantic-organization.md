@@ -8,7 +8,7 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-21 |
-| **Updated** | 2026-10-16 |
+| **Updated** | 2026-10-18 |
 | **Tags** | `organization`, `files`, `structure`, `binaries`, `companion`, `media-index`, `generated-content`, `sidecar-metadata`, `space-discovery` |
 | **Affects** | `.gitignore`, all spaces, `.datacore/lib/spaces.py` |
 | **Specs** | `datacore-specification.md` |
@@ -50,7 +50,7 @@ This section helps agents understand when and how to apply this DIP.
 | Official company doc? | Org space ([N]-org/) - shared team asset |
 | Where does a contract go? | Org: `1-tracks/legal/contracts/[type]/` |
 | Does it need a companion? | Only if non-AI-readable (Keynote, PSD, video) |
-| Where do old financials go? | Org: `4-outbox/archive/` → moves to `[space]-archive/` on server |
+| Where do old financials go? | Org: `4-archive/` → moves to `[space]-archive/` on the owner's go |
 | Personal draft about work? | Personal: `1-active/` - not official yet |
 | General concept zettel? | Personal: broader applicability beyond org |
 | Org-specific concept zettel? | Org: `3-knowledge/zettel/` - company knowledge |
@@ -181,9 +181,9 @@ Content is organized by **role and purpose**, not by format:
 ├── content/                   # Generated media collections (see below)
 ├── 0-inbox/                   # Unprocessed captures
 ├── 1-active/                  # Focus areas (self-contained work)
-│   ├── trading/               # Trading work
+│   ├── finance/               # Personal finance
 │   ├── health-longevity/      # Health & wellness
-│   ├── fds/                   # FDS work
+│   ├── writing/               # Writing projects
 │   └── [focus-area]/          # Other focus areas
 ├── 2-code/                    # Personal projects
 ├── 3-knowledge/               # Permanent knowledge (cross-cutting)
@@ -194,8 +194,7 @@ Content is organized by **role and purpose**, not by format:
 │   │   └── companies/         # Company profiles
 │   ├── pages/                 # Wiki pages
 │   └── clippings/             # Web clippings
-├── 4-outbox/                  # Content EXIT (last numbered folder)
-│   └── archive/               # Queue for archive repo
+├── 4-archive/                 # Content EXIT (last numbered folder, DIP-0017)
 ├── .obsidian/                 # Obsidian vault config
 ├── .datacore/                 # Configuration
 └── CLAUDE.md                  # Personal context
@@ -243,9 +242,7 @@ Content is organized by **role and purpose**, not by format:
 │   ├── zettel/                # Atomic concepts
 │   ├── literature/            # Source summaries
 │   └── reference/             # People, companies, glossary
-├── 4-outbox/                  # Content routing OUT (see DIP-0017)
-│   ├── _routing.yaml          # Routing rules for this space
-│   └── archive/               # Queue for archive repo on server
+├── 4-archive/                 # Content EXIT, the single exit folder (DIP-0017)
 ├── .datacore/                 # Configuration
 └── CLAUDE.md                  # Space context
 ```
@@ -260,7 +257,14 @@ Numbers indicate processing stage:
 | `1-` | Active | Current work, tracks |
 | `2-` | Projects | Code repositories |
 | `3-` | Knowledge | Permanent reference |
-| `4-` | Outbox | Routing OUT (archive, delivery, publish) |
+| `4-` | Archive | Routing OUT: `4-archive/`, the single exit folder (DIP-0017, amended 2026-10-18) |
+
+#### Space and Data roots (amended 2026-10-18)
+
+Owner decisions on the space-structure board, 2026-10-18:
+
+- **`contacts` may be a link.** The CRM module writes `<space>/contacts/`. People, companies and the landscape live in `3-knowledge/reference/`; a space root may carry `contacts` only as a symlink to `3-knowledge/reference` (listed in the space's `.datacore/structure-allow`), never as a real folder.
+- **The Data root holds only the numbered spaces and system folders.** A tool run from the root writes into the space the work is about (plans and specs to `<space>/1-tracks/dev/superpowers/`, media to `<space>/content/`). The structure checker flags any other visible folder at the root, including one git ignores; ignored dot-folders are tool configuration and are not flagged.
 
 #### Canonical Templates
 
@@ -277,24 +281,24 @@ For **generated or curated media collections** (AI-generated images, video asset
 {space}/content/{topic-slug}/json/{descriptive-name}.json
 ```
 
-**Example** — PLUR brand visualizations generated for the LLM-gap positioning concept:
+**Example** — brand visualizations generated for a product positioning concept:
 
 ```
-5-plur/content/plur-llm-gap/
-├── plur-hero-bridge.png
-├── plur-diagram-architecture.png
-├── plur-meme-goldfish.png
+1-acme/content/acme-positioning/
+├── acme-hero-bridge.png
+├── acme-diagram-architecture.png
+├── acme-meme-goldfish.png
 └── json/
-    ├── plur-hero-bridge.json        # service, prompt, created_at, model, ...
-    ├── plur-diagram-architecture.json
-    └── plur-meme-goldfish.json
+    ├── acme-hero-bridge.json        # service, prompt, created_at, model, ...
+    ├── acme-diagram-architecture.json
+    └── acme-meme-goldfish.json
 ```
 
 **Rules**:
 
 | Rule | Reason |
 |------|--------|
-| Route to the space the work belongs to | Same principle as 1-tracks/ — `5-plur/content/...` not root-level |
+| Route to the space the work belongs to | Same principle as 1-tracks/ — `1-acme/content/...` not root-level |
 | Group by **topic**, not by date or service | Humans recall by *what*, not *when*; dates/services are in the sidecar |
 | No `images/` segment | Drop until a topic mixes media types and crowding forces a split |
 | JSON sidecars in a `json/` subfolder | Keeps image-browse listings visually clean (Finder, `ls`) |
@@ -527,8 +531,8 @@ Each document goes through systematic deep processing:
 **Phase 2: ASSESS**
 - **Still active/binding?** → `1-tracks/` (contracts, current projects)
 - **Reference value?** → `3-knowledge/` (strategic docs, concepts)
-- **Historical only?** → `4-outbox/archive/` → moves to archive repo (see DIP-0017)
-- **Superseded?** → `4-outbox/archive/` with note pointing to replacement
+- **Historical only?** → `4-archive/` → moves to archive repo (see DIP-0017)
+- **Superseded?** → `4-archive/` with note pointing to replacement
 
 **Relevance assessment by type:**
 
@@ -601,7 +605,7 @@ Before determining the semantic folder, determine **which space** the content be
 
 ```
 Is this official organizational content?
-├── YES → Route to org space (e.g., 1-datafund/)
+├── YES → Route to org space (e.g., 1-acme/)
 │   Examples:
 │   - Company contracts, agreements
 │   - Official financial statements
@@ -629,17 +633,17 @@ Is this official organizational content?
 | | Personal research on competitors | Official market analysis |
 | | My writings about the company | Published blog posts |
 
-**Routing Examples (Datafund import):**
+**Routing Examples (Acme import):**
 
 | File | Route To | Rationale |
 |------|----------|-----------|
-| `investor-agreement-signed.pdf` | 1-datafund/1-tracks/legal/ | Official binding contract |
+| `investor-agreement-signed.pdf` | 1-acme/1-tracks/legal/ | Official binding contract |
 | `my-thoughts-on-fundraising.md` | 0-personal/ | Personal perspective |
-| `pitch-deck-v3.key` | 1-datafund/1-tracks/comms/ | Official company asset |
+| `pitch-deck-v3.key` | 1-acme/1-tracks/comms/ | Official company asset |
 | `pitch-ideas-draft.md` | 0-personal/1-active/ | Personal draft, not official |
-| `brand-guidelines.pdf` | 1-datafund/3-knowledge/ | Official reference |
+| `brand-guidelines.pdf` | 1-acme/3-knowledge/ | Official reference |
 | `competitor-notes.md` | Depends on formality | If official analysis → org; if personal research → personal |
-| `meeting-notes-2024-03.md` | 1-datafund/journal/ or 0-personal/ | If team meeting notes → org; if personal notes → personal |
+| `meeting-notes-2024-03.md` | 1-acme/journal/ or 0-personal/ | If team meeting notes → org; if personal notes → personal |
 
 **When Unclear:**
 
@@ -658,7 +662,7 @@ Is this official organizational content?
 **Cross-Space Knowledge:**
 
 When extracting zettels or insights from organizational documents:
-- **Zettel about org-specific concept** (e.g., "Verity tokenization model") → org space
+- **Zettel about org-specific concept** (e.g., "Atlas pricing model") → org space
 - **Zettel about general concept** (e.g., "RWA regulatory framework") → personal space (broader applicability)
 - **Personal insight about org topic** → personal space
 
@@ -670,7 +674,7 @@ When extracting zettels or insights from organizational documents:
 | Current financials | Org | `1-tracks/finance/` | Full analysis |
 | Official reference | Org | `3-knowledge/` | Extract zettels, literature notes |
 | Personal writings | Personal | `1-active/` or `3-knowledge/pages/` | Personal processing |
-| Historical/outdated | Org | `4-outbox/archive/` | Companion only, routed to archive repo |
+| Historical/outdated | Org | `4-archive/` | Companion only, routed to archive repo |
 | Personal research | Personal | `3-knowledge/` | Extract personal zettels |
 | Large media | Depends | Semantic location | Companion required |
 
@@ -825,7 +829,7 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 - [DIP-0003: Scaffolding Pattern](./DIP-0003-scaffolding-pattern.md) - Index files and navigation
 - [DIP-0009: GTD Specification](./DIP-0009-gtd-specification.md) - GTD workflow and agents
 - [DIP-0011: Nightshift Module](./DIP-0011-nightshift-module.md) - Module architecture
-- [DIP-0017: Outbox & Archive Pattern](./DIP-0017-outbox-archive-pattern.md) - 4-outbox folder, archive repos
+- [DIP-0017: Outbox & Archive Pattern](./DIP-0017-outbox-archive-pattern.md) - 4-archive exit folder, archive repos
 - `datacore-specification.md` - Current structure documentation
 
 ## Related Agents

@@ -179,7 +179,7 @@ a weekly review by deleting it; flipping it DONE moves it forward by 1 week.
 - `calendar.org` — Google Calendar is source of truth
 - `ideas.org` — merged into someday.org
 - `protocol.org` — moved to 3-knowledge/pages/ as reference
-- `1-datafund/{archive,inbox,questions,research_learning,someday}.org` — dead since 2025-12
+- Team-space `{archive,inbox,questions,research_learning,someday}.org` — retired; team spaces keep only the AI coordination shadow (Part 14)
 
 ---
 
@@ -203,7 +203,7 @@ All tasks, ideas, and inputs go to inbox.org first. No exceptions.
 
 ```org
 * Inbox
-** TODO Quick capture - investor call follow-up
+** TODO Quick capture - customer call follow-up
 ** Research: ZK proof performance benchmarks
 ** Idea: Telegram bot for daily briefings
 ```
@@ -239,10 +239,10 @@ Route to appropriate location based on focus area and tier.
 
 | Keywords | Destination |
 |----------|-------------|
-| verity, ZK, data marketplace | TIER 1 → /Verity |
-| datafund, DMCC, VARA | TIER 1 → /Datafund |
-| investor, pitch, fundraising | TIER 1 → /Fundraising |
-| mr-data, datacore, agents | TIER 1 → /Mr Data |
+| atlas, product, roadmap | TIER 1 → /Atlas |
+| company, legal, compliance | TIER 1 → /Company |
+| pitch, fundraising | TIER 1 → /Fundraising |
+| datacore, agents | TIER 1 → /Datacore |
 | trading, position, market | RESEARCH → Trading |
 | health, exercise, supplements | PERSONAL → /Health & Longevity |
 
@@ -288,8 +288,8 @@ Regular reviews ensure system integrity.
 > state writer and full requeue coverage.
 
 > **Amendment v2.0 (2026-08-29) — DRAFT, pending ratification.** Rulings below
-> were made by Gregor in session on 2026-08-28/29; the amendment text itself
-> awaits his ratification and stays Draft until he marks it otherwise.
+> were made by the owner in session on 2026-08-28/29; the amendment text itself
+> awaits the owner's ratification and stays Draft until he marks it otherwise.
 >
 > **Principle: agents and humans are the same class of worker.** The state
 > axis answers exactly one question — *who has the ball* — and it answers it
@@ -347,7 +347,7 @@ ways: done / benched-with-reason / won't-do.
    (Evidence for ruling it rather than leaving it open: while unruled, the
    ingest closed only `DONE`, so 33 cancelled tasks across four spaces stayed
    live in the projection as permanent drift — `all_clean` could never become
-   true and `box-projection-drift` alerted nightly about a condition no run
+   true and the projection-drift check alerted nightly about a condition no run
    could clear. 2026-08-31.)
 6. **PAUSED does not exist** (`WAITING` covers it; audit 2026-08-28 found
    zero entries). **ASSIGN retired** (declared once, used never).
@@ -517,11 +517,11 @@ The nightshift queue file mirrors the structure of next_actions.org to preserve 
 #+SEQ_TODO: TODO(t) NEXT(n!) WAITING(w!) DEFERRED(f) QUEUED(q) WORKING(W!) REVIEW(r!) | DONE(d!) FAILED(x!) CANCELLED(c!)
 
 * TIER 1: STRATEGIC FOUNDATION
-** /Verity
-** /Datafund
+** /Atlas
+** /Company
 ...
 * RESEARCH & LEARNING
-** Verity
+** Technology
 ...
 ```
 
@@ -548,30 +548,30 @@ The nightshift queue file mirrors the structure of next_actions.org to preserve 
 **TIER 1: STRATEGIC FOUNDATION**
 | Focus Area | Description | Keywords |
 |------------|-------------|----------|
-| `/Verity` | Data marketplace, ZK proofs | verity, zkp, institutional |
-| `/Mr Data` | AI second brain development | datacore, agents, CLI |
-| `/Datafund (Core Operations)` | Core business | datafund, DMCC, VARA |
-| `/Fundraising` | Investment, pitch | investors, SAFT, term sheet |
+| `/Atlas` | Flagship product | atlas, product, roadmap |
+| `/Datacore` | AI second brain development | datacore, agents, CLI |
+| `/Company (Core Operations)` | Core business | company, legal, compliance |
+| `/Fundraising` | Investment, pitch | fundraising, pitch |
 | `/Network & Ecosystem` | Partnerships | partnerships, community |
 
 **TIER 2: SUPPORTING WORK**
 | Focus Area | Description | Keywords |
 |------------|-------------|----------|
-| `BV (Braveheart Ventures)` | Investment vehicle | braveheart, BV |
-| `Swarm` | Swarm network (winding down) | swarm, ethswarm |
+| `Operations` | Admin, tooling | ops, admin |
+| `Legacy Project` | Project being wound down | legacy |
 
 **PERSONAL: LIFE & DEVELOPMENT**
 | Focus Area | Description | Keywords |
 |------------|-------------|----------|
 | `/Personal Development` | Growth, productivity | personal dev, stoicism |
 | `/Health & Longevity` | Health optimization | health, supplements |
-| `Home & Family` | Family, home | family, teo |
+| `Home & Family` | Family, home | family, home |
 | `Financial Management` | Personal finance | budget, taxes |
 
 **RESEARCH & LEARNING**
 | Focus Area | Description | Keywords |
 |------------|-------------|----------|
-| `Verity` | Verity research | verity research |
+| `Atlas` | Atlas research | atlas research |
 | `Trading` | Market analysis | trading, strategies |
 | `Technology` | Tech research | technology, innovation |
 
@@ -580,7 +580,7 @@ The nightshift queue file mirrors the structure of next_actions.org to preserve 
 | Level | Usage | Example |
 |-------|-------|---------|
 | `*` | Tier | `* TIER 1: STRATEGIC FOUNDATION` |
-| `**` | Focus Area | `** /Verity` |
+| `**` | Focus Area | `** /Atlas` |
 | `***` | Task/Project | `*** TODO [#A] Ship v0.1` |
 | `****` | Sub-task | `**** TODO Write tests` |
 
@@ -608,7 +608,7 @@ Related: [[Wiki Link 1]], [[Wiki Link 2]]
 
 ### Part 3.5: Rich Task Standard
 
-Nightshift tasks execute poorly when they lack context. A heading like `* TODO Create Verity roadmap :AI:` gives the executor nothing to work with. The Rich Task Standard defines the full set of properties that make tasks self-contained and executable.
+Nightshift tasks execute poorly when they lack context. A heading like `* TODO Create Atlas roadmap :AI:` gives the executor nothing to work with. The Rich Task Standard defines the full set of properties that make tasks self-contained and executable.
 
 #### Rich Task Format
 
@@ -627,7 +627,7 @@ SCHEDULED: <2026-02-22 Sun>
   - GitHub: org/repo#42
 :CURRENT_STATUS: |
   What exists already. What was last done.
-  Journal 2026-02-20 ## Session 1: "Discussed roadmap scope with Crt"
+  Journal 2026-02-20 ## Session 1: "Discussed roadmap scope with @alice"
 :ACCEPTANCE_CRITERIA: |
   - What "done" looks like (verifiable)
   - Expected output format
@@ -640,7 +640,7 @@ SCHEDULED: <2026-02-22 Sun>
   WAITING "legal review of data classification"
 :ROLE: |
   You are a technical project manager with deep knowledge
-  of the Verity codebase and Datafund's 8-week PoC timeline.
+  of the Atlas codebase and the team's 8-week PoC timeline.
 :END:
 
 Context paragraph with additional details.
@@ -755,7 +755,7 @@ SCHEDULED: <2026-02-22 Sun .+1d>
 :EFFORT:   Moderate
 :CONTEXT: |
   Scan configured news sources for topics relevant to
-  Datafund, data economy, AI agents, tokenization.
+  the company, data economy, AI agents.
 :ACCEPTANCE_CRITERIA: |
   - Literature notes created for top 3-5 findings
   - Zettels extracted for novel concepts
@@ -764,7 +764,7 @@ SCHEDULED: <2026-02-22 Sun .+1d>
   - Use exa/perplexity for web search
   - Use research-orchestrator pipeline
 :ROLE: |
-  You are a research analyst for Datafund, scanning for
+  You are a research analyst for the company, scanning for
   competitive intelligence and strategic opportunities.
 :END:
 ```
@@ -1646,9 +1646,38 @@ Unresolved Git conflict syntax outside literal Org blocks must stop task review,
 mutation and projection reconciliation. Reading both sides as ordinary tasks is
 not a valid way to resolve conflicting intent or completion evidence.
 
+> **Amendment v2.1 (2026-11-05): DRAFT, pending ratification.** Decided by the owner
+> in session on 2026-11-05. The amendment text awaits ratification and stays Draft
+> until the owner marks it otherwise.
+>
+> **The graph is divide and conquer toward the vision and intents.**
+>
+> 1. **Free depth.** Each node breaks down until it reaches work. The lower a node, the
+>    more granular it is. A branch has as many levels as the work needs. The level names
+>    in 9.1 are labels for depth, not a fixed ladder.
+> 2. **The stop rule is the GTD project:** a multi-action outcome that can finish. Single
+>    next actions live in `next_actions.org`, never in the graph.
+> 3. **Leaves are work or rules.** A `:project:` ends. A `:duty:` recurs and belongs to a
+>    role as a cadence. A `:constraint:` is a rule the work must keep. A project may hold
+>    projects.
+> 4. **Every project has a canvas** (`:CANVAS:`, see 10.2).
+> 5. **Every project has a completion check:** `:DONE_WHEN:`, or the roadmap item's
+>    `done_when` where `:ROADMAP:` is set. The roadmap owns status and dates.
+> 6. **Lifecycle.** Only projects close. Intents and the vision give direction and do
+>    not close. Winston confirms a project's check, or escalates to the owner, and a
+>    project Winston worked on goes to the owner. Checks test outcomes, not only outputs.
+>    Closed work moves to `4-archive/`. When all children of a node have closed, the node
+>    is checked in turn (the combine step). If it is not achieved, the gap becomes a new
+>    child project.
+> 6a. **New projects.** Agents propose projects, and the owner approves them. The owner
+>    may later let the fleet add and complete projects below a set level in the graph
+>    (for example level 4). No threshold is set yet. Every other rule still applies to
+>    such projects, including effect gates and the rule that agents do not merge.
+> 7. **Epic** is the code's word for a roadmap item, which is a project in this model.
+
 ### 9.1 Structure
 
-The Intent Graph has five levels of granularity:
+The Intent Graph has five levels of granularity (labels for depth; see Amendment v2.1):
 
 | Level | Name | Granularity | Review Cycle |
 |-------|------|-------------|--------------|
@@ -1735,7 +1764,7 @@ GTD defines six horizons of perspective, from ground-level actions to life purpo
 |---------|----------|-------------------|--------------|
 | Ground | Next Actions | `org/next_actions.org` (TODO/NEXT items) | Daily |
 | H1 | Projects | `org/next_actions.org` (headings with children) + Project Canvas | Weekly |
-| H2 | Areas of Focus | Focus area headings in `next_actions.org` (e.g., `/Verity`, `/Health`) | Weekly |
+| H2 | Areas of Focus | Focus area headings in `next_actions.org` (e.g., `/Atlas`, `/Health`) | Weekly |
 | H3 | Goals (1-2yr) | Intent Graph Level 2-3 nodes with OKRs | Monthly |
 | H4 | Vision (3-5yr) | Intent Graph Level 1 nodes | Quarterly |
 | H5 | Purpose | Intent Graph Level 0 (Vision) + Foundations scaffolding | Annual |
@@ -1744,12 +1773,13 @@ GTD defines six horizons of perspective, from ground-level actions to life purpo
 
 Projects with complexity beyond a simple task list use a **Project Canvas** — a structured one-page document based on the HBR/Nieto-Rodriguez methodology.
 
-**When to create a Canvas:**
-- Project has >5 tasks or >2 weeks estimated duration
-- Multiple people involved (team spaces)
-- Requires budget or resource allocation
-- Has external dependencies or stakeholders
-- `gtd-project-manager` flags it (see Part 11.6)
+**When to create a Canvas (Amendment v2.1, Draft):** every project has one; a small project's canvas may be a few lines. Besides defining the project, the canvas manages people's workload, is the bridge between work and accounting, and supports strategic planning and management. It holds purpose, people and money; status and dates live in the roadmap. Sprints read the canvas and do not have a canvas of their own: a sprint's goal and human gates live in `sprint.yaml`. This replaces the earlier thresholds:
+
+- ~~Project has >5 tasks or >2 weeks estimated duration~~
+- ~~Multiple people involved (team spaces)~~
+- ~~Requires budget or resource allocation~~
+- ~~Has external dependencies or stakeholders~~
+- ~~`gtd-project-manager` flags it (see Part 11.6)~~
 
 **Canvas location:** `CANVAS.md` in the project directory, or inline in the relevant track folder for non-code projects.
 
@@ -1776,7 +1806,7 @@ Projects with complexity beyond a simple task list use a **Project Canvas** — 
 
 **5. References** — Links to background materials, standards, related work
 
-**Reference implementation:** `1-datafund/2-projects/verity/CANVAS.md`
+**Template:** `project-canvas-template.md` (see References); each project keeps its own `CANVAS.md` in its project folder
 
 ### 10.3 OKR Integration
 
@@ -1802,7 +1832,7 @@ Intent: [Intent Graph path]
 - Each Key Result has a single owner (team member or AI agent)
 - Key Results must be measurable (number, date, binary)
 - Maximum 3-5 Key Results per Objective
-- Key Results become tasks in `next_actions.org` (or GitHub Issues for team spaces)
+- Key Results become sub-projects or roadmap items, and those hold the tasks in `next_actions.org` (or GitHub Issues for team spaces). Each task needs its own completion check, because a Key Result's test is shared across its tasks (Amendment v2.1, Draft)
 
 ### 10.4 Horizon Coverage Check
 
@@ -2140,7 +2170,7 @@ DIP-0009 Parts 1-7 implicitly describe single-space GTD. This part specifies how
 | Type | Example | GTD Owner | Task Source | Collaboration Model |
 |------|---------|-----------|-------------|---------------------|
 | Personal | `0-personal` | Individual | `org/next_actions.org` | Solo |
-| Team | `1-datafund` | Team | GitHub Issues + `org/` shadow | GitHub-first |
+| Team | `1-acme` | Team | GitHub Issues + `org/` shadow | GitHub-first |
 | System | `2-datacore` | Maintainer | `org/` + GitHub Issues | Hybrid |
 
 ### 14.2 Personal Space GTD
@@ -2153,7 +2183,7 @@ The personal space (`0-personal`) follows full GTD methodology as specified in P
 
 ### 14.3 Team Space GTD
 
-Team spaces (`1-datafund`, etc.) use a **GitHub-first** model:
+Team spaces (`[N]-[team]`, e.g. `1-acme`) use a **GitHub-first** model:
 
 **Source of truth:** GitHub Issues (not org files)
 
@@ -2200,7 +2230,7 @@ The inbox processor routes tasks to the correct space based on keywords and cont
 
 | Signal | Routing |
 |--------|---------|
-| Mentions team project (Verity, Datafund) | Team space org/ |
+| Mentions team project (e.g. Atlas) | Team space org/ |
 | Personal task (health, trading, family) | Personal space org/ |
 | System task (DIP, module, agent) | System space org/ |
 | Ambiguous | Personal space (default), surface for review |
@@ -2264,7 +2294,7 @@ Weekly review includes an integrity summary:
 ```
 Task Integrity Report
 ─────────────────────
-Stuck projects:        2 (Verity CI/CD, Newsletter automation)
+Stuck projects:        2 (Atlas CI/CD, Newsletter automation)
 Stale tasks (>14d):    5
 Potential duplicates:  1
 WAITING >7 days:       3
@@ -2590,7 +2620,7 @@ Between commands, Datacore operates as a **conversational assistant**. The user 
 | "What's on my plate?" | `gtd.agenda_view` (today_priorities) | MCP Tool |
 | "Process my inbox" | `gtd-inbox-coordinator` | Agent |
 | "Check my email" | `/mails` command | Command |
-| "Plan the verity launch" | `gtd-project-manager` + `project-canvas` skill | Agent + Skill |
+| "Plan the Atlas launch" | `gtd-project-manager` + `project-canvas` skill | Agent + Skill |
 | "How am I doing this week?" | `user-analytics-generator` | Agent |
 | "What's my readiness?" | `health.fetch_vitals` | MCP Tool |
 | "Schedule my trading review" | Calendar integration (DIP-0010) | MCP Tool |
@@ -3692,7 +3722,6 @@ All GTD agents MUST:
 - DIP-0014: Tag Taxonomy — `:AI:` routing tags, namespace conventions (Parts 3, 13)
 - DIP-0019: Learning Architecture — engram system, three-loop learning (Parts 13, 18)
 - `2-datacore/1-tracks/ops/Intent-Graph.md` — Intent Graph source document (Part 9)
-- `1-datafund/2-projects/verity/CANVAS.md` — Project Canvas reference implementation (Part 10)
 - `0-personal/3-knowledge/zettel/project-canvas-template.md` — Canvas template (Part 10)
 - DIP-0022: Module Specification — five-layer capability model (Part 21) (**co-dependency**: both DIPs reference each other)
 - `2-datacore/2-projects/datacore-health/specs/dashboard-v2-specification.md` — Health Dashboard V2 (Part 19.3)
@@ -3702,3 +3731,14 @@ All GTD agents MUST:
 - `.datacore/commands/continue.md` — `/continue` command implementation (Part 19)
 - `.datacore/modules/mail/commands/mails.md` — Mail processing command (Part 20)
 - `.datacore/gtd-spec.md` - Previous operational specification (to be archived)
+
+## 31 October 2026 amendment: one delegation route
+
+> Ratified by the owner on 2026-10-31. It reconciles Part 0 and Part 4 with what runs (the DIP check in `2-datacore/1-tracks/dev/reports/2026-10-31-task-delegation-true-state-and-dip-check-report.md`, rows 4 to 7).
+
+1. **Ledger assignment is the only way an agent receives work** (DIP-0038's claim loop), Miles included.
+   - A queue is a view. `nightshift.org` is generated from the ledger items assigned to Miles and stays in 0-personal.
+   - The one-task-at-a-time rule is a work-in-progress limit stored on Miles, not a discipline on a file.
+2. **`ai.org` is retired**, and so is Part 4's scanning of `next_actions.org` for `:AI:` tags. Part 0's file routing gives way to assignment.
+3. **Approval of agent-made tasks is a signed `approval.grant` event on the task**, written by the delegation review. It replaces the `:APPROVED_BY:` property and the review's receipt files.
+4. **A failed delegation check pauses agent-made work.** A failed canary, drill or weekly round sets the fleet pause for agent-made tasks until the owner clears it. The owner's own tasks keep running. This replaces "checks only alert".

@@ -39,7 +39,7 @@ capture (inbox) → process (classify, enrich) → archive (permanent storage)
 |--------|---------|---------|---------|
 | gtd | inbox.org | inbox-triage agent | next_actions.org, someday.org |
 | mail | Gmail inbox | mail-classifier agent | org tasks, archive labels |
-| outbox | 4-outbox/ | outbox processor | archive/ repo |
+| outbox | 4-archive/ | outbox processor | archive repo |
 | research | research task | research agent | 3-knowledge/ |
 | whatsapp | chat export | whatsapp-importer | CRM + knowledge |
 

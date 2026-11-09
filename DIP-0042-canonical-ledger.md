@@ -719,13 +719,13 @@ via `policy.set`) cuts a block at height 0 referencing all three:
   "cut_at": "2026-08-04T09:10:00Z",
   "entries": [
     {"writer":"node1","file":"0-personal/.datacore/events/node1.jsonl","seq":0,
-     "event_hash":"9f2c...a1","hlc":"1785400000000.0000.box",
+     "event_hash":"9f2c...a1","hlc":"1785400000000.0000.server",
      "observed_at":"2026-08-04T09:10:00Z","late":false},
     {"writer":"node1","file":"0-personal/.datacore/events/node1.jsonl","seq":1,
-     "event_hash":"3b7e...d4","hlc":"1785400015000.0000.box",
+     "event_hash":"3b7e...d4","hlc":"1785400015000.0000.server",
      "observed_at":"2026-08-04T09:10:00Z","late":false},
     {"writer":"node1","file":"0-personal/.datacore/events/node1.jsonl","seq":2,
-     "event_hash":"c081...9e","hlc":"1785400600000.0000.box",
+     "event_hash":"c081...9e","hlc":"1785400600000.0000.server",
      "observed_at":"2026-08-04T09:10:00Z","late":false}
   ],
   "root_hash":"b13e...77"
@@ -734,14 +734,14 @@ via `policy.set`) cuts a block at height 0 referencing all three:
 
 The snapshot at height 0 is `fold()` over exactly these three events —
 identical to the `LedgerState` in DIP-0034's worked example. Now suppose a
-laptop actor `mac` reconnects a week later with a `item.dismiss` for a
+laptop actor `workstation` reconnects a week later with a `item.dismiss` for a
 different, unrelated item `t-011`, whose `hlc` places it *before* height
 0's cut. Height 0 is not rewritten. The next block, height 1, includes the
-`mac` event with `late: true`:
+`workstation` event with `late: true`:
 
 ```jsonc
-{"writer":"mac","file":"0-personal/.datacore/events/mac.jsonl","seq":4,
- "event_hash":"7ad1...02","hlc":"1784800000000.0000.mac",
+{"writer":"workstation","file":"0-personal/.datacore/events/workstation.jsonl","seq":4,
+ "event_hash":"7ad1...02","hlc":"1784800000000.0000.workstation",
  "observed_at":"2026-08-11T09:10:00Z","late":true}
 ```
 
@@ -813,7 +813,7 @@ sources, not a measured figure:
 
 | Source | Basis | Events/day |
 |---|---|---|
-| `metric.attest` (`job.verify`) | ~11 attests/machine/day × 3 machines (Mac, box, nightshift — DIP-0034 Rationale's "three machines the owner controls") | 33 |
+| `metric.attest` (`job.verify`) | ~11 attests/machine/day × 3 machines (workstation, server, executor — DIP-0034 Rationale's "three machines the owner controls") | 33 |
 | `item.*` lifecycle | ~30 ledger items/day × ~3 events/item (create, claim, complete — `verify` not always emitted) | 90 |
 | `spend.record` | ~1 per executed job, same order as item completions ([DIP-0041](DIP-0041-executor-adapters.md), "goes live end-to-end") | 30 |
 | Briefing/approval (`item.create` from [DIP-0037](DIP-0037-grounded-briefings.md), `approval.grant`, `policy.set`) | smaller, occasional rather than per-item | 20 |
@@ -1184,9 +1184,21 @@ trigger fires.
   direction (cited in DIP-0034's Owner Decision) this DIP stays inside the
   spirit of: single-sequencer, verify-don't-trust, not distributed
   consensus.
-- `ENG-2026-0727-004` — Mac↔box sync topology; the concrete scenario
+- `ENG-2026-0727-004` — workstation↔server sync topology; the concrete scenario
   motivating Motivation Problem 1 (retroactive insertion) and the worked
   example's late-arrival illustration.
 - `ENG-2026-0423-001` — nightshift git-lock silent failure; cited again
   here (via DIP-0034) as the reason the chain must never become the write
   path (Rationale).
+
+## 31 October 2026 amendment: the hub is adopted as the front door
+
+> Ratified by the owner on 2026-10-31. It supersedes "Transport hub: deferred, with a trigger" above: the hub (datacored, the Datacore app's daemon) was built and activated on every space in October 2026.
+
+1. **The hub admits, orders and stamps every event**; it is where an event becomes real.
+   - Readers fold, and agents claim, from the hub's admitted log when it answers, and from the git copy only when it does not.
+   - Git keeps the append-only replica for history, backup, audit and offline machines. A machine without the hub writes into its local buffer, and the hub admits the buffer in its own order on reconnect.
+2. **The three roles stay named separately** (sequencer, arbiter, hub) and keep separate fallbacks, even when one machine holds all three.
+3. **The hub is watched like any job.** A job contract checks that every hub space's newest seal is under one hour old, made by the sequencer, and recomputes.
+4. **Routine hub moves wait.** Before a hub hand-over becomes routine, the hand-over defect found in the 2026-10-24 re-check (C1) is fixed. The owner already made that a precondition on 2026-10-24.
+5. **Seals stay** as the offline proof anyone can recompute. They no longer gate corrections (DIP-0034, 31 October 2026 amendment, item 3).

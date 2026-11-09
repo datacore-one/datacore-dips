@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0024 |
 | **Title** | Reactive Hooks Infrastructure |
-| **Author** | Gregor |
+| **Author** | @datacore-one |
 | **Type** | Standards Track |
 | **Status** | Draft |
 | **Created** | 2026-03-16 |
