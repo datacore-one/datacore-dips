@@ -8,7 +8,7 @@
 | **Type** | Standards Track |
 | **Status** | Draft |
 | **Created** | 2026-03-16 |
-| **Updated** | 2026-03-16 |
+| **Updated** | 2026-11-09 (amendment, Draft: one registry for every hook kind; ledger-event subscribers) |
 | **Tags** | `hooks`, `infrastructure`, `memory`, `lifecycle` |
 | **Affects** | `.datacore/registry/`, `.claude/settings.json`, all DIPs/modules |
 | **Specs** | DIP-0016 (Agent Registry), DIP-0019 (Learning Architecture) |
@@ -487,6 +487,60 @@ Every existing DIP should be audited for implicit hook points. Recommended addit
 | DIP-0019 | Session lifecycle | SessionStart, UserPromptSubmit, SessionEnd | Full session lifecycle |
 | DIP-0019 | Active memory | PreToolUse(EnterPlanMode, Skill, Agent) | Action-time injection |
 | DIP-0019 | Rehydration | PostCompact | Re-inject after compaction |
+
+### 9. Amendment 2026-11-09 (Draft, awaiting the owner): one registry for every hook kind, plus ledger-event subscribers
+
+**Why.** By 2026-11 the Claude Code and git families were in `hooks.yaml`, composed by `hooks_composer.py` and checked against what is wired (`test_hooks_registry_matches_wiring.py`). Three other kinds of hook lived outside it, and two of the four module hook kinds in use were run by nothing:
+
+| Module hook kind | Declared in | Run by |
+|---|---|---|
+| `today` | 21 modules | `today_registry.py` (/today) |
+| `claude_code` | 0 modules | `hooks_composer.py` |
+| `post_install` | 12 modules | **nothing**: the CLI installs from `requirements.txt`, `package.json` or `install.sh` |
+| `nightshift_queue`, `nightshift_complete` | 1 module each | **nothing** |
+
+Nothing reacted to ledger events either. Each observer, such as Winston's request reporter, refolded every space on a timer and kept its own "already told" state, and nothing recorded a failed delivery.
+
+**Specification.**
+
+1. **Five families, one registry.** `hooks.yaml` gains two top-level sections beside `claude_code:` and `git:`:
+   - `module_hook_kinds:` lists every kind a `module.yaml` may declare under `hooks:`. Each entry names the file that runs it (`run_by:`). `module_manifest_check.py` reports a module hook whose kind is not listed. The listed kinds are `today` and `claude_code`.
+   - `lifecycle:` records the DIP-0016 agent-lifecycle kinds (pre-execution, post-execution, validation, error) and their runner (`hooks.py`, used by the nightshift runner), so the registry is complete. Their definitions stay where DIP-0016 puts them.
+   - `ledger_events:` declares the event subscribers (item 3).
+2. **Declarations nothing runs are removed.** `post_install` entries move to the module's `install.sh` only where the module needs them. A module whose dependencies are already in `requirements.txt` or `package.json` drops the entry. `nightshift_queue` and `nightshift_complete` are removed. A kind comes back only together with the code that runs it.
+3. **Ledger-event subscribers** (`ledger_subscribers.py`).
+   - **Declaration.** A subscriber declares a `name`, the ledger event `types` it wants, a `call` (`module:function`) and `declared_by`.
+   - **The runner** reads each ledger space's task events and hands each matching event to each subscriber:
+     - **at least once**, in log order within one writer's log, with no ordering across logs;
+     - **with a cursor per subscriber, per space, per writer's log**, held in the runner's state folder. The cursor moves past an event only when the call returns without raising;
+     - **recording failures**: a failed call is recorded with its error, the cursor stays, and the next run retries it. `status` lists failures and lag;
+     - **refusing an undeclared subscriber**: a name not in the registry is refused;
+     - **read-only**: a subscriber gets a copy of the event. Anything it writes goes through `EventLog` and its guards like any other write. A subscriber cannot veto or delay a write. Guards stay in the Claude Code and git families, in core, and fail closed.
+   - **Event names.** Subscribers use the ledger's own types. Each delivered event also carries the nearest event name from the Paperclip plugin spec, where the meaning is the same, so a bridge can forward it without a lookup table of its own:
+
+     | Ledger | Paperclip-compatible alias |
+     |---|---|
+     | `item.create` | `issue.created` |
+     | `item.claim` | `agent.run.started` |
+     | `item.complete` / `item.verify` | `agent.run.finished` |
+     | `item.release` | `agent.run.failed` |
+     | `item.dismiss` | `issue.closed` |
+     | `approval.grant` | `approval.decided` |
+     | `spend.record` | `cost_event.created` |
+
+     "Task" stays Datacore's word; Paperclip's "issue" is the mapping only.
+4. **First subscriber:** Winston's request reporter takes `item.release` and tells the owner once that a doer released a request without finishing it, with the doer's own reason (`doer_said`, an excerpt of the doer's last words that `ledger_claim.py` adds to the release). This replaces the misleading "not picked up" that the level-triggered report produced after a release.
+
+**Acceptance.**
+- A module hook of an unlisted kind fails `module_manifest_check`.
+- The subscriber tests show:
+  - delivery;
+  - a retry after a failure;
+  - no redelivery after success;
+  - an undeclared subscriber refused.
+- The core suite has no new failures, and the promise evals are unedited.
+
+**Not changed.** The Claude Code and git families, the composer's output and the DIP-0016 lifecycle definitions.
 
 ## Rationale
 
