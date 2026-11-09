@@ -189,4 +189,3 @@ git commit -m "Migrate to overlay contribution model"
 ## References
 
 - [Ethereum EIP Process](https://eips.ethereum.org/EIPS/eip-1)
-- [Architecture Doc](https://github.com/datacore-one/datacore-space/blob/main/1-departments/dev/architecture/repo-contribution-architecture.md)

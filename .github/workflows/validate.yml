@@ -20,5 +20,5 @@ jobs:
           python-version: '3.12'
       - name: Verify validator failure and redaction behavior
         run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
-      - name: Validate DIP structure, numbering, and content hygiene
+      - name: Validate DIP structure, numbering, and content hygiene (credentials, private IPs, home paths, emails; private denylist is local-only)
         run: python3 scripts/validate_dips.py

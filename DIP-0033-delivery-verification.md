@@ -29,31 +29,29 @@ deterministic gate).
 
 ## Motivation
 
-On 2026-07-29 the morning journal failed to reach the principal for **four
-stacked reasons**, none of which violated any spec:
+A morning journal can fail to reach the principal for several **stacked
+reasons**, none of which violates any spec:
 
-1. nightshift wrote the journal at 03:15Z but only published it at
-   batch-end 10:43Z — a 7.5h producer-side lag no consumer could see;
-2. nothing on the Mac pulled `0-personal` since the 2026-07-27
-   three-machine split — the morning ritual silently depended on removed
-   infrastructure, and no canary ran after the change;
-3. an interrupted sync at 12:42 stranded uncommitted work in a stash and
-   died without alerting (actor never identified);
-4. the `/today` sync recipe failed on a tree that `org_workspace.load()`
-   kept re-dirtying (write-on-load), and the loop swallowed both errors.
+1. the executor writes the journal early but publishes it only at
+   batch-end, hours later — a producer-side lag no consumer can see;
+2. after a change of machine topology, nothing on the workstation pulls
+   the personal space any more — the morning ritual silently depends on
+   removed infrastructure, and no canary runs after the change;
+3. an interrupted sync strands uncommitted work in a stash and dies
+   without alerting;
+4. a sync recipe fails on a tree that a loader keeps re-dirtying
+   (write-on-load), and the loop swallows both errors.
 
-The same investigation found **10 orphaned stashes accumulated since
-2026-05-14** — real work, including journal content, lost weekly with zero
-signal — and a same-day sweep found **four systemd units on nightshift in
-`failed` state alerting nobody** (`nightshift-outbox` had failed nightly on a
-newline-bearing filename), 11 cron jobs whose only failure surface is a
-write-only log, and failure-tolerant `ExecStartPost=-` steps with no checked
-surface behind them.
+The same class of investigation typically finds orphaned stashes holding
+real work lost with zero signal, systemd units in `failed` state alerting
+nobody, cron jobs whose only failure surface is a write-only log, and
+failure-tolerant `ExecStartPost=-` steps with no checked surface behind
+them.
 
 Every component matched its spec. DIPs are design-time documents; all of
 this was **runtime drift and silent failure**. The one place instrumented
-with an outcome check — the box's 08:00 `cos_verify_morning` — is the one
-place failures were caught same-day. This DIP generalizes that pattern. Its
+with an outcome check — a morning verifier on the server — is the one
+place failures are caught same-day. This DIP generalizes that pattern. Its
 subject is *runtime truth*, not design.
 
 ## Specification
@@ -65,8 +63,8 @@ Every user-facing deliverable is registered in
 
 ```yaml
 - id: morning-journal
-  producer: nightshift-today.service (03:15Z) → 0-personal push
-  consumption_point: Mac, journal open in editor
+  producer: executor-today.service (03:15Z) → 0-personal push
+  consumption_point: workstation, journal open in editor
   deadline: "08:35 local"
   verifier: .datacore/lib/morning_journal.py   # alerts on miss
   alert: macOS notification + non-zero exit
@@ -80,8 +78,8 @@ outbox archive run.
 ### 2. Verify at the point of consumption (normative)
 
 The verifier asserts the outcome **where the principal experiences it**,
-not where the pipeline produces it. "The box sent the audio" is a producer
-check; "the journal is on the Mac, fresh, and was opened by 08:35" is a
+not where the pipeline produces it. "The server sent the audio" is a producer
+check; "the journal is on the workstation, fresh, and was opened by 08:35" is a
 consumption check. Producer checks remain useful for diagnosis; only
 consumption checks count as verification.
 
@@ -116,7 +114,7 @@ as one command (`datacore-smoke`), covering the most likely flows:
 | Mail triage | audit.jsonl has an entry < 24h old; errors below threshold; actionable items present in briefing artifact |
 | Task round-trip | task created via app API appears in org file with `:ID:`; org files unchanged on disk after a pure read |
 | Intent graph | `intents.org` parses in every space; app `/intents` answers 200/401, not 404/5xx |
-| Failed units | `systemctl --failed` empty on box + nightshift |
+| Failed units | `systemctl --failed` empty on every server host |
 | LLM fallback | monthly, sandboxed: primary backend forced to fail → briefing still ships, `_meta.llm_attempts` records the chain, degraded skeleton renders |
 
 **Non-determinism rule:** smoke checks assert **invariants** — existence,
@@ -128,9 +126,9 @@ prose), generalized.
 **Cadence:** nightly on the machine that owns each scenario, plus
 **post-change canary** — after any infrastructure change (machine split,
 cron/timer change, sync topology, module deploy), the affected scenarios
-run once before the change is considered done. The 2026-07-27 split would
-have failed the morning-chain scenario within a day instead of surfacing
-two days later through a lost briefing.
+run once before the change is considered done. A machine split checked
+this way fails the morning-chain scenario within a day instead of surfacing
+days later through a lost briefing.
 
 ### 5. The AI / determinism boundary (normative)
 
@@ -177,12 +175,12 @@ Constraints go at the boundary, not everywhere:
 2. **Phase 2:** `datacore-smoke` runner + the seven scenarios above;
    failed-units check wired to `cos_alert`.
 3. **Phase 3:** sweep all `|| true` / `except: pass` /
-   `ExecStartPost=-` sites against §3.2 (inventory from the 2026-07-29
-   audit); fix or annotate.
+   `ExecStartPost=-` sites against §3.2 (inventory from an audit of
+   the installation); fix or annotate.
 
 ## Open Questions
 
-1. Where does the smoke runner live — chief-of-staff module (box-centric)
+1. Where does the smoke runner live — chief-of-staff module (server-centric)
    or a new `verify` module (machine-agnostic)?
 2. Should smoke results feed the app (System Pulse card) in addition to
    alerts?

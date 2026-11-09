@@ -115,7 +115,7 @@ DIP-0034 built an append-only, hash-chained, per-writer event ledger and then ex
 ### The ledger, as shipped, does not touch the problem that motivated it
 
 DIP-0034's own Motivation names two recurring failure classes: **duplicate
-resurrection / ID-conflict churn** (`ENG-2026-0727-004` — the Mac and the box
+resurrection / ID-conflict churn** (`ENG-2026-0727-004` — the workstation and the server
 each mint their own `:ID:` for headings that lack one, so the same logical
 task ends up under two different IDs and every sync conflicts on pure
 metadata) and **git-lock silent failure** (`ENG-2026-0423-001` — nightshift's
@@ -160,10 +160,10 @@ identity from content on every read:
   unchecked.
 - **`org_resolve_id_conflicts.py`** — resolves git merge conflicts that are
   *only* competing auto-assigned `:ID:` values, because two machines
-  (datacore-app's daemon and `ensure-ids` on the box) each invent a different
+  (datacore-app's daemon and `ensure-ids` on the server) each invent a different
   UUID for the same heading when it lacks one, and "the next sync conflicts
   on pure metadata — no human decision is involved," per its own docstring.
-- **`reconcile_sync_merge.py`** — resolves Mac↔nightshift-server merge
+- **`reconcile_sync_merge.py`** — resolves workstation↔executor merge
   conflicts on GTD org files specifically, because "a blind union would
   resurrect archived tasks" — the server's file and the laptop's file are
   both plausible "current state," and there is no principled way to decide
@@ -344,7 +344,7 @@ item's `parent` is either (a) the ledger id of its nearest stateful ancestor
 task, or (b) a **structural sentinel** — a stable, deterministically-derived
 identifier (namespaced distinctly from real item ids, e.g. `struct:<slug of
 the heading path>`) for a non-stateful ancestor heading (a Tier or Focus Area
-heading such as `** /Verity`, which carries no TODO keyword and is never
+heading such as `** /Acme Project`, which carries no TODO keyword and is never
 itself an `item.create`), or (c) `struct:root` for a task with no ancestor
 heading at all. Structural sentinels nest under other structural sentinels or
 `struct:root`, so the tree is always fully reconstructible with no dangling
@@ -702,7 +702,7 @@ chief-of-staff host is it.** Four points, then the trade-off this decision is no
    (its own routing comment: a local model by default, escalating to a
    hosted model, failing soft back to the hosted one) calling `/process-inbox` (run) → `git commit` (commit) →
    `cos_sync.sh` again (sync). The sync-run-commit-sync ordering is itself
-   the fix for a past incident where the box could otherwise act on stale
+   the fix for a past incident where the server could otherwise act on stale
    data or leave its own output unpublished — this DIP does not introduce
    that discipline, it names an actor that already follows it and makes the
    naming a ledger fact instead of an implicit assumption about which
@@ -744,12 +744,12 @@ chief-of-staff host is it.** Four points, then the trade-off this decision is no
    **automated** actors only — the owner can process the inbox in-session,
    interactively, at any time, whether or not the designated processor's scheduled run has
    or hasn't happened. An overlap (a human runs `/process-inbox` manually
-   moments before the box's timer also fires) is possible and is rendered
+   moments before the server's timer also fires) is possible and is rendered
    harmless by the same idempotent content-hash keying named in point 2, not
    by any coordination between the two.
 
 **This is a trade-off, not a pure win, and this DIP records it as one.**
-Routing an inbox entry is a judgment call, and the box runs a
+Routing an inbox entry is a judgment call, and the server runs a
 lighter-weight, differently-tiered model for this task than an interactive
 session does — `cos_llm.sh`'s own routing comment for the `inbox-processing`
 task class states it plainly — a local model by default. Concentrating
@@ -793,7 +793,7 @@ The projector runs on two triggers, not one, and both are required:
   that regression as unacceptable, not as an acceptable cost of migration.
 - **Periodic, on a fixed interval, to absorb remote events.** The eager
   trigger only fires for events appended *locally* — a sibling machine's
-  `box.jsonl` arriving via the existing git-based sync has no local
+  `server.jsonl` arriving via the existing git-based sync has no local
   `append()` call to hook, so nothing eager fires for it. A scheduled sweep
   (the same cadence class as DIP-0010's existing sync poll interval — 10
   minutes — is a reasonable default to reuse rather than a new interval to
@@ -1320,7 +1320,7 @@ what each phase requires and its trigger, not a schedule.
   never-resurface dedupe rule this DIP's Inbox Processing section adapts,
   with the full-entry (not heading-only) refinement the real `inbox.org`
   corpus required.
-- `ENG-2026-0727-004` — Mac↔box sync topology and its duplicate-resurrection
+- `ENG-2026-0727-004` — workstation↔server sync topology and its duplicate-resurrection
   / ID-conflict-churn failure modes, the direct motivating evidence for this
   DIP alongside the five repair scripts cited in Motivation.
 - `ENG-2026-0423-001` — nightshift git-lock silent failure, the other

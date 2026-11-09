@@ -163,8 +163,8 @@ Server (nightshift):
 ~/Data/
 ├── 0-personal/              # Main space (synced)
 ├── 0-personal-archive/      # Archive repo (separate)
-├── 1-datafund/
-├── 1-datafund-archive/
+├── 1-acme/
+├── 1-acme-archive/
 └── ...
 ```
 
@@ -198,8 +198,8 @@ Local machine:               Nightshift server:
 ├── 0-personal/              ├── 0-personal/
 │   └── 4-archive/           │   └── 4-archive/
 │                            ├── 0-personal-archive/  ← separate repo
-├── 1-datafund/              ├── 1-datafund/
-│   └── 4-archive/           ├── 1-datafund-archive/
+├── 1-acme/                  ├── 1-acme/
+│   └── 4-archive/           ├── 1-acme-archive/
 └── ...                      └── ...
 
 Flow: Local 4-archive/ → sync → Server processes → Archive repo
@@ -214,7 +214,7 @@ Local machine:
 │   └── 4-archive/
 ├── .datacore/archives/      # Local archive repos
 │   ├── 0-personal-archive/
-│   └── 1-datafund-archive/
+│   └── 1-acme-archive/
 └── ...
 
 Flow: Local 4-archive/ → /outbox command → Local archive repo
@@ -425,7 +425,7 @@ _Last audited: 2026-03-04_
 |---------|----------|
 | Module structure (v1.1.0) | `modules/outbox/module.yaml` with tools, skills, agents, commands |
 | Single exit folder `4-archive/` (amended 2026-10-18) | No space has `4-outbox/`; `test_dip_0017_no_space_has_a_second_exit_folder` |
-| Server-side archive repos | `nightshift:~/Data/{0-personal,1-datafund,2-datacore}-archive.git` |
+| Server-side archive repos | A server-side bare repo per space (`[N]-[name]-archive.git`) |
 | `outbox-processor` agent | `modules/outbox/agents/outbox-processor.md` — routes `4-archive/` to server repos |
 | `archive-indexer` agent | `modules/outbox/agents/archive-indexer.md` — builds datacortex snapshot for search |
 | `/outbox` command | `modules/outbox/commands/outbox.md` — `--dry-run`, `--space`, `--verbose` options |

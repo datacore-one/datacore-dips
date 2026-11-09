@@ -23,11 +23,11 @@ Establishes a hybrid credential management system combining shared credentials (
 ### Problem: Credential Loss and Duplication
 
 Real incident that motivated this DIP:
-- Alchemy Sepolia RPC key needed for Fairdrop demo
+- Alchemy Sepolia RPC key needed for a demo app
 - Key existed only in `~/Data/<space>/<project>/.env`
 - No index or registry made it discoverable
 - Nearly lost during development, requiring extensive search
-- Same credential needed by multiple FDS projects (fairdrop, fairdrive)
+- Same credential needed by multiple team projects (acme-app, acme-drive)
 
 ### Current Pain Points
 
@@ -71,7 +71,7 @@ Before implementing this DIP, ensure:
 - `gpg` 2.2+ (optional, for encrypted secrets)
 
 **Infrastructure Requirements**:
-- SSH access to private server (nightshift) for secrets repository
+- SSH access to a private server (the secrets server) for secrets repository
 - OS-level disk encryption (FileVault on macOS, LUKS on Linux)
 - Git pre-commit hooks support (for secrets scanning)
 
@@ -101,7 +101,7 @@ Before implementing this DIP, ensure:
     └── .env                          # Project-specific credentials
 
 # Secrets Repository (separate, on private server)
-user@nightshift-server:Data/0-personal-secrets.git/
+user@secrets-server:Data/0-personal-secrets.git/
 ├── install.sh                        # Bootstrap script
 ├── restore.sh                        # Secrets-only restore
 ├── README.md                         # Documentation
@@ -134,14 +134,14 @@ credentials:
       - path: ".datacore/env/blockchain-rpc.env"
         var_name: "ALCHEMY_SEPOLIA_RPC_URL"
         primary: true
-      - path: "3-fds/2-projects/fairdrop/.env"
+      - path: "3-acme-labs/2-projects/acme-app/.env"
         var_name: "ALCHEMY_SEPOLIA_RPC_URL"
         primary: false
         note: "Legacy location, migrate to shared"
     used_by:
-      - "3-fds/2-projects/fairdrop"
-      - "3-fds/2-projects/fairdrive"
-    description: "Sepolia testnet RPC endpoint for FDS projects"
+      - "3-acme-labs/2-projects/acme-app"
+      - "3-acme-labs/2-projects/acme-drive"
+    description: "Sepolia testnet RPC endpoint for team projects"
     documentation: "https://docs.alchemy.com/reference/api-overview"
 
   - id: infura-mainnet-rpc
@@ -155,7 +155,7 @@ credentials:
         var_name: "INFURA_MAINNET_RPC_URL"
         primary: true
     used_by:
-      - "3-fds/2-projects/fairdrop"
+      - "3-acme-labs/2-projects/acme-app"
     description: "Ethereum mainnet RPC endpoint"
     documentation: "https://docs.infura.io/"
 
@@ -172,7 +172,7 @@ credentials:
         primary: true
     used_by:
       - "0-personal/code/*"
-      - "3-fds/*"
+      - "3-acme-labs/*"
     description: "Claude API access for agents and automation"
     documentation: "https://docs.anthropic.com/"
     cost_implications: "Pay-per-token, monitor usage"
@@ -203,11 +203,11 @@ credentials:
       - path: ".datacore/env/analytics.env"
         var_name: "POSTHOG_API_KEY"
         primary: true
-      - path: "3-fds/2-projects/fairdrop/.env"
+      - path: "3-acme-labs/2-projects/acme-app/.env"
         var_name: "NEXT_PUBLIC_POSTHOG_KEY"
         primary: false
     used_by:
-      - "3-fds/2-projects/fairdrop"
+      - "3-acme-labs/2-projects/acme-app"
     description: "Product analytics and feature flags"
     documentation: "https://posthog.com/docs"
 
@@ -222,7 +222,7 @@ credentials:
         var_name: "SENTRY_DSN"
         primary: true
     used_by:
-      - "3-fds/2-projects/fairdrop"
+      - "3-acme-labs/2-projects/acme-app"
     description: "Error tracking and performance monitoring"
     documentation: "https://docs.sentry.io/"
 
@@ -238,7 +238,7 @@ credentials:
         var_name: "VERCEL_TOKEN"
         primary: true
     used_by:
-      - "3-fds/2-projects/fairdrop"
+      - "3-acme-labs/2-projects/acme-app"
     description: "Vercel CLI and deployment automation"
     documentation: "https://vercel.com/docs/rest-api"
 
@@ -253,7 +253,7 @@ credentials:
         var_name: "DOCKER_HUB_TOKEN"
         primary: true
     used_by:
-      - "3-fds/2-projects/*"
+      - "3-acme-labs/2-projects/*"
     description: "Docker image registry authentication"
     documentation: "https://docs.docker.com/security/for-developers/access-tokens/"
 
@@ -286,7 +286,7 @@ credentials:
         var_name: "NPM_TOKEN"
         primary: true
     used_by:
-      - "3-fds/2-projects/fairdrop"
+      - "3-acme-labs/2-projects/acme-app"
     description: "NPM package publishing"
     documentation: "https://docs.npmjs.com/about-access-tokens"
 
@@ -298,12 +298,12 @@ credentials:
     category: database
     provider: neon
     locations:
-      - path: "3-fds/2-projects/fairdrop/.env"
+      - path: "3-acme-labs/2-projects/acme-app/.env"
         var_name: "DATABASE_URL"
         primary: true
     used_by:
-      - "3-fds/2-projects/fairdrop"
-    description: "Fairdrop production database"
+      - "3-acme-labs/2-projects/acme-app"
+    description: "Acme App production database"
     documentation: "https://neon.tech/docs"
     note: "Contains database credentials, rotate regularly"
 
@@ -322,7 +322,7 @@ credentials:
         primary: true
     used_by:
       - "0-personal/code/backup"
-      - "3-fds/2-projects/fairdrop"
+      - "3-acme-labs/2-projects/acme-app"
     description: "S3 bucket access for backups and asset storage"
     documentation: "https://docs.aws.amazon.com/IAM/"
 
@@ -334,11 +334,11 @@ credentials:
     category: communication
     provider: sendgrid
     locations:
-      - path: "3-fds/2-projects/fairdrop/.env"
+      - path: "3-acme-labs/2-projects/acme-app/.env"
         var_name: "SENDGRID_API_KEY"
         primary: true
     used_by:
-      - "3-fds/2-projects/fairdrop"
+      - "3-acme-labs/2-projects/acme-app"
     description: "Transactional email delivery"
     documentation: "https://docs.sendgrid.com/"
 
@@ -355,7 +355,7 @@ credentials:
         primary: true
     used_by:
       - ".datacore/agents/*"
-    description: "Nightshift agent notifications"
+    description: "Agent notifications"
     documentation: "https://api.slack.com/messaging/webhooks"
 
   # Machine-Specific (Travel Pattern)
@@ -433,11 +433,11 @@ Is it machine-specific (SSH key, GPG key)?
 **Three Storage Locations**:
 
 1. **Secrets Repository** (separate git repo on private server)
-   - **Location**: `user@nightshift-server:Data/0-personal-secrets.git/`
+   - **Location**: `user@secrets-server:Data/0-personal-secrets.git/`
    - **Contents**: Critical credentials, SSH/GPG keys, machine configs
    - **Encryption**: GPG-encrypted at rest
    - **Sync**: Manual pull/push, never auto-synced
-   - **Access**: Requires SSH to nightshift server
+   - **Access**: Requires SSH to the secrets server
    - **Use case**: Travel laptop bootstrap, disaster recovery
 
 2. **Shared Datacore Credentials** (`.datacore/env/`)
@@ -505,10 +505,10 @@ Is it machine-specific (SSH key, GPG key)?
 │   └── deployment.env                # Deployment credentials
 │
 ├── project-envs/                     # Critical project credentials
-│   └── 3-fds/
+│   └── 3-acme-labs/
 │       └── 2-projects/
-│           ├── fairdrop.env          # Fairdrop production credentials
-│           └── fairdrive.env         # Fairdrive production credentials
+│           ├── acme-app.env          # Acme App production credentials
+│           └── acme-drive.env        # Acme Drive production credentials
 │
 ├── backups/                          # Backup metadata
 │   ├── credential-index.yaml         # Backup of credential index
@@ -523,7 +523,7 @@ Is it machine-specific (SSH key, GPG key)?
 **Key Design Decisions**:
 
 - **Separate repo**: Not in main Datacore (privacy, sync control)
-- **Private server**: Hosted on nightshift (not GitHub)
+- **Private server**: Hosted on the secrets server (not GitHub)
 - **GPG encryption**: Optional encryption for critical files
 - **Version controlled**: Git history for credential rotation tracking
 - **Verified restores**: Checksums and manifest for integrity
@@ -904,19 +904,19 @@ Category: blockchain-rpc
 Provider: alchemy
 
 Description:
-  Sepolia testnet RPC endpoint for FDS projects
+  Sepolia testnet RPC endpoint for team projects
 
 Locations:
   [PRIMARY] .datacore/env/blockchain-rpc.env
     Variable: ALCHEMY_SEPOLIA_RPC_URL
 
-  [LEGACY] 3-fds/2-projects/fairdrop/.env
+  [LEGACY] 3-acme-labs/2-projects/acme-app/.env
     Variable: ALCHEMY_SEPOLIA_RPC_URL
     Note: Legacy location, migrate to shared
 
 Used By:
-  - 3-fds/2-projects/fairdrop
-  - 3-fds/2-projects/fairdrive
+  - 3-acme-labs/2-projects/acme-app
+  - 3-acme-labs/2-projects/acme-drive
 
 Documentation: https://docs.alchemy.com/reference/api-overview
 
@@ -1007,7 +1007,7 @@ Found 2 credentials:
 
 1. alchemy-sepolia-rpc
    Alchemy Sepolia RPC Key
-   Locations: .datacore/env/blockchain-rpc.env, 3-fds/2-projects/fairdrop/.env
+   Locations: .datacore/env/blockchain-rpc.env, 3-acme-labs/2-projects/acme-app/.env
 
 2. infura-sepolia-rpc
    Infura Sepolia RPC Key
@@ -1032,7 +1032,7 @@ ISSUES:
 1. Duplicate Credentials (1)
    - alchemy-sepolia-rpc: found in 2 locations
      Primary: .datacore/env/blockchain-rpc.env
-     Duplicate: 3-fds/2-projects/fairdrop/.env
+     Duplicate: 3-acme-labs/2-projects/acme-app/.env
      Recommendation: Remove duplicate, use shared credential
 
 2. Missing Credentials (1)
@@ -1064,15 +1064,15 @@ $ datacore creds migrate alchemy-sepolia-rpc --dry-run
 
 Current locations:
   [PRIMARY] .datacore/env/blockchain-rpc.env
-  [DUPLICATE] 3-fds/2-projects/fairdrop/.env
+  [DUPLICATE] 3-acme-labs/2-projects/acme-app/.env
 
 Migration plan:
   1. Keep primary location: .datacore/env/blockchain-rpc.env
-  2. Update 3-fds/2-projects/fairdrop/.env to source from shared
+  2. Update 3-acme-labs/2-projects/acme-app/.env to source from shared
   3. Remove duplicate entry from index
 
 Changes (preview only, not applied):
-  File: 3-fds/2-projects/fairdrop/.env
+  File: 3-acme-labs/2-projects/acme-app/.env
     - ALCHEMY_SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/...
     + source ${DATACORE_DIR}/env/blockchain-rpc.env
 
@@ -1085,16 +1085,16 @@ Migrating: alchemy-sepolia-rpc
 
 Current locations:
   [PRIMARY] .datacore/env/blockchain-rpc.env
-  [DUPLICATE] 3-fds/2-projects/fairdrop/.env
+  [DUPLICATE] 3-acme-labs/2-projects/acme-app/.env
 
 Migration plan:
   1. Keep primary location: .datacore/env/blockchain-rpc.env
-  2. Update 3-fds/2-projects/fairdrop/.env to source from shared
+  2. Update 3-acme-labs/2-projects/acme-app/.env to source from shared
   3. Remove duplicate entry from index
 
 Proceed? (y/N): y
 
-✓ Updated 3-fds/2-projects/fairdrop/.env:
+✓ Updated 3-acme-labs/2-projects/acme-app/.env:
   - Removed: ALCHEMY_SEPOLIA_RPC_URL=...
   - Added: source ${DATACORE_DIR}/env/blockchain-rpc.env
 ✓ Updated credential index
@@ -1114,7 +1114,7 @@ $ datacore creds backup
 
 Backing up credentials to secrets repository...
 
-Secrets repository: user@nightshift-server:Data/0-personal-secrets.git/
+Secrets repository: user@secrets-server:Data/0-personal-secrets.git/
 
 Files to backup:
   .datacore/env/.env
@@ -1227,7 +1227,7 @@ Continue with rotation? (y/N):
 Single storage location doesn't work for three reasons:
 
 1. **Security tiers differ**: Database URLs (critical) need different protection than read-only API keys (medium)
-2. **Project boundaries**: Some credentials are truly project-specific (fairdrop DB), others are shared (Sepolia RPC)
+2. **Project boundaries**: Some credentials are truly project-specific (an app database), others are shared (Sepolia RPC)
 3. **Portability needs**: Travel laptop needs subset of credentials, not all
 
 Hybrid approach:
@@ -1243,7 +1243,7 @@ Five reasons:
 2. **Sync control**: Manual sync prevents accidental exposure
 3. **Machine portability**: Clone once, deploy to any machine
 4. **Backup strategy**: Independent backup schedule from code
-5. **Access control**: SSH to nightshift required, adds security layer
+5. **Access control**: SSH to the secrets server required, adds security layer
 
 Alternative (rejected): Store secrets in .datacore/env/ with gitignore
 - Problem: No backup, no portability, loss risk remains
@@ -1292,7 +1292,7 @@ Benefit: Compromise of travel laptop doesn't expose all credentials
 - Mark old locations as "legacy" in index
 
 **Phase 3: Secrets Repository Setup** (Week 4)
-- Create 0-personal-secrets.git on nightshift
+- Create 0-personal-secrets.git on the secrets server
 - Migrate critical credentials (SSH keys, GitHub tokens, DB URLs)
 - Create bootstrap script
 - Test fresh machine installation
@@ -1331,7 +1331,7 @@ Benefit: Compromise of travel laptop doesn't expose all credentials
    - Storage: secrets-repo only
    - Encryption: GPG at rest
    - Rotation: quarterly
-   - Access: SSH to nightshift required
+   - Access: SSH to the secrets server required
 
 2. **High**: API keys with billing or destructive capabilities
    - Storage: secrets-repo or .datacore/env/
@@ -1385,19 +1385,19 @@ Benefit: Compromise of travel laptop doesn't expose all credentials
 4. **Key Distribution**:
    - Main workstation: Full GPG keyring
    - Travel laptop: Encryption-only subkey (cannot decrypt critical credentials)
-   - Nightshift server: Public key only (for encrypted backups)
+   - Secrets server: Public key only (for encrypted backups)
 
 **SSH Key Restrictions**:
 
 1. **Main Workstation SSH Key** (main_workstation_ed25519):
    - GitHub scopes: `repo`, `workflow`, `read:org`, `gist`
-   - Server access: Full access to nightshift
+   - Server access: Full access to the secrets server
    - Passphrase required: Yes
 
 2. **Travel Laptop SSH Key** (travel_laptop_ed25519):
    - GitHub scopes: `repo` (read-only), `read:org`
    - Server access: Limited to secrets-repo read-only operations
-   - SSH restrictions in `~/.ssh/authorized_keys` on nightshift:
+   - SSH restrictions in `~/.ssh/authorized_keys` on the secrets server:
      ```
      command="git-shell -c \"$SSH_ORIGINAL_COMMAND\"",no-port-forwarding,no-X11-forwarding,no-agent-forwarding ssh-ed25519 AAAA... travel_laptop
      ```
@@ -1413,9 +1413,9 @@ Benefit: Compromise of travel laptop doesn't expose all credentials
 - **Secrets repository**:
   - SSH key required (deployed by bootstrap script)
   - Server-side: `authorized_keys` enforces command restrictions
-  - Two-factor auth on nightshift server (TOTP)
+  - Two-factor auth on the secrets server (TOTP)
 
-- **Nightshift server**:
+- **Secrets server**:
   - Firewall restricts SSH to known IPs (home: 203.0.113.0/24, office: 198.51.100.0/24)
   - fail2ban monitors failed SSH attempts (3 strikes = 1 hour ban)
   - SSH config: `PasswordAuthentication no`, `PubkeyAuthentication yes`
@@ -1456,9 +1456,9 @@ exit 0
 
 **Secrets-Repo Replication Strategy**:
 
-Primary strategy: Single authoritative server (nightshift) with manual backups
+Primary strategy: Single authoritative server (the secrets server) with manual backups
 
-1. **Primary**: nightshift server (`user@nightshift-server:Data/0-personal-secrets.git/`)
+1. **Primary**: the secrets server (`user@secrets-server:Data/0-personal-secrets.git/`)
 2. **Backup 1**: Encrypted USB drive (monthly export, stored in safe)
 3. **Backup 2**: Encrypted cloud backup (optional, via `gpg --encrypt | aws s3 cp`)
 
@@ -1466,7 +1466,7 @@ Replication procedure:
 ```bash
 # Monthly backup to USB drive
 cd /Volumes/BACKUP_USB/
-git clone user@nightshift-server:Data/0-personal-secrets.git
+git clone user@secrets-server:Data/0-personal-secrets.git
 tar czf secrets-$(date +%Y%m%d).tar.gz 0-personal-secrets.git/
 gpg --encrypt --recipient your-email@example.com secrets-*.tar.gz
 rm -rf 0-personal-secrets.git secrets-*.tar.gz  # Keep only .gpg file
@@ -1523,7 +1523,7 @@ Tasks:
 - [ ] Write migration script for batch updates (8 hours)
 - [ ] Migrate 5-10 duplicate credentials to shared location (4 hours)
 - [ ] Update projects to source shared credentials (automated script, 4 hours)
-- [ ] Test all affected projects (fairdrop, fairdrive, etc.) (8 hours)
+- [ ] Test all affected projects (acme-app, acme-drive, etc.) (8 hours)
 - [ ] Mark legacy locations in index (2 hours)
 - [ ] Write integration tests for migration (6 hours)
 - [ ] Document migration process (3 hours)
@@ -1545,8 +1545,8 @@ Dependencies:
 **Phase 3: Secrets Repository Setup** (2 weeks, ~60 hours)
 
 Tasks:
-- [ ] Setup nightshift server access (SSH config, authorized_keys) (4 hours)
-- [ ] Create 0-personal-secrets.git on nightshift (2 hours)
+- [ ] Set up secrets server access (SSH config, authorized_keys) (4 hours)
+- [ ] Create 0-personal-secrets.git on the secrets server (2 hours)
 - [ ] Implement directory structure (ssh/, gnupg/, datacore/, etc.) (3 hours)
 - [ ] Create `install.sh` bootstrap script (~100 lines, 12 hours)
 - [ ] Create `restore.sh` secrets-only restore (6 hours)
@@ -1558,14 +1558,14 @@ Tasks:
 - [ ] Test travel laptop bootstrap with limited SSH key (3 hours)
 
 Deliverables:
-- 0-personal-secrets.git repository on nightshift
+- 0-personal-secrets.git repository on the secrets server
 - Bootstrap scripts (install.sh, restore.sh, verify.sh)
 - Updated credential index with secrets-repo locations
 - Tested installation procedure (documented with screenshots)
 - VM images for testing (Ubuntu, macOS)
 
 Dependencies:
-- SSH access to nightshift configured
+- SSH access to the secrets server configured
 - Test VMs provisioned (Vagrant or Docker)
 - GPG key generated (optional for encrypted backup testing)
 
@@ -1689,7 +1689,7 @@ class TestCredentialWorkflow(unittest.TestCase):
 **Test Scenarios**:
 
 1. **Fresh Machine Bootstrap**:
-   - Clone secrets-repo from nightshift
+   - Clone secrets-repo from the secrets server
    - Run `./install.sh --machine-type main`
    - Verify all credentials loaded
    - Verify SSH/GPG keys installed
@@ -1796,7 +1796,7 @@ Should rotation be automated or manual?
 
 **3. Team Credentials Management**
 
-How should team spaces (3-fds) handle shared credentials?
+How should team spaces (e.g. `3-acme-labs`) handle shared credentials?
 
 | Option | Pros | Cons | Score |
 |--------|------|------|-------|
@@ -1866,33 +1866,33 @@ Should `datacore creds add` support generating credentials (e.g., SSH keys, API 
 ---
 
 ## Implementation Status
-_Last audited: 2026-04-25 (final verification pass)_
 
-### Implemented
+_The reference implementation follows the model above. Per-installation
+deployment state (which hosts run it, credential counts, mesh layout) is
+installation data and belongs in the private layer, not in this spec._
+
+### Implemented (reference implementation)
 
 | Feature | Evidence |
 |---------|----------|
-| Central secrets repository | Bare git repo on BlackPi (`gregor@<gitea-host>:~/secrets.git`) |
-| Credential split (global/space/project) | 10 scoped files: `global.env` + 8 `spaces/` + 1 `projects/` |
-| Instance manifests | `instances/{local,nightshift,tris,data-on-claw}.yaml` |
+| Central secrets repository | Bare git repo on a private secrets server (`user@secrets-server:~/secrets.git`) |
+| Credential split (global/space/project) | Scoped files: `global.env` + `spaces/*.env` + `projects/*.env` |
+| Instance manifests | `instances/<instance>.yaml` — one per host, declaring which scopes it receives |
 | Sync script | `scripts/sync.sh` — git pull + assemble `.env` per manifest (5s timeout) |
 | Bootstrap script | `scripts/install.sh` — one-command new instance setup |
-| Instance-local credentials | `local.env` on all 4 instances with INSTANCE_NAME set |
-| Credential index v2.0 | 35 entries with scope field (global/space/project/instance-local) |
-| CLI sync command | `python creds.py sync [--instance name]` |
+| Instance-local credentials | `local.env` per instance with `INSTANCE_NAME` set |
+| Credential index v2.0 | Entries carry a scope field (global/space/project/instance-local) |
+| CLI sync command | `creds sync [--instance name]` |
 | CLI list/show/search/audit | Existing commands in `.datacore/lib/creds.py` |
-| Rotation tracking | `creds.py rotate` with bootstrap from .env |
+| Rotation tracking | `creds rotate` with bootstrap from .env |
 | Gitignore enforcement | `.env` files and `secrets/` gitignored |
 | Pre-commit secrets scanning | `.datacore/hooks/pre-commit` validates for PII/secrets |
 | Security tier definitions | Low/Medium/High/Critical in credential-index.yaml |
 | Three-tier architecture | Global + space-scoped + instance-local credentials |
-| Tailscale mesh (5 nodes) | mac, blackpi, nightshift, hermes, plur-claw — all interconnected |
-| All 4 instances deployed | local (86 creds), nightshift (84), tris (35), data-on-claw (35) |
-| All instances git-based sync | All pull from BlackPi via Tailscale IP (<gitea-host>) |
-| FDS X credential aliases | Dual names: X_CONSUMER_KEY (canonical) + FDS_X_API_KEY (nightshift) |
-| Nightshift systemd migration | All 24 services + 5 scripts updated from `~/config/nightshift.env` |
+| Private network transport | Instances reach the secrets server over a private network (VPN/mesh), never the public internet |
+| Credential aliases | One canonical variable name; legacy names served as aliases during migration |
 | `creds add` CLI command | Interactive + non-interactive mode, routes to scope, updates index, commits |
-| Hourly sync cron | All 4 instances (nightshift, tris, Mr Data) sync every hour |
+| Hourly sync cron | Every instance syncs on a schedule |
 | `creds audit` v2 compatible | Accepts both v1 `locations` and v2 `var_name`/`vars` schema |
 | `creds list --tier` v2 compatible | Reads both `security_tier` and `tier` fields |
 
@@ -1907,10 +1907,10 @@ _Last audited: 2026-04-25 (final verification pass)_
 
 | Question | Resolution |
 |----------|------------|
-| Where should the secrets repo live? | BlackPi (Raspberry Pi) — central private git server |
+| Where should the secrets repo live? | A dedicated private git server (the secrets server), not GitHub |
 | How should credentials be scoped? | Three tiers: global, space-scoped, instance-local |
-| How should instances sync? | git pull from BlackPi (or rsync if no connectivity) |
-| Who pushes to the secrets repo? | Only root user (local); all others pull |
+| How should instances sync? | git pull from the secrets server (or rsync if no connectivity) |
+| Who pushes to the secrets repo? | Only the owner's workstation; all others pull |
 | Should instances share all credentials? | No — per-instance manifests declare space access |
 
 ---
@@ -1921,16 +1921,16 @@ _Added 2026-08-18. Status: Draft — not ratified._
 
 Everything above models a **static credential**: a value minted once, copied to
 the machines that need it, and valid until someone rotates it by hand. For API
-keys and SSH keys that is correct, and the implementation works — a central repo,
-per-instance manifests, `creds sync` on an hourly cron across four instances.
+keys and SSH keys that is correct — a central repo, per-instance manifests,
+`creds sync` on an hourly cron.
 
 It does not model a **rotating credential**: one whose value changes on its own,
-using a refresh token that is **single-use**. The Claude Code subscription token
-is the example that has cost the most, and it is not in the credential index at
-all — not by oversight, but because there is no shape in the schema it fits.
+using a refresh token that is **single-use**. A CLI subscription OAuth token is
+the typical example, and such tokens often end up outside the credential index
+entirely, because there is no shape in the schema they fit.
 
-Applying static machinery to a rotating credential produces a specific, repeatable
-failure, observed continuously from roughly 2026-07 to 2026-08-18.
+Applying static machinery to a rotating credential produces a specific,
+repeatable failure.
 
 ### Why distribution is the wrong primitive here
 
@@ -1940,43 +1940,35 @@ renew it: the refresh token is single-use, so a second holder attempting refresh
 does not get a fresh credential — it *invalidates* the one the first holder just
 obtained.
 
-On winston this produced five copies of one token:
+A typical server ends up with several copies of one token, for example:
 
 | Store | Consumer | Can refresh? |
 |---|---|---|
 | `~/.claude/.credentials.json` | `claude -p` | yes — the CLI, in-process |
-| `/etc/datacored.env` | `datacored.service` | no |
-| `~/.config/cos.env` | every `cos_*.sh` (sourced with `set -a`) | no |
-| `~/.hermes/.env` | hermes gateway | no |
+| a system service env file | a daemon | no |
+| a shell env file sourced with `set -a` | cron scripts | no |
+| an agent gateway's own `.env` | the gateway | no |
 | `~/.datacore/datacore.env` | agents, assorted crons | no |
 
-`cos.env` is the dangerous one: sourced with `set -a`, it **exports** its copy,
-so a stale value there silently overrides the store that can heal. That is why
-the same command succeeded when run by hand and returned `401 OAuth access token
-has been revoked` under cron — a discrepancy that consumed several debugging
-sessions before the export was noticed.
+A file sourced with `set -a` is the dangerous one: it **exports** its copy, so a
+stale value there silently overrides the store that can heal. The symptom is a
+command that succeeds when run by hand and returns `401 OAuth access token has
+been revoked` under cron.
 
 ### Why "just pick the authoritative store" is not enough
 
-On 2026-08-17 a change was made asserting the CLI store was authoritative, and
-stripping the environment copy before invoking `claude -p` so the self-refreshing
-store would always win. Within hours the CLI store held an **empty** access token
-while the environment copy remained valid. The observable result was a system
-that looked half-alive: the morning audio briefing delivered (it reads the
-environment copy) while the research digest returned `OAuth session expired and
-could not be refreshed` (it went through the changed path).
+Declaring one store authoritative in code, without declaring it in the index,
+does not hold: the next component, person or agent reading the code picks a
+different one. The result is a system that looks half-alive — some jobs succeed
+on one copy while others fail on another.
 
-The lesson is not that the other store should have been chosen. It is that
-**nothing in the system declares which store owns the credential**, so each
-component — and each person or agent reading the code — picks one, and half of
-them are wrong at any given time. Ambiguity is the defect.
+The lesson: **nothing in the system declares which store owns the credential**,
+so each component picks one, and some are wrong at any given time. Ambiguity is
+the defect.
 
-### Why the existing health checks did not catch any of this
+### Why shape-based health checks do not catch this
 
-Both checks report on file *shape*, never on whether the credential works.
-
-`oauth_health_check.py::check_claude_token` reads the file, finds `expiresAt`
-absent, and returns:
+A check that reads the file, finds `expiresAt` absent, and returns
 
 ```
 verdict : NO_EXPIRY
@@ -1985,14 +1977,10 @@ problem : None
 exit    : 0
 ```
 
-That was produced on 2026-08-18 against a credential that could not authenticate
-at all. The parenthetical guess is the whole problem in miniature: *could not
-determine* was rendered as *fine*.
-
-`creds audit` reports `All checks passed` for 35 credentials on the same day, and
-is correct to — it audits the index's internal consistency, which is intact. It
-has no opinion about liveness, and the one credential that was failing is not
-indexed.
+renders *could not determine* as *fine* — even against a credential that cannot
+authenticate at all. Likewise `creds audit` is correct to report `All checks
+passed` when the index is internally consistent: it has no opinion about
+liveness, and an unindexed credential is invisible to it.
 
 **A check whose "healthy" and "could not tell" are the same output is not a
 check.** Three-state reporting — `ok` / `FAIL` / `n-a` — is a requirement, not a
@@ -2011,7 +1999,7 @@ A `rotating` entry additionally declares:
 | Field | Meaning | Why it must be declared |
 |---|---|---|
 | `owner` | the ONE process permitted to refresh | two refreshers racing a single-use token is the core failure |
-| `mint_host` | where the credential can be created at all | browser-derived credentials (`claude /login`, `nlm auth`) can only be minted where a browser is signed in; servers can never self-heal, and today nothing says so |
+| `mint_host` | where the credential can be created at all | browser-derived credentials (`claude /login`, `nlm auth`) can only be minted where a browser is signed in; servers can never self-heal, and without this field nothing says so |
 | `consumers` | who reads it, and from where | so a fix applied to four of five stores is visibly incomplete |
 | `verify` | a command that proves it works | health must be a call, not a file stat |
 
@@ -2027,14 +2015,13 @@ creds get <id>            # print a currently-valid value, refreshing if needed
 Properties that make it different from reading a file:
 
 - **Exclusive**: takes a lock for the credential's id, so two callers cannot race
-  the single-use refresh. This is the concurrency the current design has no way
-  to express.
+  the single-use refresh.
 - **Owner-enforced**: only the declared `owner` may refresh. Everyone else waits
   for the owner's result rather than initiating a second rotation.
 - **Verified**: returns a value that was proven to work, or fails loudly. It never
   returns a value it merely found.
 
-Consumers call `creds get` instead of reading a path. Five stores collapse to one
+Consumers call `creds get` instead of reading a path. Many stores collapse to one
 owner plus a cache, and the export-overrides-the-healing-store class of bug
 becomes unrepresentable.
 
@@ -2053,81 +2040,69 @@ This absorbs `oauth_health_check.py`, which becomes the `verify` implementation
 for the Google OAuth entries rather than a parallel checker with its own opinion
 about health.
 
-#### 4. Mint-on-Mac, pull-on-server as declared topology
+#### 4. Mint-on-workstation, pull-on-server as declared topology
 
-`mint_host` makes explicit what is currently folklore: `nlm` auth and
-`claude /login` derive from browser cookies and can only be created on the Mac.
-Servers receive; they never mint. Writing it down converts a recurring
-rediscovery into a field a tool can read.
+`mint_host` makes explicit what is otherwise folklore: `nlm` auth and
+`claude /login` derive from browser cookies and can only be created on the
+workstation where a browser is signed in. Servers receive; they never mint.
+Writing it down converts a recurring rediscovery into a field a tool can read.
+
+#### 5. Scope at project grain where a space mixes risk levels
+
+When one space holds both low-risk inputs an assistant needs and high-risk
+credentials (exchange keys, wallets, social accounts, infrastructure control),
+split the high-risk ones into `projects/<name>` scopes so an assistant scoped to
+the space does not receive them. Grant consumers that relied on the space scope
+explicitly before the split syncs, or they break on the next run.
+
+#### 6. Every host that uses credentials is an instance
+
+A host that consumes credentials but has no manifest, no sync and no index entry
+accumulates hand-placed copies with no owner. Onboard every such host as an
+instance. Prefer onboarding **without a repo clone**: a clone hands a host every
+space's credentials and then assembles a subset, which makes scoping advisory. The
+host receives only its assembled set.
 
 ### Migration
 
-1. Add `lifecycle: static` to the 35 existing entries. No behaviour change.
-2. Index the Claude subscription token as the first `rotating` entry, declaring
-   its owner, mint host, five current consumers and a `verify`.
+1. Add `lifecycle: static` to the existing entries. No behaviour change.
+2. Index the CLI subscription token as the first `rotating` entry, declaring
+   its owner, mint host, current consumers and a `verify`.
 3. Ship `creds doctor` and run it daily before changing any consumer — the
    current state must be measurable before it is altered.
 4. Migrate consumers to `creds get` one at a time, most-broken first.
 
-Step 3 precedes step 4 deliberately. Two changes were made to this credential
-path on 2026-08-17 on unverified assumptions about which store was authoritative,
-and both were wrong. Measurement first.
+Step 3 precedes step 4 deliberately: changes made on unverified assumptions about
+which store is authoritative tend to be wrong. Measurement first.
 
 ### Extension implementation status
 
-_As of 2026-08-18. The extension itself remains Draft; this records what exists._
+_The extension itself remains Draft._
 
-| Piece | State | Evidence |
-|---|---|---|
-| `lifecycle` field | done | 44 entries; 3 `rotating` (claude-code-oauth, plur-x-oauth2, withings-oauth) |
-| `creds get` broker | done | serves on mac + winston; lock proven (holder 3s → waiter 1.70s / 1.50s) |
-| Lock on refresh | done | exclusive per-credential flock; the single-use race is now unrepresentable |
-| Refuses dead values | done | verified against real bogus tokens: provider 401 → declined, not served |
-| `creds doctor` | done | live calls, ok/FAIL/n-a, scope-aware. **FAIL 0** on mac (ok 8) and winston (ok 7) |
-| Credential attestation | done | `credential.read/write/refresh/verify`, a set separate from EGRESS_KINDS |
-| Non-file stores | done | keychain on macOS, json on Linux, selected by one platform-aware function |
-| Instance-local precedence | done | `local.env` wins, which is how per-agent keys work |
-| First consumer wired | done | `cos_cred()` in cos_llm.sh, broker-served with an announced fallback |
-| Remaining consumers | **open** | winston still holds 4 copies of the Claude token; they persist until each reader calls the broker |
-| `owner` enforcement | **open** | declared in the index, not yet enforced at refresh time |
+| Piece | State |
+|---|---|
+| `lifecycle` field | done |
+| `creds get` broker with exclusive per-credential lock | done |
+| Refuses dead values (provider 401 → declined, not served) | done |
+| `creds doctor` (live calls, ok/FAIL/n-a, scope-aware) | done |
+| Credential attestation (`credential.read/write/refresh/verify`, separate from EGRESS_KINDS) | done |
+| Non-file stores (keychain on macOS, json on Linux, one platform-aware selector) | done |
+| Instance-local precedence (`local.env` wins — how per-agent keys work) | done |
+| All consumers migrated to `creds get` | open |
+| `owner` enforcement at refresh time | open |
 
-**One index, not five.** `creds.py` read `.datacore/specs/` (35 entries, last
-updated 2026-04-23) while the synced secrets repo maintained its own. They drifted
-four months and neither tool knew about the other. Consolidated onto the
-secrets-repo copy — the only one that travels to another machine.
-
-**Scoping needed a finer grain than spaces.** `0-personal` held the health inputs
-a briefing reads AND exchange keys, the personal X account and droplet control, so
-scoping an assistant to that space handed it `GATE_API_KEY`. Split into
-`projects/trading`, `projects/jssr-x`, `projects/do-infra`. Winston assembles 25
-credentials against the workstation's 110, with trading, wallets, X accounts and
-the Etsy seller account verifiably excluded.
-
-That split immediately proved the value of declaring dependencies: nightshift's
-trading units were satisfied *by accident* because the keys sat in a space it
-already held. The split would have stripped them on the next hourly sync and
-broken 17 units. Caught by checking, not by a 02:00 failure, and now granted
-explicitly.
-
-**Winston was never an instance.** No secrets repo, no sync, no index, no
-assembled `.env` — every credential hand-placed into five files with no owner.
-That single gap is the root cause of the credential outages from 2026-07 to
-2026-08-18, and it is why the Claude token was absent from the index: the host
-that needed it was outside the system that maintains it.
-
-Winston is onboarded **without a repo clone**. A clone hands a host every space's
-credentials and then assembles a subset, which makes scoping advisory. It receives
-only its assembled set.
+**One index, not several.** If the CLI reads one index while the synced secrets
+repo maintains another, they drift and neither tool knows. Keep a single index —
+the secrets-repo copy, the only one that travels to another machine.
 
 ### Open questions
 
 | Question | Status |
 |---|---|
-| Does the datacored adapter's refresh become the `owner`, or does it move to `creds get`? | Open — it is a system service and cannot read a user-owned CLI store, which is the constraint that created the re-implementation in the first place |
-| What wrote the four winston env stores at 16:08 on 2026-08-17? | **RESOLVED** — an operator's own manual `cos_token_sync` run. It exercised the CLI, which refreshed, and propagated. Reconstructing it took an hour of mtimes and stayed a guess until confirmed; `credential.write` attestation makes the same question a query |
-| What wrote the four winston env stores at 16:08 on 2026-08-17? | **Unresolved.** `cos_token_sync` had never succeeded; the old timer is disabled. An unidentified writer is a blocker for declaring any `owner` |
+| Does a system daemon's own refresh become the `owner`, or does it move to `creds get`? | Open — a system service cannot read a user-owned CLI store, which is the constraint that creates re-implementations in the first place |
+| How can an unexplained write to an env store be traced? | `credential.write` attestation makes the question a query instead of an mtime reconstruction; an unidentified writer blocks declaring any `owner` |
 | Should `creds get` be a daemon rather than a CLI? | Open — a CLI with a lockfile is simpler and probably sufficient |
-| How do Winston/nightshift receive rotating credentials without minting? | Open — likely `creds get` over the Tailscale mesh against the Mac as owner |
+| How do servers receive rotating credentials without minting? | Open — likely `creds get` over the private network against the workstation as owner |
 
 
 ---
@@ -2146,7 +2121,7 @@ only its assembled set.
 |------|---------|---------|
 | 2026-01-15 | 0.1.0 | Initial draft |
 | 2026-03-04 | 0.2.0 | Added Implementation Status, Current Workaround; formally deferred CLI tooling |
-| 2026-04-23 | 1.0.0 | Multi-instance activation: BlackPi secrets repo, space-scoped split, sync/install scripts, 4 instances |
-| 2026-04-25 | 1.1.0 | Full deployment: Tailscale mesh (5 nodes), all 4 instances bootstrapped and git-syncing, PLUR Hub + Datafund DO + FDS_X aliases added |
+| 2026-04-23 | 1.0.0 | Multi-instance activation: private secrets server repo, space-scoped split, sync/install scripts |
+| 2026-04-25 | 1.1.0 | Full deployment: private-network transport, all instances bootstrapped and git-syncing, credential aliases |
 | 2026-08-18 | 1.2.0 | Extension: Rotating Credentials — lifecycle field, broker (`creds get`), liveness `creds doctor`, mint-host topology. Draft, not ratified |
-| 2026-08-18 | 1.3.0 | Extension implementation status: broker + doctor live on two hosts, index consolidated from five to one, project-level scoping, winston onboarded scoped. Still Draft |
+| 2026-08-18 | 1.3.0 | Extension implementation status: broker + doctor live, single index, project-level scoping, scoped onboarding without a repo clone. Still Draft |
