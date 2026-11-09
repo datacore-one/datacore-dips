@@ -141,7 +141,7 @@ Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json
 
 | Requirement | Purpose |
 |-------------|---------|
-| Git + Git LFS | Version control, large file handling |
+| Git | Version control (Git LFS not required: binaries stay out of git, DIP-0015) |
 | GitHub CLI (`gh`) | Repo management, authenticated |
 | Python 3.8+ | System scripts (`pip install pyyaml`) |
 | Node.js >= 22 | MCP servers, module tools |
