@@ -8,7 +8,7 @@
 | **Type** | Core |
 | **Status** | Implemented |
 | **Created** | 2025-12-21 |
-| **Updated** | 2026-08-03 |
+| **Updated** | 2026-10-18 |
 | **Tags** | `organization`, `files`, `structure`, `git-lfs`, `companion`, `media-index`, `generated-content`, `sidecar-metadata`, `space-discovery` |
 | **Affects** | `.gitattributes`, all spaces, `.datacore/lib/spaces.py` |
 | **Specs** | `datacore-specification.md` |
@@ -50,7 +50,7 @@ This section helps agents understand when and how to apply this DIP.
 | Official company doc? | Org space ([N]-org/) - shared team asset |
 | Where does a contract go? | Org: `1-tracks/legal/contracts/[type]/` |
 | Does it need a companion? | Only if non-AI-readable (Keynote, PSD, video) |
-| Where do old financials go? | Org: `4-outbox/archive/` → moves to `[space]-archive/` on server |
+| Where do old financials go? | Org: `4-archive/` → moves to `[space]-archive/` on the owner's go |
 | Personal draft about work? | Personal: `1-active/` - not official yet |
 | General concept zettel? | Personal: broader applicability beyond org |
 | Org-specific concept zettel? | Org: `3-knowledge/zettel/` - company knowledge |
@@ -191,8 +191,7 @@ Content is organized by **role and purpose**, not by format:
 │   │   └── companies/         # Company profiles
 │   ├── pages/                 # Wiki pages
 │   └── clippings/             # Web clippings
-├── 4-outbox/                  # Content EXIT (last numbered folder)
-│   └── archive/               # Queue for archive repo
+├── 4-archive/                 # Content EXIT (last numbered folder, DIP-0017)
 ├── .obsidian/                 # Obsidian vault config
 ├── .datacore/                 # Configuration
 └── CLAUDE.md                  # Personal context
@@ -238,9 +237,7 @@ Content is organized by **role and purpose**, not by format:
 │   ├── zettel/                # Atomic concepts
 │   ├── literature/            # Source summaries
 │   └── reference/             # People, companies, glossary
-├── 4-outbox/                  # Content routing OUT (see DIP-0017)
-│   ├── _routing.yaml          # Routing rules for this space
-│   └── archive/               # Queue for archive repo on server
+├── 4-archive/                 # Content EXIT, the single exit folder (DIP-0017)
 ├── .datacore/                 # Configuration
 └── CLAUDE.md                  # Space context
 ```
@@ -255,7 +252,14 @@ Numbers indicate processing stage:
 | `1-` | Active | Current work, tracks |
 | `2-` | Projects | Code repositories |
 | `3-` | Knowledge | Permanent reference |
-| `4-` | Outbox | Routing OUT (archive, delivery, publish) |
+| `4-` | Archive | Routing OUT: `4-archive/`, the single exit folder (DIP-0017, amended 2026-10-18) |
+
+#### Space and Data roots (amended 2026-10-18)
+
+Owner decisions on the space-structure board, 2026-10-18:
+
+- **`contacts` may be a link.** The CRM module writes `<space>/contacts/`. People, companies and the landscape live in `3-knowledge/reference/`; a space root may carry `contacts` only as a symlink to `3-knowledge/reference` (listed in the space's `.datacore/structure-allow`), never as a real folder.
+- **The Data root holds only the numbered spaces and system folders.** A tool run from the root writes into the space the work is about (plans and specs to `<space>/1-tracks/dev/superpowers/`, media to `<space>/content/`). The structure checker flags any other visible folder at the root, including one git ignores; ignored dot-folders are tool configuration and are not flagged.
 
 #### Canonical Templates
 
@@ -541,8 +545,8 @@ Each document goes through systematic deep processing:
 **Phase 2: ASSESS**
 - **Still active/binding?** → `1-tracks/` (contracts, current projects)
 - **Reference value?** → `3-knowledge/` (strategic docs, concepts)
-- **Historical only?** → `4-outbox/archive/` → moves to archive repo (see DIP-0017)
-- **Superseded?** → `4-outbox/archive/` with note pointing to replacement
+- **Historical only?** → `4-archive/` → moves to archive repo (see DIP-0017)
+- **Superseded?** → `4-archive/` with note pointing to replacement
 
 **Relevance assessment by type:**
 
@@ -684,7 +688,7 @@ When extracting zettels or insights from organizational documents:
 | Current financials | Org | `1-tracks/finance/` | Full analysis |
 | Official reference | Org | `3-knowledge/` | Extract zettels, literature notes |
 | Personal writings | Personal | `1-active/` or `3-knowledge/pages/` | Personal processing |
-| Historical/outdated | Org | `4-outbox/archive/` | Companion only, routed to archive repo |
+| Historical/outdated | Org | `4-archive/` | Companion only, routed to archive repo |
 | Personal research | Personal | `3-knowledge/` | Extract personal zettels |
 | Large media | Depends | Semantic location | Companion required |
 
@@ -847,7 +851,7 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 - [DIP-0003: Scaffolding Pattern](./DIP-0003-scaffolding-pattern.md) - Index files and navigation
 - [DIP-0009: GTD Specification](./DIP-0009-gtd-specification.md) - GTD workflow and agents
 - [DIP-0011: Nightshift Module](./DIP-0011-nightshift-module.md) - Module architecture
-- [DIP-0017: Outbox & Archive Pattern](./DIP-0017-outbox-archive-pattern.md) - 4-outbox folder, archive repos
+- [DIP-0017: Outbox & Archive Pattern](./DIP-0017-outbox-archive-pattern.md) - 4-archive exit folder, archive repos
 - `datacore-specification.md` - Current structure documentation
 
 ## Related Agents

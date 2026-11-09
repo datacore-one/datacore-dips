@@ -1006,3 +1006,27 @@ ratify this amendment or certify active rollout.
 | Compatibility impact | Valid registries/signatures are unchanged; invalid mutation inputs require repair. |
 | Tests affected | Malformed/null/list registries, same-actor and different-actor concurrency, existing key mismatch; core key/persistence suites. |
 | Runtime/deployment impact | Qualify actual key storage permissions and deployed readers; signing alone does not establish independent OS or credential isolation. |
+
+## 31 October 2026 amendment: always signed, no voids, corrections forward only
+
+> Ratified by the owner on 2026-10-31 ("proposed rule changes are good, apply them"), from the review in `2-datacore/1-tracks/dev/reports/2026-10-31-tasks-and-ledger-ground-up-report.md`. Implementation follows the phases in `2-datacore/1-tracks/dev/superpowers/plans/2026-10-31-tasks-and-ledger-rebuild-plan.md`. Where this section and an earlier one disagree, this section holds. The October 2026 hub amendment (sections D to J) is referenced by the code but its text was not found in this repository on 2026-10-31; it should be merged here so the two can be read together.
+
+1. **Signing is always on.** This supersedes the signing amendment of 2026-07-30 and owner decision 7 of 2026-10-04.
+   - A writer signs unless it is told not to with an explicit `DATACORE_LEDGER_SIGN=0`, in the environment or in `identity.env`. A hub space refuses an unsigned writer regardless.
+   - The trigger the 2026-07-30 amendment named has fired: agents on separate machines write to one ledger, and the hub admits only signed events.
+   - Each actor's ledger key is to be bound to its fds-id identity (DIP-0023) by a signed record. Old events keep verifying under the keys they were signed with.
+2. **No voids.** This supersedes owner decision 6 of 2026-09-26 ("no exceptions, only voids").
+   - The hub's admission refuses anything malformed, unsigned, unchained or not allowed, so a bad event never enters. `ledger.void` is no longer written.
+   - Voids already in the history stay valid and fold exactly as before.
+3. **Corrections are forward only.** This supersedes the reversal window of 2026-10-23 (a reversal inside `REVERSAL_MAX_AGE_MS` on the hub's clock, never after a seal).
+   - An admitted event is final at admission.
+   - A correction is a new forward event that names the event it corrects, who corrected it and why: `item.reopen`, `item.update`, `owner.set` or a compensating action.
+   - A client's "undo" writes such an event.
+   - Reversals already in the history stay valid.
+   - The rule that control records are never reversible now holds for every event.
+4. **Work and telemetry apart.** Telemetry already has its own log per writer (LED-8). In addition, the task fold does not read telemetry: job verdicts, check-ins, projection attestations and spend have their own readers and their own retention.
+5. **One work ledger per owner.** The direction is ratified: one ledger for an installation's owner, with `space` as a field on each event, and a separate ledger only where the set of people differs. The migration (an owner-signed genesis, the old logs frozen and still verifiable, a two-space trial first) gets its own amendment before it runs.
+6. **One way in.**
+   - Every task change is a command that writes a signed event (the org adapter, the app, MCP, an editor hook).
+   - Org lists are read-only views. `inbox.org` stays free text: the single capture point, consumed and returned to empty.
+   - Once that is in place, the ingest of hand edits to generated lists is retired.

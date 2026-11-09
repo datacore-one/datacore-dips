@@ -1190,3 +1190,15 @@ trigger fires.
 - `ENG-2026-0423-001` — nightshift git-lock silent failure; cited again
   here (via DIP-0034) as the reason the chain must never become the write
   path (Rationale).
+
+## 31 October 2026 amendment: the hub is adopted as the front door
+
+> Ratified by the owner on 2026-10-31. It supersedes "Transport hub: deferred, with a trigger" above: the hub (datacored, the Datacore app's daemon) was built and activated on every space in October 2026.
+
+1. **The hub admits, orders and stamps every event**; it is where an event becomes real.
+   - Readers fold, and agents claim, from the hub's admitted log when it answers, and from the git copy only when it does not.
+   - Git keeps the append-only replica for history, backup, audit and offline machines. A machine without the hub writes into its local buffer, and the hub admits the buffer in its own order on reconnect.
+2. **The three roles stay named separately** (sequencer, arbiter, hub) and keep separate fallbacks, even when one machine holds all three.
+3. **The hub is watched like any job.** A job contract checks that every hub space's newest seal is under one hour old, made by the sequencer, and recomputes.
+4. **Routine hub moves wait.** Before a hub hand-over becomes routine, the hand-over defect found in the 2026-10-24 re-check (C1) is fixed. The owner already made that a precondition on 2026-10-24.
+5. **Seals stay** as the offline proof anyone can recompute. They no longer gate corrections (DIP-0034, 31 October 2026 amendment, item 3).

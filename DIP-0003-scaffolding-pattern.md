@@ -411,7 +411,7 @@ _Last audited: 2026-03-04_
 | `create-space` agent | Done | Scaffolds spaces with folder structure and templates |
 | `scaffolding-auditor` agent | Done | Audits scaffolding completeness, generates drafts |
 | `_index.md` pattern | Done | Index files in key folders for navigation |
-| Numbered folder convention | Done | 0-inbox through 4-outbox in all spaces |
+| Numbered folder convention | Done | 0-inbox through 4-archive in all spaces |
 | Link-following discovery | Done | Agents traverse wiki-links for topic clusters |
 | DIP-0002 layered scaffolding | Done | `SCAFFOLDING.base.md` template deployed to all 5 spaces with `3-knowledge/` |
 | Project module structure | Done | Defined but not enforced by auditor |

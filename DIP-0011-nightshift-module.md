@@ -996,7 +996,7 @@ server_reads_only:
 Even without `/tomorrow`, server runs at scheduled times:
 
 ```
-00:00 → Server pulls
+Every hour, on the hour (the job manifest's schedule) → Server pulls
       → Checks for :AI: tasks
       → Executes if any exist
       → Pushes results
@@ -1009,7 +1009,7 @@ Even without `/tomorrow`, server runs at scheduled times:
 | Trigger | Initiator | When |
 |---------|-----------|------|
 | Manual | `/tomorrow` | User runs command |
-| Scheduled | Cron | Midnight, 6am |
+| Scheduled | systemd timer | Hourly (the job manifest's schedule) |
 | Continuous | Daemon | Polling (24/7 mode) |
 | Wake | `/today` | User pulls results |
 
@@ -1020,7 +1020,7 @@ operation:
   mode: hybrid  # manual | scheduled | continuous | hybrid
 
   scheduled:
-    times: ["00:00", "06:00"]
+    schedule: hourly   # the job manifest's schedule (31 October 2026 amendment)
 
   continuous:
     enabled: false
@@ -1417,3 +1417,18 @@ checking pending and completed effects and preserving the original evidence.
 | Compatibility impact | Existing untouched tasks need no migration. Uncertain new attempts require explicit reconciliation. Automatic quota fallback after invocation is removed. |
 | Tests affected | Concurrent stale snapshots, interrupted process, failed acknowledgement, quota/timeout/error-envelope variants, queue and GC refusal, proposal-to-approved-work transition. |
 | Runtime/deployment impact | Qualify the real controller and worker path. This marker is not an OS boundary and does not replace the designated-installation authority or protect against two independent restored controller stores. |
+
+## 31 October 2026 amendment: one schedule, assignments as the queue
+
+> Ratified by the owner on 2026-10-31.
+
+1. **The overnight run's schedule is the job manifest's** (hourly, owner, 2026-10-02). The configuration example above (00:00 and 06:00) and the module's timer file are brought into line with it; the manifest is the only source.
+2. **The separate 3-hourly preflight is folded into the run**, whose first step is the same git check.
+3. **The run's queue is the ledger items assigned to Miles** (DIP-0009, 31 October 2026 amendment). `nightshift.org` is their generated view.
+
+## 3 November 2026 amendment: the review setting on Miles, and no committed queue file
+
+> Proposed 2026-11-03 (plan 2026-10-31, phase H: delegation-safety 2 and evening-handoff 3). **Not ratified**: the owner ratifies or changes it.
+
+1. **The review-before-execution setting on Miles is decided here, not in an environment file.** The compatibility decision above leaves `DATACORE_REVIEW_BEFORE_EXECUTION` as an opt-in read from each host's environment, which no review reads. For Miles's overnight run the setting is **on** (`1`): a machine-originated task runs only after a fresh, contract-bound review, and a stale review refuses it. The environment value on Miles's host follows this line, and a check reports any host whose value differs. *(Owner: confirm "on", or write "off" here.)*
+2. **The overnight run does not commit or push `nightshift.org`.** Since the 31 October amendment the queue is the ledger items assigned to Miles, and `nightshift.org` is their generated view. Assignment reaches other machines through the hub and the ledger events, not through a committed copy of the file. Committing the view only made a second record that could disagree with the ledger. The file stays local, regenerated each run, and is not tracked.
