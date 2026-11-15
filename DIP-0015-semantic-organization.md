@@ -316,7 +316,13 @@ For **generated or curated media collections** (AI-generated images, video asset
 
 > **Amended 2026-10-16 (owner):** Datacore does not use Git LFS. Binary files are not committed to git (no-binaries-in-git policy, in force since 2026-07-16). The earlier LFS strategy is withdrawn.
 
-**No binaries in git.** Binary files stay in their semantic location on disk but are gitignored. Their companion markdown (and any prompt or sidecar that produced them) is committed, so the knowledge travels with the repo even when the bytes do not. No special folders for binaries.
+> **Amended 2026-11-14 (owner):** "large files should be blocked. There can be a dedicated folder in a space, and it will be dealt with separately. Backup to [the fleet's storage host] can be done through rsync. The files can be symlinked to relevant folders in the space for better findability." This replaces "no special folders for binaries" and settles the open question below.
+
+**No binaries in git.** Binary files are gitignored. Their companion markdown (and any prompt or sidecar that produced them) is committed, so the knowledge travels with the repo even when the bytes do not.
+
+**The media folder.** Each space has a `media/` folder at its root, ignored by git (`/media/` in the space's `.gitignore`). A large file lives there under the relative path it would otherwise have had (`media/content/video/promo.mp4`), and a relative symlink stays at its semantic location, so it is found where it belongs. The symlink is committed; on a machine without the file it dangles, which is expected. `media/` does not sync between machines. `.datacore/lib/media_store.py` moves a file in (`move <path>`), adds the ignore line (`ignore`), and copies every space's `media/` to the fleet's storage host with rsync (`backup`, one folder per machine and space), never deleting there.
+
+**Enforced at commit.** The space pre-commit hook refuses a staged binary of 10 MB or more (`SPACE_MAX_BINARY_MB`), naming the file and the move command. Text is never capped by this rule: the ledger's signed logs are large text by design. The agents' autosave asks the hook file by file, so a refused binary is held back alone and the rest of the space still syncs.
 
 ```
 legal/contracts/
@@ -333,7 +339,7 @@ legal/contracts/
 
 Each space's `.gitignore` excludes binary types (video, audio, presentations, design files, archives). A binary already tracked in git is a defect: untrack it (`git rm --cached`) and add its pattern to `.gitignore`. Do not move it to LFS and do not run `git lfs migrate`.
 
-**Open (owner):** where binaries that must survive a lost machine are stored outside git. Until decided, they live only on disk and in machine backups.
+~~**Open (owner):** where binaries that must survive a lost machine are stored outside git.~~ Settled 2026-11-14: in the space's `media/` folder, backed up to the fleet's storage host (see The media folder above).
 
 #### Tier Summary
 
@@ -504,7 +510,7 @@ User receives    ←──git pull──   Server commits + pushes
 **Server requirements:**
 1. `.gitignore` excludes binary types in every space
 2. Server commits the companion/sidecar for any binary it generates, never the binary itself
-3. Binaries a server generates reach the owner by a channel outside git (open, see Storage Strategy)
+3. Binaries a server generates go into that space's `media/` folder and reach the fleet's storage host through `media_store.py backup` (see Storage Strategy); a channel to the owner's own machine is still open
 
 ### Part 3: Ingest Workflow
 
