@@ -6,7 +6,7 @@
 | **Title** | Scaffolding Pattern |
 | **Author** | @datacore-one |
 | **Type** | Standard |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2025-12-01 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `scaffolding`, `knowledge`, `projects`, `modules` |

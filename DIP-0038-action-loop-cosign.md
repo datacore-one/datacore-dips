@@ -6,7 +6,7 @@
 | **Title** | Action Loop + Co-sign |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-09-12 |
 | **Tags** | `action-loop`, `co-sign`, `approvals`, `briefing`, `policy`, `datacore-v2` |

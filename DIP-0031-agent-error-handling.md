@@ -6,7 +6,7 @@
 | **Title** | Agent Error Classification & Recovery |
 | **Author** | Datacore Team |
 | **Type** | Standards |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2026-06-10 |
 | **Updated** | 2026-06-10 |
 | **Tags** | `errors`, `reliability`, `nightshift`, `observability` |

@@ -28,8 +28,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 NAME_RE = re.compile(r'^DIP-(\d{4})-[a-z0-9-]+\.md$')
 REQUIRED_FIELDS = ['**DIP**', '**Title**', '**Status**', '**Created**']
-VALID_STATUS = {'Draft', 'Review', 'Accepted', 'Implemented',
-                'Superseded', 'Withdrawn'}
+#: Four statuses only (owner, 2026-11-15). Whether a DIP is built is a checked
+#: fact (datacore's dip_conformance.py), never a header.
+VALID_STATUS = {'Draft', 'Ratified', 'Superseded', 'Retired'}
 DEFAULT_PRIVATE_DENYLIST = '~/.datacore/private/customer-denylist.yaml'
 
 # High-precision credential patterns + private-infra markers that must

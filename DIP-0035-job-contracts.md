@@ -6,7 +6,7 @@
 | **Title** | Job Contracts + Unified Verifier |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-08-27 |
 | **Tags** | `jobs`, `verification`, `manifest`, `artifacts`, `metric-attest`, `datacore-v2` |

@@ -6,7 +6,7 @@
 | **Title** | Server-First Artifacts |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-10-16 |
 | **Depends** | [DIP-0035](DIP-0035-job-contracts.md) (manifest format + `job_verify.py`, the primary substrate this DIP puts into production); also builds on [DIP-0034](DIP-0034-event-ledger-substrate.md) (ledger events) and [DIP-0036](DIP-0036-config-plane.md) (config plane) — see Relates to |

@@ -6,7 +6,7 @@
 | **Title** | Event Ledger Substrate |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-08-27 |
 | **Tags** | `ledger`, `events`, `hash-chain`, `hlc`, `signing`, `datacore-v2` |

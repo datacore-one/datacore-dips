@@ -6,7 +6,7 @@
 | **Title** | Meetings Module |
 | **Author** | @datacore-one |
 | **Type** | Module |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2025-12-18 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `meetings`, `gtd`, `calendar`, `standup` |

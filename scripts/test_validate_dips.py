@@ -24,6 +24,23 @@ class HygieneDiagnostics(unittest.TestCase):
                 self.assertEqual(catalog_status.strip(), status)
 
 
+    def test_only_the_four_statuses_are_valid(self):
+        """Draft, Ratified, Superseded, Retired (owner, 2026-11-15). "Implemented"
+        is a checked fact (dip_conformance), not a header."""
+        self.assertEqual(validate_dips.VALID_STATUS, {'Draft', 'Ratified', 'Superseded', 'Retired'})
+        for old in ('Implemented', 'Accepted', 'Review', 'Partial', 'Withdrawn'):
+            with self.subTest(status=old), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                (root / 'DIP-9999-fixture.md').write_text(
+                    f'**DIP** | 9999\n**Title** | Fixture\n**Status** | {old}\n**Created** | 2026-09-11\n')
+                self.assertEqual(_run(root)[0], 1)
+
+    def test_every_dip_is_in_the_catalogue(self):
+        root = Path(__file__).resolve().parents[1]
+        listed = set(re.findall(r'\]\((DIP-\d{4}-[^)]+\.md)\)', (root / 'README.md').read_text()))
+        missing = sorted(p.name for p in root.glob('DIP-[0-9]*.md') if p.name not in listed)
+        self.assertEqual(missing, [])
+
     def test_detected_values_never_enter_diagnostics(self):
         samples = [
             'AKIA' + 'ABCDEFGHIJKLMNOP',

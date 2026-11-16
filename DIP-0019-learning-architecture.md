@@ -6,7 +6,7 @@
 | **Title** | Learning Architecture - The Engram Model |
 | **Author** | @datacore-one |
 | **Type** | Standards Track |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2026-01-23 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `learning`, `engrams`, `absorption`, `consolidation`, `cognitive`, `ACT-R`, `spreading-activation`, `dual-coding` |

@@ -6,7 +6,7 @@
 | **Title** | Config Plane |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-08-27 |
 | **Depends On** | DIP-0035 (Job Contracts — `required_env` schema `doctor()` audits directly); DIP-0034 (Event Ledger Substrate — Rollout Plan phase numbering only, no event type consumed) |

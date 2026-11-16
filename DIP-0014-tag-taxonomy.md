@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0014 |
 | **Title** | Tag Taxonomy |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Author** | @datacore-one |
 | **Created** | 2025-12-19 |
 | **Updated** | 2026-03-04 |

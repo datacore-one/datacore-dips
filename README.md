@@ -17,32 +17,30 @@ A DIP is a design document providing information to the Datacore community about
 
 ## DIP Status
 
-Read each DIP header and its explicit amendment, rollout and future-work notes together. An Implemented header does not ratify an explicitly proposed section or establish that every follow-up is deployed. Catalog rows mirror the referenced header; they do not override it.
+Four statuses, and nothing else in a header (owner, 2026-11-15):
 
-| Status | Description |
-|--------|-------------|
-| **Draft** | Initial proposal, open for feedback |
-| **Review** | Under formal review by maintainers |
-| **Accepted** | Approved for implementation |
-| **Partial** | Specification accepted, implementation in progress |
-| **Implemented** | Merged and released |
-| **Rejected** | Not accepted (with rationale) |
-| **Withdrawn** | Withdrawn by author |
-| **Superseded** | Replaced by a newer DIP or implementation |
-| **Deferred** | Postponed for future consideration |
+| Status | Meaning |
+|--------|---------|
+| **Draft** | Proposed. Not a rule yet, whatever the code does. A qualifier may follow the word ("Draft (owner ratifies)") |
+| **Ratified** | The owner approved it. It is the rule; code and other documents that disagree are wrong |
+| **Superseded** | Replaced by another DIP, which the header names |
+| **Retired** | No longer a rule and not replaced |
+
+Only the owner ratifies. An agent may write a Draft or propose an amendment as a pull request left open; it never changes a status to Ratified.
+
+**"Implemented" is not a status.** Whether a ratified DIP is built is a fact to check, not a word to type: `dip_conformance.py` in the datacore repository derives it from the files a DIP names. Headers that said Implemented or Accepted before 2026-11-16 now say Ratified.
+
+Read each DIP header together with its amendment, rollout and future-work notes. A Ratified header does not ratify a section that is explicitly marked as proposed. Catalog rows mirror the referenced header; they do not override it.
 
 ## DIP Workflow
 
 ```
-1. Fork datacore-dips repo
-2. Copy DIP-0000-template.md to DIP-XXXX-title.md
-3. Fill in the template
-4. Submit PR with status: Draft
-5. Community discussion on PR
-6. Maintainers move to Review
-7. Accept/Reject decision
-8. Implementation PR(s) to relevant repos
-9. Status updated to Implemented
+1. Copy DIP-0000-template.md to DIP-XXXX-title.md (next free number)
+2. Fill in the template; status Draft
+3. Open a pull request against main and leave it open
+4. The owner reviews; changes are made on the same pull request
+5. The owner ratifies: the header becomes Ratified and the pull request is merged
+6. An amendment to a Ratified DIP is its own pull request, dated, and ratified the same way
 ```
 
 ## When to Create a DIP
@@ -78,55 +76,88 @@ See [DIP-0000-template.md](DIP-0000-template.md) for the template.
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0001](DIP-0001-contribution-model.md) | Contribution Model | Implemented |
-| [0002](DIP-0002-layered-context-pattern.md) | Layered Context Pattern | Implemented |
-| [0005](DIP-0005-installation-upgrade.md) | Installation & Upgrade | Implemented |
-| [0014](DIP-0014-tag-taxonomy.md) | Tag Taxonomy | Implemented |
-| [0016](DIP-0016-agent-registry.md) | Agent Registry & Discoverability | Implemented |
+| [0001](DIP-0001-contribution-model.md) | Contribution Model | Ratified |
+| [0002](DIP-0002-layered-context-pattern.md) | Layered Context Pattern | Ratified |
+| [0005](DIP-0005-installation-upgrade.md) | Installation & Upgrade | Ratified |
+| [0014](DIP-0014-tag-taxonomy.md) | Tag Taxonomy | Ratified |
+| [0016](DIP-0016-agent-registry.md) | Agent Registry & Discoverability | Ratified |
 
 ### Knowledge & Content
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0003](DIP-0003-scaffolding-pattern.md) | Scaffolding Pattern | Implemented |
-| [0015](DIP-0015-semantic-organization.md) | Semantic Organization | Implemented |
-| [0017](DIP-0017-outbox-archive-pattern.md) | Outbox & Archive Pattern | Implemented |
-| [0019](DIP-0019-learning-architecture.md) | Learning Architecture | Implemented |
+| [0003](DIP-0003-scaffolding-pattern.md) | Scaffolding Pattern | Ratified |
+| [0015](DIP-0015-semantic-organization.md) | Semantic Organization | Ratified |
+| [0017](DIP-0017-outbox-archive-pattern.md) | Outbox & Archive Pattern | Ratified |
+| [0019](DIP-0019-learning-architecture.md) | Learning Architecture | Ratified |
 
 ### GTD & Task Management
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0009](DIP-0009-gtd-specification.md) | GTD System Specification | Implemented |
-| [0010](DIP-0010-external-sync-architecture.md) | External Sync Architecture | Implemented |
-| [0011](DIP-0011-nightshift-module.md) | Nightshift Module | Implemented |
+| [0009](DIP-0009-gtd-specification.md) | GTD System Specification | Ratified |
+| [0010](DIP-0010-external-sync-architecture.md) | External Sync Architecture | Ratified |
+| [0011](DIP-0011-nightshift-module.md) | Nightshift Module | Ratified |
 
 ### Domain Modules
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0012](DIP-0012-crm-module.md) | CRM Module | Implemented |
-| [0013](DIP-0013-meetings-module.md) | Meetings Module | Implemented |
+| [0012](DIP-0012-crm-module.md) | CRM Module | Ratified |
+| [0013](DIP-0013-meetings-module.md) | Meetings Module | Ratified |
 
 ### Process & Templates
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0000](DIP-0000-template.md) | DIP Template | Implemented |
+| [0000](DIP-0000-template.md) | DIP Template | Draft |
 
 ### System Architecture
 
 | DIP | Title | Status |
 |-----|-------|--------|
-| [0021](DIP-0021-search-research-architecture.md) | Search & Research Architecture | Implemented |
-| [0022](DIP-0022-module-specification.md) | Module Specification | Implemented |
+| [0021](DIP-0021-search-research-architecture.md) | Search & Research Architecture | Ratified |
+| [0022](DIP-0022-module-specification.md) | Module Specification | Ratified |
 
 ### Infrastructure & Security
 
 | DIP | Title | Status |
 |-----|-------|--------|
 | [0018](DIP-0018-credential-management.md) | Credential Management | Draft |
-| [0020](DIP-0020-whatsapp-module.md) | WhatsApp Module | Accepted |
+| [0020](DIP-0020-whatsapp-module.md) | WhatsApp Module | Ratified |
+
+### Not yet grouped (listed 2026-11-16)
+
+These existed without a catalogue row. They are listed by number until the catalogue is regrouped.
+
+| DIP | Title | Status |
+|-----|-------|--------|
+| [0023](DIP-0023-messaging-module.md) | Messaging Module | Draft |
+| [0024](DIP-0024-reactive-hooks-infrastructure.md) | Reactive Hooks Infrastructure | Draft |
+| [0025](DIP-0025-datacore-bench.md) | Evaluation & Benchmarking (datacore-bench) | Draft |
+| [0026](DIP-0026-architectural-primitives.md) | Architectural Primitives | Draft |
+| [0027](DIP-0027-behavioural-observation-architecture.md) | Behavioural Observation Architecture | Draft |
+| [0028](DIP-0028-capture-endpoint-contract.md) | Capture Endpoint Contract | Draft |
+| [0029](DIP-0029-command-scoped-engram-recall.md) | Command-Scoped Engram Recall | Ratified |
+| [0031](DIP-0031-agent-error-handling.md) | Agent Error Classification & Recovery | Ratified |
+| [0032](DIP-0032-egress-enforcement.md) | Egress Enforcement | Draft |
+| [0033](DIP-0033-delivery-verification.md) | Delivery Verification & Smoke Scenarios | Draft |
+| [0034](DIP-0034-event-ledger-substrate.md) | Event Ledger Substrate | Ratified |
+| [0035](DIP-0035-job-contracts.md) | Job Contracts + Unified Verifier | Ratified |
+| [0036](DIP-0036-config-plane.md) | Config Plane | Ratified |
+| [0037](DIP-0037-grounded-briefings.md) | Grounded Briefings | Ratified |
+| [0038](DIP-0038-action-loop-cosign.md) | Action Loop + Co-sign | Ratified |
+| [0039](DIP-0039-server-first-artifacts.md) | Server-First Artifacts | Ratified |
+| [0040](DIP-0040-agent-consolidation.md) | Agent Consolidation | Ratified |
+| [0041](DIP-0041-executor-adapters.md) | Executor Adapters | Ratified |
+| [0042](DIP-0042-canonical-ledger.md) | Canonical Ledger & Finality | Draft |
+| [0043](DIP-0043-org-projection.md) | Org Projection & Genesis Import | Draft |
+| [0044](DIP-0044-actor-identity.md) | Actor Identity | Draft |
+| [0046](DIP-0046-git-transport.md) | Git as Ledger Transport | Draft |
+| [0047](DIP-0047-egress-attestation.md) | Egress Attestation — recording what agents do to the outside world | Draft |
+| [0048](DIP-0048-validation-envelope.md) | Shared Validation Envelope for PLUR Engrams ↔ EvoMap Genes | Draft — gated on Evolver-spike lift signal |
+| [0049](DIP-0049-module-tool-loading-architecture.md) | Module Tool Loading Architecture | Draft |
+| [0050](DIP-0050-cadences-as-assigned-duties.md) | Cadences as assigned duties, executed by their owners | Draft (owner ratifies) |
 
 ### Historical / Superseded
 

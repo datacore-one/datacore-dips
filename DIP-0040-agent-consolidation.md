@@ -6,7 +6,7 @@
 | **Title** | Agent Consolidation |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-08-27 |
 | **Tags** | `agents`, `registry`, `lifecycle`, `gc`, `personas-as-data`, `datacore-v2` |

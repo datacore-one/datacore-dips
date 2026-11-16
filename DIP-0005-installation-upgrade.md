@@ -6,7 +6,7 @@
 | **Title** | Installation & Upgrade |
 | **Author** | @datacore-one |
 | **Type** | Core |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2025-12-03 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `installation`, `bootstrap`, `upgrade`, `onboarding` |

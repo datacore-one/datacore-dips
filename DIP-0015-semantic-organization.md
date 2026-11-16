@@ -6,7 +6,7 @@
 | **Title** | Semantic Organization |
 | **Author** | Datacore Team |
 | **Type** | Core |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2025-12-21 |
 | **Updated** | 2026-10-18 |
 | **Tags** | `organization`, `files`, `structure`, `binaries`, `companion`, `media-index`, `generated-content`, `sidecar-metadata`, `space-discovery` |

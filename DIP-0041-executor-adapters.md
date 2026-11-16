@@ -6,7 +6,7 @@
 | **Title** | Executor Adapters |
 | **Author** | Datacore Team |
 | **Type** | Infrastructure |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Depends** | DIP-0034 (Event Ledger Substrate) — hard dependency for the shadow-accounting half only (`ledger.log.EventLog`, the `spend.record` event type, its fold handler); the executor-abstraction half and the generator half are each independently functional without it — see Compatibility |
 | **Created** | 2026-07-30 |
 | **Updated** | 2026-09-12 |

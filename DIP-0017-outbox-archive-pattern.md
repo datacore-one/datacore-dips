@@ -6,7 +6,7 @@
 | **Title** | Outbox & Archive Pattern |
 | **Author** | Datacore Team |
 | **Type** | Core |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2025-12-22 |
 | **Updated** | 2026-10-18 |
 | **Tags** | `outbox`, `archive`, `organization`, `routing` |
