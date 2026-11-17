@@ -826,7 +826,7 @@ _Items below are outside v1.0 scope. They remain specified for future implementa
 ### Resolved Questions
 
 1. ~~**`.gitattributes` per-space or root?**~~ — Withdrawn with LFS (2026-10-16).
-2. **PDFs and images in git?** — Owner, 2026-10-16: "leave it, unless they are big". PDFs and images stay in git; big ones come out. "Big" is applied as over 10 MB, the old LFS threshold — that number was the implementer's choice, not the owner's, and waits for the owner to confirm.
+2. **PDFs and images in git?** — Owner, 2026-10-16: "leave it, unless they are big". PDFs and images stay in git; big ones come out. "Big" is 10 MB or more — confirmed by the owner on 2026-11-15 ("10mb is the right size limit for now").
 3. **Companion suffix?** — Same name (e.g., `deck.key` → `deck.md`). Keeps companion co-located with source file.
 
 ## References
