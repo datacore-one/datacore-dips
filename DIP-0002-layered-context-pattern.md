@@ -6,7 +6,7 @@
 | **Title** | Layered Context Pattern |
 | **Author** | Datacore Team |
 | **Type** | Core |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2025-12-01 |
 | **Updated** | 2026-03-17 |
 | **Tags** | `context`, `privacy`, `CLAUDE.md`, `layers`, `contribution` |

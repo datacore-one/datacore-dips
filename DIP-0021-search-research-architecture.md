@@ -6,7 +6,7 @@
 | **Title** | Search & Research Architecture |
 | **Author** | @datacore-one, Claude (AI-assisted) |
 | **Type** | Core |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2026-02-18 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `search`, `research`, `agents`, `ingest`, `mcp`, `architecture` |

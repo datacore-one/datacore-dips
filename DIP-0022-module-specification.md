@@ -6,7 +6,7 @@
 | **Title** | Module Specification |
 | **Author** | @datacore-one |
 | **Type** | Standards Track |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2026-02-20 |
 | **Updated** | 2026-09-13 |
 | **Tags** | `modules`, `mcp`, `skills`, `agents`, `engrams`, `workflows`, `architecture` |

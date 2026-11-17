@@ -6,7 +6,7 @@
 | **Title** | DIP Template |
 | **Author** | Datacore Team |
 | **Type** | Process |
-| **Status** | Implemented |
+| **Status** | Draft |
 | **Created** | 2025-12-01 |
 | **Updated** | 2025-12-01 |
 | **Tags** | `template`, `process` |

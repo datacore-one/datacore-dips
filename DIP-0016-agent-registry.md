@@ -6,7 +6,7 @@
 | **Title** | Agent Registry & Discoverability |
 | **Author** | @datacore-one |
 | **Type** | Standards Track |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2025-12-21 |
 | **Updated** | 2026-03-04 |
 | **Tags** | `agents`, `registry`, `discovery`, `hooks`, `lifecycle`, `erc-8004` |

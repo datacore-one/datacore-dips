@@ -4,7 +4,7 @@
 |-------|-------|
 | **DIP** | 0010 |
 | **Title** | External Sync Architecture |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2025-12-04 |
 | **Updated** | 2026-03-04 |
 | **Author** | @datacore-one |

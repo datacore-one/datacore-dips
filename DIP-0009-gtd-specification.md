@@ -6,7 +6,7 @@
 | **Title** | GTD System Specification |
 | **Author** | @datacore-one |
 | **Type** | Core |
-| **Status** | Implemented |
+| **Status** | Ratified |
 | **Created** | 2025-12-04 |
 | **Updated** | 2026-09-14 (proposed audit amendments; v2.0 DRAFT of 2026-08-29 — seven-state loop, agents-as-workers; pending ratification. Prior: v1.1 2026-07-24) |
 | **Tags** | `gtd`, `task-management`, `org-mode`, `agents` |
